@@ -3059,10 +3059,10 @@ TEST_SAX:
 	; Store A & X;
 	
 	JSR TEST_RunTest_AddrInitAXYF
-	.word $05D2
+	.word $05D3
 	.byte $21
 	.byte $5A, $A5, $45, (flag_i)
-	.word $05D2
+	.word $05D3
 	.byte $00
 	.byte $5A, $A5, $45, (flag_i)
 	
