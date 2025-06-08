@@ -219,6 +219,11 @@ For more information, I recommend reading the fully commented assembly code for 
   D: Reading $4015 1 cycle later than the previous test will not clear the IRQ flag. (it gets set again on the following CPU cycle)  
   E: Reading $4015 1 cycle later than the previous test will not clear the IRQ flag. (it gets set again on this CPU cycle)  
   F: Reading $4015 1 cycle later than the previous test will clear the IRQ flag.  
+  G: The Frame Counter Interrupt flag should not have been set 29827 cycles after resetting the frame counter.  
+  H: The Frame Counter Interrupt flag should have been set 29828 cycles after resetting the frame counter, even if suprressing Frame Counter Interrupts.  
+  I: The Frame Counter Interrupt flag should have been set 29829 cycles after resetting the frame counter, even if suprressing Frame Counter Interrupts.  
+  J: The Frame Counter Interrupt flag should not have been set 29830 cycles after resetting the frame counter if suprressing Frame Counter Interrupts.  
+  K: Despite the Frame Counter Interrupt flag being set for those 2 CPU cycles, if suppressing Frame Counter Interrupts, an IRQ does not occur.  
 
 ### Frame Counter 4-step
   1: The first clock of the length counters was early.  

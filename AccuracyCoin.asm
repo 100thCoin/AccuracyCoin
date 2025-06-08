@@ -6828,7 +6828,7 @@ FAIL_InstructionTiming2:
 TEST_IFlagLatency_IRQ:
 	STX <$50
 	LDA #0	
-	STX $4010	; disable the DMA IRQ
+	STA $4010	; disable the DMA IRQ
 	RTI
 ;;;;;;;
 
@@ -7871,17 +7871,118 @@ TEST_FrameCounterIRQ_Continue:
 	LDA $4015 ; Read on the same cycle the IRQ flag is set.
 	LDA $4015 ; Read again! But it will be cleared.
 	BNE FAIL_FrameCounterIRQ3
+	INC <currentSubTest
+	
+	;;; Test G [APU Frame Counter IRQ]: Despite the "Suppress Frame Counter Interrupts flag" being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (this is timed 1 cycle too early) ;;;
+	; This is a farily recent discovery as of writing this test, so I'm expecting some emulators to fail this one.
+	; Let me break this down:
+	; 29828 Cycles after frame counter reset: $4015.6 is set to 1.
+	; 29829 Cycles after frame counter reset: $4015.6 is set to 1. (The IRQ Level detector is only pulled low if the "Suppress Frame Counter Interrupts flag" is false)
+	; 29830 Cycles after frame counter reset: $4015.6 is set according to the "Suppress Frame Counter Interrupts flag". (The IRQ Level detector is only pulled low if the "Suppress Frame Counter Interrupts flag" is false)
+	;
+	; The following 4 tests will check 29827, 29828, 29829, and 29830 cycles after resetting the frame counter, and the test after that will verify that the IRQ level detector is not pulled low. (An IRQ did not happen)
+	JSR WaitForVBlank
+	LDA #02
+	STA $4014 ; sync with even CPU cycle
+	LDA <$00  ; sync with odd CPU cycle
+	LDA #$40
+	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on an even cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	; the flag should be enabled in 29831 CPU cycles.
+	; So let's stall for 29827 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
+	JSR Clockslide_29700
+	JSR Clockslide_100
+	JSR Clockslide_27
+	LDA $4015
+	AND #$40
+	BNE FAIL_FrameCounterIRQ3
+	INC <currentSubTest
+	BNE TEST_FrameCounterIRQ_Continue2
+		
+FAIL_FrameCounterIRQ3:
+	LDA #$40
+	STA $4017	; disable the IRQ flag.
+	JMP TEST_Fail
+	
+TEST_FrameCounterIRQ_Continue2:
+	;;; Test H [APU Frame Counter IRQ]: Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It happens on this cycle) ;;;
+	JSR WaitForVBlank
+	LDA #02
+	STA $4014 ; sync with even CPU cycle
+	LDA <$00  ; sync with odd CPU cycle
+	LDA #$40
+	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on an even cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	; the flag should be enabled in 29831 CPU cycles.
+	; So let's stall for 29828 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
+	JSR Clockslide_29700
+	JSR Clockslide_100
+	JSR Clockslide_28
+	LDA $4015
+	AND #$40
+	BEQ FAIL_FrameCounterIRQ3
+	INC <currentSubTest
+
+	;;; Test I [APU Frame Counter IRQ]: Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It happens on this cycle too) ;;;
+	JSR WaitForVBlank
+	LDA #02
+	STA $4014 ; sync with even CPU cycle
+	LDA <$00  ; sync with odd CPU cycle
+	LDA #$40
+	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on an even cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	; the flag should be enabled in 29831 CPU cycles.
+	; So let's stall for 29828 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
+	JSR Clockslide_29700
+	JSR Clockslide_100
+	JSR Clockslide_29
+	LDA $4015
+	AND #$40
+	BEQ FAIL_FrameCounterIRQ3
+	INC <currentSubTest
+
+	;;; Test J [APU Frame Counter IRQ]:  Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It does not happen on this cycle) ;;;
+	JSR WaitForVBlank
+	LDA #02
+	STA $4014 ; sync with even CPU cycle
+	LDA <$00  ; sync with odd CPU cycle
+	LDA #$40
+	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on an even cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	; the flag should be enabled in 29831 CPU cycles.
+	; So let's stall for 29830 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
+	JSR Clockslide_29700
+	JSR Clockslide_100
+	JSR Clockslide_30
+	LDA $4015
+	AND #$40
+	BNE FAIL_FrameCounterIRQ3
+	INC <currentSubTest
+
+	;;; Test K [APU Frame Counter IRQ]: Despite the frame counter interrupt flag being set for those two cycles, an IRQ will not occur even if the CPU I flag is clear. ;;;
+	JSR TEST_IFlagLatency_IRQPrep
+	; This test is only relaible if the Interrupt Flag Latency test passes.
+	JSR WaitForVBlank
+	LDX #$5A
+	LDA #02
+	STA $4014 ; sync with even CPU cycle
+	LDA <$00  ; sync with odd CPU cycle
+	LDA #$40
+	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on an even cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	; the flag should be enabled in 29831 CPU cycles.
+	; So let's stall for 29828 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
+	JSR Clockslide_29700
+	JSR Clockslide_100
+	JSR Clockslide_27
+	CLI
+	SEI	;[Read Opcode] [Poll for interrupts, and Dummy Read cycle]
+	LDA <$50
+	CMP #$5A
+	BEQ FAIL_FrameCounterIRQ4
+	INC <currentSubTest
 
 	;; END OF TEST ;;
 	LDA #1
 	RTS
 ;;;;;;;
 
-FAIL_FrameCounterIRQ3:
-	LDA #$40
-	STA $4017	; disable the IRQ flag.
-	JMP TEST_Fail
-
+FAIL_FrameCounterIRQ4:
 FAIL_FrameCounter4Step:
 	JMP FAIL_AndDisableAudioChannels
 ;;;;;;;;;;;;;;;;;
@@ -7900,13 +8001,13 @@ TEST_FrameCounter4Step:
 	STA $4017 ; Manually clock the pulse 1 length counter.
 	LDA #$40
 	STA $4017 ; 4-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
-	LDA <$00  ; stall for 3 CPU cycles.
-	; Okay, the first time the length counters get clocked is in 14912 CPU cycles.
-	JSR Clockslide_14900 ; 12 cycles to go.
-	NOP ; 10 cycles to go
-	NOP ; 8 cycles to go
-	NOP ; 6 cycles to go
-	NOP ; 4 cycles
+	NOP  ; stall for frame counter to be reset.
+	; Okay, the first time the length counters get clocked is in 14913 CPU cycles.
+	JSR Clockslide_14900 ; 13 cycles to go.
+	NOP ; 11 cycles to go
+	NOP ; 9 cycles to go
+	NOP ; 7 cycles to go
+	LDA <$00 ; 4 cycles
 	LDA $4015 ; the pulse channel should still be playing for 1 more cycle.
 	BEQ FAIL_FrameCounter4Step
 	INC <currentSubTest
@@ -7923,53 +8024,51 @@ TEST_FrameCounter4Step:
 	STA $4017 ; Manually clock the pulse 1 length counter.
 	LDA #$40
 	STA $4017 ; 4-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
-	LDA <$00  ; stall for 3 CPU cycles.
-	; Okay, the first time the length counters get clocked is in 14912 CPU cycles.
-	JSR Clockslide_14900 ; 12 cycles to go.
-	NOP ; 10 cycles to go
-	NOP ; 8 cycles to go
-	NOP ; 6 cycles to go
-	LDA <$00 ; 3 cycle to go
+	NOP  ; stall for frame counter to be reset.
+	; Okay, the first time the length counters get clocked is in 14913 CPU cycles.
+	JSR Clockslide_14900 ; 13 cycles to go.
+	NOP ; 11 cycles to go
+	NOP ; 9 cycles to go
+	NOP ; 7 cycles to go
+	NOP ; 5 cycles to go
+	NOP ; 3 cycles to go
 	LDA $4015 ; the pulse channel should have stopped just before you read.
 	BNE FAIL_FrameCounter4Step
 	INC <currentSubTest
 	
-	;;; Test 3 [APU Frame Counter 4-Step Mode]: Verify the timing of the second clock (read 1 cycle early. It's still going) ;;;
+	;;; Test 3 [APU Frame Counter 4-Step Mode]: Verify the timing of the second clock while not inhibiting Frame Counter IRQs (read 1 cycle early. It's still going) ;;;
 	LDA #2
 	STA $4014
 	;CPU is synced with even CPU cycle
-	LDA #0
-	STA $4017 ; Reset the frame counter.
 	LDA #$18
-	STA $4003 ; Length = 2.
+	STA $4003	; Set the length to 2. We don't need to manually clock this one, as we're checking the timing of the 2nd clock.
 	LDA #$40
 	STA $4017 ; 4-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
-	LDA <$00  ; stall for 3 CPU cycles.
-	; Okay, the first time the length counters get clocked is in 29829 CPU cycles.
-	JSR Clockslide_29820 ; 9 cycles to go.
+	NOP  ; stall for frame counter to be reset.
+	; Okay, the second time the length counters get clocked is in 29829 CPU cycles.
+	JSR Clockslide_29820 ; 9 cycle to go
 	NOP ; 7 cycles to go
-	LDA <$00 ; 4
+	LDA <$00  ; 4 cycles to go
 	LDA $4015 ; the pulse channel should still be playing for 1 more cycle.
+	AND #$01  ; If you passed the Frame Counter IRQ test, bit 6 of $4015 should be set here, so it's very important we run AND #1
 	BEQ FAIL_FrameCounter4Step
 	INC <currentSubTest
 	
-	;;; Test 4 [APU Frame Counter 4-Step Mode]: Verify the timing of the second clock (Read the cycle it stops);;;
+	;;; Test 4 [APU Frame Counter 4-Step Mode]: Verify the timing of the second clock while not inhibiting Frame Counter IRQs (Read the cycle it stops) ;;;
 	LDA #2
 	STA $4014
-	;CPU is synced with even CPU cycle
-	LDA #0
-	STA $4017 ; Reset the frame counter.
 	LDA #$18
-	STA $4003 ; Length = 2.
+	STA $4003 ; Set the length to 2. We don't need to manually clock this one, as we're checking the timing of the 2nd clock.
 	LDA #$40
 	STA $4017 ; 4-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
-	LDA <$00  ; stall for 3 CPU cycles.
-	; Okay, the first time the length counters get clocked is in 29829 CPU cycles.
-	JSR Clockslide_29820 ; 9 cycles to go.
+	NOP  ; stall for frame counter to be reset.
+	; Okay, the second time the length counters get clocked is in 29829 CPU cycles.
+	JSR Clockslide_29820 ; 9 cycles to go
 	NOP ; 7 cycles to go
-	NOP ; 5
+	NOP ; 5 cycles to go
 	NOP ; 3 cycles to go
-	LDA $4015 ; the pulse channel should have stopped just before you read.
+	LDA $4015; the pulse channel should have stopped just before you read.
+	AND #$01 ; If you passed the Frame Counter IRQ test, bit 6 of $4015 should be set here, so it's very important we run AND #1
 	BNE FAIL_FrameCounter4Step2
 	INC <currentSubTest
 	
@@ -7985,18 +8084,18 @@ TEST_FrameCounter4Step:
 	STA $4017 ; Manually clock the pulse 1 length counter.
 	LDA #$40
 	STA $4017 ; 4-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
-	LDA <$00  ; stall for 3 CPU cycles.
-	; Okay, the third time the length counters get clocked is in 44742 CPU cycles.
-	JSR Clockslide_44730 ; 12 cycles to go.
-	NOP ; 10 cycles to go
-	NOP ; 8 cycles to go
-	NOP ; 6
-	NOP ; 4 cycles
+	NOP  ; stall for frame counter to be reset.
+	; Okay, the third time the length counters get clocked is in 44743 CPU cycles.
+	JSR Clockslide_44730 ; 13 cycles to go.
+	NOP ; 11 cycles to go
+	NOP ; 9 cycles to go
+	NOP ; 7  cycles to go
+	LDA <$00 ; 4  cycles to go
 	LDA $4015 ; the pulse channel should still be playing for 1 more cycle.
 	BEQ FAIL_FrameCounter4Step2
-	INC <currentSubTest
+	INC <currentSubTest	
 	
-	;;; Test 6 [APU Frame Counter 4-Step Mode]: Verify the timing of the third clock  (Read the cycle it stops);;;
+	;;; Test 6 [APU Frame Counter 4-Step Mode]: Verify the timing of the third clock  (Read the cycle it stops) ;;;
 	LDA #2
 	STA $4014
 	;CPU is synced with even CPU cycle
@@ -8008,23 +8107,49 @@ TEST_FrameCounter4Step:
 	STA $4017 ; Manually clock the pulse 1 length counter.
 	LDA #$40
 	STA $4017 ; 4-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
-	LDA <$00  ; stall for 3 CPU cycles.
-	; Okay, the third time the length counters get clocked is in 44742 CPU cycles.
-	JSR Clockslide_44730 ; 12 cycles to go.
-	NOP ; 10 cycles to go
-	NOP ; 8 cycles to go
-	NOP ; 6
-	LDA <$00 ; 3 cycle to go
+	NOP  ; stall for frame counter to be reset.
+	; Okay, the third time the length counters get clocked is in 44743 CPU cycles.
+	JSR Clockslide_44730 ; 13 cycles to go.
+	NOP ; 11 cycles to go
+	NOP ; 9 cycles to go
+	NOP ; 7 cycles to go
+	NOP ; 5 cycles to go
+	NOP ; 3 cycles to go
 	LDA $4015 ; the pulse channel should have stopped just before you read.
 	BNE FAIL_FrameCounter4Step2	
-	; And at this point, the frame counter has already looped, so there's no need to test further.
+	INC <currentSubTest	
 	
 	;; END OF TEST ;;
 	LDA #1
 	RTS
 ;;;;;;;
-
+	
 FAIL_FrameCounter4Step2:
+	JMP FAIL_AndDisableAudioChannels
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+TEST_FrameCounterSyncDMC:
+	SEI
+	LDA #$40        ; clear irq flag
+	STA $4017
+	LDA #$00        ; mode 0, frame irq enabled
+	STA $4017
+	JSR Clockslide_29820 ; 7
+	LDA <$00
+	NOP
+	NOP
+	LDA $4015
+	AND #$40
+	BNE TEST_FrameCounter4Step_Sync
+TEST_FrameCounter4Step_Sync:
+	LDA #$40        ; clear irq flag
+	STA $4017
+	RTS
+;;;;;;;
+
+FAIL_FrameCounter4Step_:
+	JMP FAIL_AndDisableAudioChannels
+;;;;;;;;;;;;;;;;;
+
 FAIL_FrameCounter5Step:
 	JMP FAIL_AndDisableAudioChannels
 ;;;;;;;;;;;;;;;;;
@@ -8744,7 +8869,7 @@ TEST_DMC_Conflicts_AnswerKey_Famicom:
 	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	.byte $00, $00, $00, $00, $00, $00, $01, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	.byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
-	.byte $FF, $FF, $FF, $FF, $FF, $FF, $F9, $F8, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
+	.byte $FF, $FF, $FF, $FF, $FF, $FF, $F9, $E0, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
 
 	.org $EFC0
 TEST_DMC_ConflictsSample:
