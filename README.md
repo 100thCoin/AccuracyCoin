@@ -262,9 +262,9 @@ For more information, I recommend reading the fully commented assembly code for 
   I: There should be a one-byte buffer that's filled immediately if empty.  
   J: Check that the DMA occurs on the correct CPU cycle.  
   K: The Sample Address should overflow to $8000 instead of $0000  
-  L: Writing to $4015 when the DMC timer has less than 2 cycles until clocked will not trigger a DMC DMA until after the 3 or 4 CPU cycle delay of writing to $4015.  
-  M: Writing to $4015 when the DMC timer has less than 1 cycles until clocked will not trigger a DMC DMA until after the 3 or 4 CPU cycle delay of writing to $4015.  
-  N: Writing to $4015 when the DMC timer has less than 0 cycles until clocked will not trigger a DMC DMA until after the 3 or 4 CPU cycle delay of writing to $4015.  
+  L: Writing to $4015 when the DMC timer has 2 cycles until clocked will not trigger a DMC DMA until after the 3 or 4 CPU cycle delay of writing to $4015.  
+  M: Writing to $4015 when the DMC timer has 1 cycles until clocked will not trigger a DMC DMA until after the 3 or 4 CPU cycle delay of writing to $4015.  
+  N: Writing to $4015 when the DMC timer has 0 cycles until clocked will not trigger a DMC DMA until after the 3 or 4 CPU cycle delay of writing to $4015.  
 
 ### DMA + Open Bus
   1: LDA $4000 should not read back $00 if a DMA did not occur.  
