@@ -8293,6 +8293,7 @@ FAIL_DeltaModulationChannel:
 ;;;;;;;;;;;;;;;;;
 
 TEST_DeltaModulationChannel:
+	
 	; Special thanks to blargg, as I am pretty much just going to copy the test they wrote in 2005.
 	LDA #$00
 	STA $4012 ; Sample address $C000.
@@ -8301,7 +8302,6 @@ TEST_DeltaModulationChannel:
 	LDA #$0F
 	STA $4010 ; Fastest sample rate.
 	JSR Clockslide_4000
-
 	;;; Test 1 [APU Delta Modulation Channel]: Verify the DMC works ;;;
 	; In other words, if the DMC is playing audio, bit 4 of address $4015 will be set.
 	LDA #$10
@@ -8627,73 +8627,105 @@ TEST_DMC_OverflowLoop: ; DMA every 432 CPU cycles.
 	CMP #$EA
 	BNE FAIL_DeltaModulationChannel4
 	INC <currentSubTest
-	
-	;;; Test L [APU Delta Modulation Channel]: Check that the DMA will be delayed by 1 CPU cycle if the write to $4015 occurs 2 cycles before the DMA timer reaches 0. ;;;
-	; This is blargg's original DMA sync routine.
-	; As I wrote in my notes there, blargg made an off-by-one error that allows for an interesting bug to be seen in emulators.
-	; While blargg's code was supposed to sync the DMC DMA to occur 3 cycles after the write to $4015, it actually occured 2 cycles after the write.
-	; Many emulators made the mistake of letting the DMA occur when the timer reaches zero, rather than after the 3 CPU cycle delay of the $4015 write.
-	;
-	; I'm going to hope that no page boundaries get crossed by any branches here, and I'm not actually aligning this code.
-	LDX #0
-	LDA #$80  ; slowest speed.
-	STA $4010 ; Enable DMC IRQ
-	LDA #$0
-	STA $4013 ; Length = 0 (+1)
-	STA $4015 ; Disable DMC
-	LDA #$10
-	STA $4015 ; Enable DMC (clear the DMC buffer)
-	NOP
-	STA $4015 ; Enable DMC a second time.
-TEST_DMCSync_loop:
-	BIT $4015	; This only exits once bit 4 is cleared.
-	BNE TEST_DMCSync_loop ; wait for DMC Interrupt
-	NOP
-	NOP
-	NOP
-	LDA #$E2
-	BNE TEST_DMCSync_First ; branch always to sync_dmc_first
-TEST_DMCSync_Wait:
-	LDA #$E3
-TEST_DMCSync_First:
-	NOP
-	NOP	
-	NOP
-	NOP
-	SEC
-	SBC #$01
-	BNE TEST_DMCSync_First
-	LDA #$10
-	STA $4015
-	NOP
-	BIT $4015
-	BNE TEST_DMCSync_Wait
 
-	; The DMA is now synced!
-	LDA <Copy_A ; waste 3 cycles
-	LDA <Copy_A ; waste 3 cycles
-	NOP
-	LDX #$A3
-	LDA #$03
-TEST_DMCSync_loop2:
-	DEX
-	BNE TEST_DMCSync_loop2
-	SEC
-	SBC #$01
-	BNE TEST_DMCSync_loop2
-	LDA #$40
-	STA $4010	; make it loop.
-	LDA #$10
-	STA $4015 ; start DMC
-	; Despite the DMC DMA being timed to occur in only 2 cycles, it actually occurs in 3 cycles, after the write to $4015 is seen by the audio chip.
-	NOP ; [Read Opcode] [Dummy Read]
-	NOP ; [Read Opcode] [DMC DMA] [Dummy Read]
-	; The next DMA will occur in 3419 CPU cycles.
-	JSR Clockslide_3000
-	JSR Clockslide_400
-	JSR Clockslide_15
-	LDA $4000	; [Read Opcode] [Read Operand] [Read Operand] [DMC DMA! Databus = $00] [Read Open Bus]
+	;;; Test L [APU Delta Modulation Channel]: Check that the DMA will be delayed by 1 CPU cycle if the write to $4015 (which enables the DMC) occurs 2 cycles before the DMA timer reaches 0. ;;;
+	; Keep in mind, at the moment we're writing $10 to $4015, the DMC sample still has 1 bit remaining before the buffer is cleared.
+	; Which poses an interesting question. Do we run a load DMA (because we wrote to $4015), or a relaod DMA (because the last bit in the buffer has been read)? 
+	; So the order of operations is: 
+	; - Write $10 to the $4015. The Delta Modulation Channel will be enabled in 3 CPU cycles.
+	; - Timer reaches zero, and the last bit in the buffer has been read, attempt to run a DMC DMA on the next CPU cycle.
+	; - We're ready for the DMA, but the Delta Modulation Channel isn't enabled yet! Wait another cycle.
+	; - The DMC is enabled this time, so the DMA occurs.
+	;
+	; Per my current understanding, if a sample is playing, you disable the DMC, and the final bit is read from the buffer, the DMA will still attempt to run every cycle until the DMC is re-enabled.
+	; It just doesn't run until the DMA is enabled, 3 or 4 cycles after a write to $4015.
+	JSR DMASync_50CyclesRemaining
+	LDA #0		;+2
+	STA $4015	;+4 disable DMC.
+	LDA #0		;+2
+	STA $4013	;+4
+	LDA #$4F	;+2
+	STA $4010	;+4 loop sample. (and use the fastest sample rate)
+	; 32 cycles remaining until the DMC timer hits 0
+	JSR Clockslide_25
+	; The timer is now 7
+	LDA #$10	;+2	(5 cycles left)
+	STA $4015	; Enable the DMC with 2 cycles until the DMA timer hits 0)
+	; it will be delayed by 1 cycle, causing an alignment cycle. This DMA will be 3 CPU cycles long instead of the typical 4.
+	LDA <$00 ; +3 cycles.	[read opcode] [read operand] [attempt DMC DMA, the DMC Channel isn't enabled yet, so read from address $0000]
+	; +3 cycles from the DMA. [Get Halt] [Put] [Get] ; 
+	; now we wait for the DMA again.
+	; it will occur in 432-5 (=427) cycles.
+	JSR Clockslide_400	; 27 cycles left.
+	JSR Clockslide_24	; 3 cycles left.
+	LDA $4000 ; [read opcode] [read operand] [read operand] [DMC DMA] [Read open bus]
 	BNE FAIL_DeltaModulationChannel4
+	INC <currentSubTest
+	
+	;;; Test M [APU Delta Modulation Channel]: Check that the DMA will be delayed by 2 CPU cycles if the write to $4015 occurs 1 cycles before the DMA timer reaches 0. ;;;
+	; The order of operations is: 
+	; - Write $10 to the $4015. The Delta Modulation Channel will be enabled in 3 CPU cycles.
+	; - Timer reaches zero, and the last bit in the buffer has been read, attempt to run a DMC DMA on the next CPU cycle.
+	; - We're ready for the DMA, but the Delta Modulation Channel isn't enabled yet! Wait another cycle.
+	; - We're ready for the DMA, but the Delta Modulation Channel isn't enabled yet! Wait another cycle.
+	; - The DMC is enabled this time, so the DMA occurs.
+	JSR DMASync_50CyclesRemaining
+	LDA #0		;+2
+	STA $4015	;+4 disable DMC.
+	LDA #0		;+2
+	STA $4013	;+4
+	LDA #$4F	;+2
+	STA $4010	;+4 loop sample. (and use the fastest sample rate)
+	; 32 cycles remaining until the DMC timer hits 0
+	JSR Clockslide_26
+	; The timer is now 6
+	LDA #$10	;+2	(4 cycles left)
+	STA $4015	; Enable the DMC with 1 cycles until the DMA timer hits 0)
+	; it will be delayed by 1 cycle, causing an alignment cycle. This DMA will be 3 CPU cycles long instead of the typical 4.
+	LDA <$00 ; +3 cycles.	[read opcode] [attempt DMC DMA, the DMC Channel isn't enabled yet, so read operand] [attempt DMC DMA, the DMC Channel isn't enabled yet, so read from address $0000]
+	; +4 cycles from the DMA. [Put] [Get Halt] [Put] [Get] ; 
+	; now we wait for the DMA again.
+	; it will occur in 432-5 (=427) cycles.
+	JSR Clockslide_400	; 27 cycles left.
+	JSR Clockslide_23	; 3 cycles left.
+	LDA $4000 ; [read opcode] [read operand] [read operand] [DMC DMA] [Read open bus]
+	BNE FAIL_DeltaModulationChannel4
+	INC <currentSubTest
+	BNE FAIL_DeltaModulationChannelC3
+FAIL_DeltaModulationChannel4:
+	JMP FAIL_AndDisableAudioChannels
+FAIL_DeltaModulationChannelC3:
+
+	;;; Test N [APU Delta Modulation Channel]: Check that the DMA will be delayed by 3 CPU cycles if the write to $4015 occurs the same CPU cycle the DMA timer reaches 0. ;;;
+	; The order of operations is: 
+	; - Write $10 to the $4015. The Delta Modulation Channel will be enabled in 3 CPU cycles.
+	; 	- On the same cycle, the timer reaches zero, and the last bit in the buffer has been read, attempt to run a DMC DMA on the next CPU cycle.
+	; - We're ready for the DMA, but the Delta Modulation Channel isn't enabled yet! Wait another cycle.
+	; - We're ready for the DMA, but the Delta Modulation Channel isn't enabled yet! Wait another cycle.
+	; - We're ready for the DMA, but the Delta Modulation Channel isn't enabled yet! Wait another cycle.
+	; - The DMC is enabled this time, so the DMA occurs.
+	JSR DMASync_50CyclesRemaining
+	LDA #0		;+2
+	STA $4015	;+4 disable DMC.
+	LDA #0		;+2
+	STA $4013	;+4
+	LDA #$4F	;+2
+	STA $4010	;+4 loop sample. (and use the fastest sample rate)
+	; 32 cycles remaining until the DMC timer hits 0
+	JSR Clockslide_27
+	; The timer is now 5
+	LDA #$10	;+2	(3 cycles left)
+	STA $4015	; Enable the DMC with 0 cycles until the DMA timer hits 0)
+	; it will be delayed by 1 cycle, causing an alignment cycle. This DMA will be 3 CPU cycles long instead of the typical 4.
+	LDA <$00 ; +3 cycles.	[attempt DMC DMA, the DMC Channel isn't enabled yet, so read opcode] [attempt DMC DMA, the DMC Channel isn't enabled yet, so read operand] [attempt DMC DMA, the DMC Channel isn't enabled yet, so read from address $0000]
+	; +3 cycles from the DMA. [Get Halt] [Put] [Get]
+	; now we wait for the DMA again.
+	; it will occur in 432-5 (=427) cycles.
+	JSR Clockslide_400	; 27 cycles left.
+	JSR Clockslide_22	; 3 cycles left.
+	LDA $4000 ; [read opcode] [read operand] [read operand] [DMC DMA] [Read open bus]
+	BNE FAIL_DeltaModulationChannel4
+	
 	;; END OF TEST ;;
 	LDA #$00
     STA $4015	; disable all audio channels.
@@ -8701,7 +8733,6 @@ TEST_DMCSync_loop2:
 	RTS
 ;;;;;;;
 
-FAIL_DeltaModulationChannel4:
 FAIL_DMC_Conflicts1:
 	JMP FAIL_AndDisableAudioChannels
 ;;;;;;;;;;;;;;;;;
@@ -8743,7 +8774,7 @@ TEST_DMABusConflict:
 	LDA #$00
 	STA $4017
 	JSR Clockslide_30000
-	; Okay cool, the frame coutner IRQ flag should now be set.
+	; Okay cool, the frame counter IRQ flag should now be set.
 	
 	JSR DMASync_50CyclesRemaining
 	LDA #4		;+2
@@ -10910,6 +10941,13 @@ Clockslide_4320:
 	JSR Clockslide_20	;120
 	JSR Clockslide_200  ;320
 	JSR Clockslide_4000 ;4320
+	RTS
+;;;;;;;
+
+Clockslide_432:
+	JSR Clockslide_100Minus12
+	JSR Clockslide_32	;132
+	JSR Clockslide_300  ;420
 	RTS
 ;;;;;;;
 
