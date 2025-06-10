@@ -6171,15 +6171,16 @@ TEST_APURegActivation:
 	BNE FAIL_APURegActivation0 ; If this fails, the Frame interrupt flag wasn't cleared when read last time.
 	INC <currentSubTest
 	
-	;;; Test 3 [APU Register Activation]: Can the DMA read from the APU registers when the CPU is not executing out of page $40? ;;;
-	; The objective: Time a DMA just before reading from $4015.
-	
+	;;; Test 3 [APU Register Activation]: Can the DMA read from the APU registers when the CPU is not executing out of page $40? ;;;	
 	; What's happening here?
 	; The 2A03 chip (the CPU/APU) has an address bus.
 	; Inside the 2A03 chip are 3 address busses: The 6502 Address Bus, the DMC Address Bus, and the OAM Address bus. On any given cycle, only one of these busses can be chosen to connect to the 2A03 address bus.
 	; Here's the catch. Reading from the APU registers requires the 6502 address bus to be in the range of $4000 through $401F.
 	; If the OAM address bus is pointing to $4000 through $401F, and the 6502 address bus isn't, then the OAM DMA will only read open bus from that range.
 	; Which can be detected, since reading $4015 clears the interrupt flag.
+	;
+	; This test will write $40 to $4014, running an OAM DMA that will read from address $4000 to $40FF.
+	; However, the APU registers are not active! So every value read by the DMA will be open bus.
 	
 	JSR Clockslide_29780 ; wait for the frame interrupt flag.
 	JSR Clockslide_100
@@ -6194,7 +6195,12 @@ TEST_APURegActivation:
 	;;; Test 4 [APU Register Activation]: Can your emulator handle the wacky setup required to determine if the APU registers are active due to the 6502 address bus? (this could cause a crash) ;;;
 	; Oh- also don't press anything on controller 2 during this test. thanks. :)
 	;
-	; This is possibly the most amazing test in this entire ROM.
+	; Okay, so what is this test all about?
+	; The APU registers (from $4000 to $4017) are not always accessible.
+	; For instance, in the previous test, the APU registers were not active, so that OAM DMA didn't read any of the value there.
+	; So "What activates the APU registers?" I hear you asking.
+	; These registers are active when the 6502 Address Bus is in the range $4000 through $401F.
+	; So if the 6502 address bus was within that range, and a OAM DMA were to occur, then the OAM DMA would be able to read the APU registers.
 	;
 	; Here's the plan. (Special thanks to lidnariq and Fiskbit)
 	; Execute STA $4014 (A = $40) from address $3FFE. (The 6502 address bus will be $4001 when the OAM DMA occurs. Follow that up with a BRK from address $4001.)
@@ -7870,6 +7876,29 @@ TEST_FrameCounterIRQ:
 	INC <currentSubTest
 	
 	;;; Test 7 [APU Frame Counter IRQ]: The IRQ flag should be cleared when the APU transitions from a "put" cycle to a "get" cycle. ;;;
+	; If you are reading this, then you probably passed test 6 and failed test 7.
+	; This was a brand new discovery as of writing this ROM, so I expect most emulators to fail this.
+	;
+	; When reading from $4015, bit 6 will be cleared. This is known behavior (and the focus of test 5)
+	; However, bit 6 will not be cleared until the next "get" cycle.
+	; For instance here's what happened during test 6:
+	; (put) [Read Opcode: $1F]
+	; (get) [Read Operand: $15]
+	; (put) [Read Operand: $40]
+	; (get) [Read $4015] (this is a get cycle, so clear bit 6 of 4015)
+	; (put) [Read $4015] (bit 6 was already cleared before the read.)
+	;
+	; And here's what will happen in this test:
+	; (get) [Read Opcode: $1F]
+	; (put) [Read Operand: $15]
+	; (get) [Read Operand: $40]
+	; (put) [Read $4015] (this is a put cycle, so bit 6 of 4015 will not be cleared until after the next cycle.)
+	; (get) [Read $4015] (bit 6 was still set when this was read. *Now* we clear bit 6 of $4015.)
+	;
+	; And of course, in the event of a regular non-double-read, $4015 will still only clear bit 6 on the next get cycle,
+	; so you probably want to clear bit 6 inside the APU cycle code of your emulator, and not in your "read $4015" code.
+	; I suggest making a flag for "we are clearing bit 6 on the next APU get cycle" to be set inside the "read $4015" code.
+	
 	LDA #$00	
 	STA $4017	; 4-step mode, enable IRQ
 	JSR Clockslide_30000 ; wait long enough that the IRQ flag would be set.
