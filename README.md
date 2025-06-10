@@ -210,7 +210,7 @@ For more information, I recommend reading the fully commented assembly code for 
   4: The IRQ flag should not be set when the APU Frame counter is in the 5-step mode, and the IRQ flag is disabled.  
   5: Reading the IRQ flag should clear the IRQ flag.  
   6: The IRQ flag should be cleared when the APU transitions from a "put" cycle to a "get" cycle.  
-  7: The IRQ flag should be cleared when the APU transitions from a "put" cycle to a "get" cycle.  
+  7: The IRQ flag should not be cleared yet the APU transitions from a "get" cycle to a "put" cycle.  
   8: Changing the Frame Counter to 5-step mode after the flag was set should not clear the flag.  
   9: Disabling the IRQ flag should clear the IRQ flag.  
   A: The IRQ flag was enabled too early. (writing to $4017 on an odd CPU cycle.)  

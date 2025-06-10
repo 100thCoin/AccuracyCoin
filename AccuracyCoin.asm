@@ -7875,25 +7875,25 @@ TEST_FrameCounterIRQ:
 	BNE FAIL_FrameCounterIRQ ; If SLO is properly emulated, you might see bit 7 set here (failing the test). The flag is actually cleared before the second read, so it bit 7 should be 0.
 	INC <currentSubTest
 	
-	;;; Test 7 [APU Frame Counter IRQ]: The IRQ flag should be cleared when the APU transitions from a "put" cycle to a "get" cycle. ;;;
+	;;; Test 7 [APU Frame Counter IRQ]: The IRQ flag should not be cleared yet the APU transitions from a "get" cycle to a "put" cycle. ;;;
 	; If you are reading this, then you probably passed test 6 and failed test 7.
 	; This was a brand new discovery as of writing this ROM, so I expect most emulators to fail this.
 	;
 	; When reading from $4015, bit 6 will be cleared. This is known behavior (and the focus of test 5)
 	; However, bit 6 will not be cleared until the next "get" cycle.
 	; For instance here's what happened during test 6:
-	; (put) [Read Opcode: $1F]
-	; (get) [Read Operand: $15]
-	; (put) [Read Operand: $40]
-	; (get) [Read $4015] (this is a get cycle, so clear bit 6 of 4015)
-	; (put) [Read $4015] (bit 6 was already cleared before the read.)
-	;
-	; And here's what will happen in this test:
 	; (get) [Read Opcode: $1F]
 	; (put) [Read Operand: $15]
 	; (get) [Read Operand: $40]
-	; (put) [Read $4015] (this is a put cycle, so bit 6 of 4015 will not be cleared until after the next cycle.)
-	; (get) [Read $4015] (bit 6 was still set when this was read. *Now* we clear bit 6 of $4015.)
+	; (put) [Read $4015] (this is a get cycle, so clear bit 6 of 4015)
+	; (get) [Read $4015] (bit 6 was already cleared before the read.)
+	;
+	; And here's what will happen in this test:
+	; (put) [Read Opcode: $1F]
+	; (get) [Read Operand: $15]
+	; (put) [Read Operand: $40]
+	; (get) [Read $4015] (this is a put cycle, so bit 6 of 4015 will not be cleared until after the next cycle.)
+	; (put) [Read $4015] (bit 6 was still set when this was read. *Now* we clear bit 6 of $4015.)
 	;
 	; And of course, in the event of a regular non-double-read, $4015 will still only clear bit 6 on the next get cycle,
 	; so you probably want to clear bit 6 inside the APU cycle code of your emulator, and not in your "read $4015" code.
