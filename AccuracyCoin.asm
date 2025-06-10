@@ -9391,7 +9391,7 @@ TEST_ImpliedDummyRead_Loop:	; This loop tests the opcodes that don't have bit 5 
 	; Fetch opcode from $4015
 	; BRK if PASS, RTI if FAIL. (This is why we had to PHA after the JSR)
 	LDA #0
-	STA <$60	; address $51 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
+	STA <$60	; address $60 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
 	JSR DMASyncWith48	; 50 cycles until DMA.
 	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag
 	JSR Clockslide_36	;19 cycles until DLA
@@ -9405,12 +9405,12 @@ TEST_ImpliedDummyRead_Loop:	; This loop tests the opcodes that don't have bit 5 
 	JMP $400F; [Read opcode] [Read operand] [Read operand] 
 	; [DMC DMA, databus = $48]
 	; PHA [databus = A (A = $A4)] [also dummy read.]
-	; LDY <$A4 [Read opcode] [Read operand] [read address $A6, a value of $A5]
+	; LDY <$A4 [Read opcode] [Read operand] [read address $A4, a value of $A5]
 	; LDA <$A5 [Read opcpde] [Read operand] [Read address $A5, the opcode we want to test.]
 	; NOP [Read Opcode] [Dummy Read $4015 (This should clear the Frame Counter interrupt.)]
 	; [Read opcode from $4015. Hopefully, a BRK.]
 	;
-	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed, which sets $51 and jumps to TEST_ImpliedDummyRead_Post.
+	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed, which sets $60 and jumps to TEST_ImpliedDummyRead_Post.
 TEST_ImpliedDummyRead_Post:
 
 	LDA <$60
@@ -9494,7 +9494,7 @@ TEST_ImpliedDummyRead_Loop2:	; This loop tests the opcodes that do have bit 5 se
 	JSR ReadController1; We need controller 1 to be fully clocked, and controller 2 unclocked.
 
 	LDA #0
-	STA <$60	; address $51 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
+	STA <$60	; address $60 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
 	JSR DMASyncWithA5	; 50 cycles until DMA.
 	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag
 	JSR Clockslide_47; 95 cycles from clockslides. 8 cycles until DMA
@@ -9508,7 +9508,7 @@ TEST_ImpliedDummyRead_Loop2:	; This loop tests the opcodes that do have bit 5 se
 	; [Read $4015: 20] [Read $4016: 21] [dummy read stack] [Push PCH: 40] [Push PHL: 16] [read $4017: 00]
 	; Keep in mind, the open bus value when reading controller 2 will be 16, which gets masked away, as only the upper 3 bits of controller 2 matter.
 	;
-	; and hopefully the JSR takes you to $0021, a BRK to TEST_ImpliedDummyRead_BRKed2, which sets $51 and jumps to TEST_ImpliedDummyRead_Post2.
+	; and hopefully the JSR takes you to $0021, a BRK to TEST_ImpliedDummyRead_BRKed2, which sets $60 and jumps to TEST_ImpliedDummyRead_Post2.
 TEST_ImpliedDummyRead_Post2:
 	LDA <$60
 	BEQ FAIL_ImpliedDummyRead3
@@ -9541,7 +9541,7 @@ TEST_ImpliedDummyRead_Continue2:
 	STA <$A6
 
 	LDA #0
-	STA <$60	; address $51 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
+	STA <$60	; address $60 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
 	JSR DMASyncWith68	; 50 cycles until DMA.
 	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag
 	JSR Clockslide_40; 99 cycles from clockslides. 19 cycles until DMA
@@ -9559,7 +9559,7 @@ TEST_ImpliedDummyRead_Continue2:
 	; PHA [Read Opcode] [Dummy Read $4015 (This should clear the Frame Counter interrupt.)] [Push A ($48) to stack]
 	; [Read opcode from $4015. Hopefully, a JSR.]
 	;
-	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed3, which sets $51 and jumps to TEST_ImpliedDummyRead_PostPHP.
+	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed3, which sets $60 and jumps to TEST_ImpliedDummyRead_PostPHP.
 	.org $D23D	; PHP should push $3C to the stack, so the RTS instruction would return here:
 TEST_ImpliedDummyRead_PostPHP:
 	LDA <$60
@@ -9579,7 +9579,7 @@ TEST_ImpliedDummyRead_PostPHP:
 	STA <$A6
 
 	LDA #0
-	STA <$60	; address $51 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
+	STA <$60	; address $60 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
 	JSR DMASyncWith68	; 50 cycles until DMA.
 	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag
 	JSR Clockslide_35; 99 cycles from clockslides. 19 cycles until DMA
@@ -9599,7 +9599,7 @@ TEST_ImpliedDummyRead_PostPHP:
 	; PHA [Read Opcode] [Dummy Read $4015 (This should clear the Frame Counter interrupt.)] [Push A ($48) to stack]
 	; [Read opcode from $4015. Hopefully, a BRK.]
 	;
-	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed3, which sets $51 and jumps to TEST_ImpliedDummyRead_PostPHA.
+	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed3, which sets $60 and jumps to TEST_ImpliedDummyRead_PostPHA.
 TEST_ImpliedDummyRead_PostPHA:
 
 	LDA <$60
@@ -9628,7 +9628,7 @@ TEST_ImpliedDummyRead_Loop5:	; This loop tests PLP and PLA
 	STA <$A5
 
 	LDA #0
-	STA <$60	; address $51 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
+	STA <$60	; address $60 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
 	JSR DMASyncWith48	; 50 cycles until DMA.
 	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag
 	JSR Clockslide_39; 99 cycles from clockslides. 19 cycles until DMA
@@ -9643,7 +9643,7 @@ TEST_ImpliedDummyRead_Loop5:	; This loop tests PLP and PLA
 	; PLA [Read Opcode] [Dummy Read $4015 (This should clear the Frame Counter interrupt.)] [Dummy Read from stack (no way to test for this)] [Pull A from stack]
 	; [Read opcode from $4015. Hopefully, a BRK.]
 	;
-	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed5, which sets $51 and jumps to TEST_ImpliedDummyRead_Post5.
+	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed5, which sets $60 and jumps to TEST_ImpliedDummyRead_Post5.
 TEST_ImpliedDummyRead_Post5:
 	LDA <$60
 	BEQ FAIL_ImpliedDummyRead5
@@ -9675,7 +9675,7 @@ TEST_ImpliedDummyRead_Loop6:	; This loop tests BRK and RTI
 	STA <$A6
 
 	LDA #0
-	STA <$60	; address $51 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
+	STA <$60	; address $60 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
 	JSR DMASyncWith48	; 50 cycles until DMA.
 	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag
 	JSR Clockslide_39; 99 cycles from clockslides. 19 cycles until DMA
@@ -9691,7 +9691,7 @@ TEST_ImpliedDummyRead_Loop6:	; This loop tests BRK and RTI
 	; BRK [Read Opcode] [Dummy Read $4015 (This should clear the Frame Counter interrupt.)] [The rest of BRK/RTI...]
 	; We don't read $4015 for the operand this time, so we're just going to LDA $4015 after returning to stable code to verify the dummy read happened.
 	;
-	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed6, which sets $51 and jumps to TEST_ImpliedDummyRead_Post6.
+	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed6, which sets $60 and jumps to TEST_ImpliedDummyRead_Post6.
 TEST_ImpliedDummyRead_Post6:
 	; Fun fact, the RTI instruction will immediately lead into an IRQ, so the "BRK routine" does some checks for that.
 	SEI
@@ -9717,8 +9717,6 @@ TEST_ImpliedDummyRead_Continue4:
 
 	LDA #$60
 	STA <$A5
-	LDA #0
-	STA <$60	; address $51 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
 	JSR DMASyncWith68	; 50 cycles until DMA.
 	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag
 	JSR Clockslide_36; 99 cycles from clockslides. 19 cycles until DMA
