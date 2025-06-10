@@ -86,6 +86,7 @@ PrintDecimalTensCheck = $39
 result_VblankSync_PreTest = $3A
 DebugMode = $3B
 
+Reserverd_41 = $41 ; Used in the Implied Dummy Reads. It's probably best we never actually use this.
 
 PostDMACyclesUntilTestInstruction = 14
 
@@ -102,7 +103,12 @@ suitePointerList = $80
 
 suiteExecPointerList = $A0
 
+Reserverd_C1 = $C1 ; Used in the Implied Dummy Reads. It's probably best we never actually use this.
+
+
 Reserved_C8 = $C8; For my "unofficial opcodes are correct length" tests, I use [Two-Byte-Opcode][INY], and then check the value of Y. Since INY is $C8, I'd like to avoid corrupting something stored in byte C8.
+
+Reserverd_E1 = $E1 ; Used in the Implied Dummy Reads. It's probably best we never actually use this.
 
 
 Copy_X2 = $ED	; These are exclusively used to keep registers from before RunTest from being modified during a test, so they can be restored after the test.
@@ -254,6 +260,8 @@ result_FrameCounter5Step = $469
 result_DeltaModulationChannel = $46A
 result_DMABusConflict = $46B
 result_DMA_Plus_OpenBus = $46C
+
+result_ImpliedDummyRead = $46D
 
 result_PowOn_CPURAM = $0480
 result_PowOn_CPUReg = $0481
@@ -407,6 +415,7 @@ TableTable:
 	.word Suite_PPUTiming
 	.word Suite_SpriteZeroHits
 	.word Suite_PPUMisc
+	.word Suite_CPUBehavior2
 EndTableTable:
 
 	; I'm not a huge fan of using macros in this ROM, since they make the asm code look different than the compiled bytes, and thus harder to debug.
@@ -433,7 +442,6 @@ Suite_CPUBehavior:
 	table "Open Bus", 				 $FF, result_OpenBus, TEST_OpenBus
 	;table "CPU Instructions", 		 $FF, result_CPUInstr, DebugTest
 	table "Unofficial Instructions", $FF, result_UnofficialInstr, TEST_UnofficialInstructionsExist
-
 	.byte $FF
 	
 	;; Unofficial Instructions: SLO ;;
@@ -621,6 +629,11 @@ Suite_PPUMisc:
 	table "RMW $2007 Extra Write", $FF, result_RMW2007, TEST_RMW2007
 	;table "Palette Corruption", $FF, result_Unimplemented, DebugTest
 	.byte $FF
+	
+Suite_CPUBehavior2:
+	.byte "CPU Behavior 2", $FF
+	table "Implied Dummy Reads",	 $FF, result_ImpliedDummyRead, TEST_ImpliedDummyRead
+	.byte $FF
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -703,7 +716,7 @@ AERROP_RT_Skip:
 AREROM_MenuLoop1:
 	STA $2007
 	INX
-	CPX #((EndTableTable - TableTable)/2)+1 ; Compare X with the total page count.
+	CPX #((EndTableTable - TableTable)/2) ; Compare X with the total page count.
 	BNE AREROM_MenuLoop1
 	LDA #$D1	; Upper right corner.
 	STA $2007
@@ -717,7 +730,7 @@ AREROM_MenuLoop1:
 AREROM_MenuLoop2:
 	STA $2007
 	INX
-	CPX #((EndTableTable - TableTable)/2)+1 ; Compare X with the total page count.
+	CPX #((EndTableTable - TableTable)/2) ; Compare X with the total page count.
 	BNE AREROM_MenuLoop2
 	LDA #$D3	; Bottom right corner.
 	STA $2007
@@ -734,7 +747,7 @@ AREROM_MenuLoop3:
 	CPX #10 ; once X = 11, stop.
 	BNE AREROM_MenuLoop3
 	JSR SetPPUADDRFromWord
-	.byte $21, $07+((EndTableTable - TableTable)/2)+2
+	.byte $21, $07+((EndTableTable - TableTable)/2)+1
 	LDA #$D4	; horizontal bar.
 	LDX #0
 AREROM_MenuLoop4:
@@ -879,10 +892,10 @@ AERROP_AttributeLoop:
 	.byte "Page", $FF
 	JSR PrintText
 	.word $20A8
-	.byte "12345678911111111", $FF
+	.byte "123456789111111111", $FF
 	JSR PrintText
 	.word $20D1
-	.byte "01234567", $FF
+	.byte "012345678", $FF
 
 	JSR WaitForVBlank
 	JSR SetUpAllTestMenuPalette
@@ -922,6 +935,139 @@ PressStartToContinue:
 	JMP ReloadMainMenu
 PressStartToContinue_End:
 	RTI
+	
+DMASyncWith48:
+	; This fuction very relaibly exits with exactly 50 CPU cycles until the DMA occurs.
+	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
+	STA <Copy_A
+	LDA #$4F ; loop, max speed.
+	STA $4010
+	LDA #0
+	STA $4011 ; minimum value of DMC
+	LDA #$BC
+	STA $4012 ; Sample address $EF00.
+	LDA #0
+	STA $4013 ; 1 byte length.
+	LDA #$10
+	STA $4015 ; Start the DMC DMA loop
+	NOP
+	NOP
+DMASync48_Loop:
+	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $00 from the DMA.
+	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
+	CMP #$48
+	BNE DMASync48_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
+	LDA #$0F ; don't loop, continue at max speed. +2 (9)
+	STA $4010 
+	LDA <$00  
+	LDA Copy_A
+	JSR Clockslide_100
+	JSR Clockslide_100
+	JSR Clockslide_100
+	JSR Clockslide_50
+	NOP
+	CMP <$C9
+	RTS 
+	
+DMASyncWith60:
+	; This fuction very relaibly exits with exactly 50 CPU cycles until the DMA occurs.
+	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
+	STA <Copy_A
+	LDA #$4F ; loop, max speed.
+	STA $4010
+	LDA #0
+	STA $4011 ; minimum value of DMC
+	LDA #$BB
+	STA $4012 ; Sample address $EEC0.
+	LDA #0
+	STA $4013 ; 1 byte length.
+	LDA #$10
+	STA $4015 ; Start the DMC DMA loop
+	NOP
+	NOP
+DMASync60_Loop:
+	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $00 from the DMA.
+	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
+	CMP #$60
+	BNE DMASync60_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
+	LDA #$0F ; don't loop, continue at max speed. +2 (9)
+	STA $4010 
+	LDA <$00  
+	LDA Copy_A
+	JSR Clockslide_100
+	JSR Clockslide_100
+	JSR Clockslide_100
+	JSR Clockslide_50
+	NOP
+	CMP <$C9
+	RTS 
+	
+DMASyncWithA5:
+	; This fuction very relaibly exits with exactly 50 CPU cycles until the DMA occurs.
+	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
+	STA <Copy_A
+	LDA #$4F ; loop, max speed.
+	STA $4010
+	LDA #0
+	STA $4011 ; minimum value of DMC
+	LDA #$BA
+	STA $4012 ; Sample address $EEC0.
+	LDA #0
+	STA $4013 ; 1 byte length.
+	LDA #$10
+	STA $4015 ; Start the DMC DMA loop
+	NOP
+	NOP
+DMASyncA5_Loop:
+	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $00 from the DMA.
+	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
+	CMP #$A5
+	BNE DMASyncA5_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
+	LDA #$0F ; don't loop, continue at max speed. +2 (9)
+	STA $4010 
+	LDA <$00  
+	LDA Copy_A
+	JSR Clockslide_100
+	JSR Clockslide_100
+	JSR Clockslide_100
+	JSR Clockslide_50
+	NOP
+	CMP <$C9
+	RTS 
+	
+DMASyncWith68:
+	; This fuction very relaibly exits with exactly 50 CPU cycles until the DMA occurs.
+	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
+	STA <Copy_A
+	LDA #$4F ; loop, max speed.
+	STA $4010
+	LDA #0
+	STA $4011 ; minimum value of DMC
+	LDA #$B9
+	STA $4012 ; Sample address $EEC0.
+	LDA #0
+	STA $4013 ; 1 byte length.
+	LDA #$10
+	STA $4015 ; Start the DMC DMA loop
+	NOP
+	NOP
+DMASync68_Loop:
+	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $00 from the DMA.
+	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
+	CMP #$68
+	BNE DMASync68_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
+	LDA #$0F ; don't loop, continue at max speed. +2 (9)
+	STA $4010 
+	LDA <$00  
+	LDA Copy_A
+	JSR Clockslide_100
+	JSR Clockslide_100
+	JSR Clockslide_100
+	JSR Clockslide_50
+	NOP
+	CMP <$C9
+	RTS 
+	
 	
 	.bank 1
 	.org $A000
@@ -1101,10 +1247,10 @@ TEST_OpenBus_ContinueTest4:    ; Anyway, that was the greatest crime against pro
 	; RTS
 	;
 	; Here's what could go wrong:
-	; Open bus behavior coulkd be faked, specifically by always returning the high byte from this address range.
+	; Open bus behavior could be faked, specifically by always returning the high byte from this address range.
 	; in which case, `LSR <$56, X` will run until $5700, running `SRE <$57, X` until $5800, running `CLI` until $5900, and so on.
 	; In that case, once the PC reaches $6000, it will run RTS, however the falgs and stuff will be wrong, so we can check for that.
-	; (Granted, I already tested for that, so that shouldn't be the case if we made it this far)
+	;	-In theory we already ruled this behavior out with previous tests... but who knows. A lot could go wrong with emulation.
 	;
 	; It's also possible the same thing will happen, but instead of RTS, it runs BRK. Either way, that's a fail.
 	; Since that's a possibility, set up the IRQ routine.
@@ -4162,6 +4308,8 @@ TEST_DMA_Plus_OpenBus:
 	BNE FAIL_DMA_Plus_OpenBus
 	
 	;; END OF TEST ;;
+	LDA #0
+	STA $4015
 	LDA #1
 	RTS
 ;;;;;;;
@@ -7707,28 +7855,55 @@ TEST_FrameCounterIRQ:
 	LDA $4015 ; read it again, but it's already cleared.
 	BNE FAIL_FrameCounterIRQ
 	INC <currentSubTest
+	
+	;;; Test 6 [APU Frame Counter IRQ]: The IRQ flag should be cleared when the APU transitions from a "put" cycle to a "get" cycle.  ;;;
+	LDA #$00	
+	STA $4017	; 4-step mode, enable IRQ
+	JSR Clockslide_30000 ; wait long enough that the IRQ flag would be set.
+	LDA #02
+	STA $4014 ; align with even cycle.
+	LDA #0
+	LDX #0
+	.byte $1F	; SLO Absolute, X
+	.word $4015 ; This reads from $4015 twice!
+	BNE FAIL_FrameCounterIRQ ; If SLO is properly emulated, you might see bit 7 set here (failing the test). The flag is actually cleared before the second read, so it bit 7 should be 0.
+	INC <currentSubTest
+	
+	;;; Test 7 [APU Frame Counter IRQ]: The IRQ flag should be cleared when the APU transitions from a "put" cycle to a "get" cycle. ;;;
+	LDA #$00	
+	STA $4017	; 4-step mode, enable IRQ
+	JSR Clockslide_30000 ; wait long enough that the IRQ flag would be set.
+	LDA #02
+	STA $4014 ; align with even cycle.
+	LDA <$00  ; align with odd cycle.
+	LDA #0
+	LDX #0
+	.byte $1F	; SLO Absolute, X
+	.word $4015 ; This reads from $4015 twice!
+	BEQ FAIL_FrameCounterIRQ2 ; If SLO is properly emulated, bit 7 will be set if you passed the test. The frame counter interrupt flag gets cleared after the second read in this case.
+	INC <currentSubTest
 
-	;;; Test 6 [APU Frame Counter IRQ]: Changing the Frame Counter to 5-step mode after the flag was set does not clear the flag. ;;;
+	;;; Test 8 [APU Frame Counter IRQ]: Changing the Frame Counter to 5-step mode after the flag was set does not clear the flag. ;;;
 	LDA #$00	
 	STA $4017 ; 4-step mode, enable IRQ
 	JSR Clockslide_30000 ; wait long enough that the IRQ flag would be set.
 	LDA #$80
 	STA $4017 ; 5-step mode, enable IRQ
 	LDA $4015 ; read the IRQ flag, which will still be set.
-	BEQ FAIL_FrameCounterIRQ
+	BEQ FAIL_FrameCounterIRQ2
 	INC <currentSubTest
 	
-	;;; Test 7 [APU Frame Counter IRQ]: Disabling the IRQ flag will clear the IRQ flag. ;;;
+	;;; Test 9 [APU Frame Counter IRQ]: Disabling the IRQ flag will clear the IRQ flag. ;;;
 	LDA #$00	
 	STA $4017	; 4-step mode, enable IRQ
 	JSR Clockslide_30000 ; wait long enough that the IRQ flag would be set.
 	LDA #$40
 	STA $4017 ; clear the IRQ flag.
 	LDA $4015 ; read the IRQ flag, which will no longer be set.
-	BNE FAIL_FrameCounterIRQ
+	BNE FAIL_FrameCounterIRQ2
 	INC <currentSubTest
 	
-	;;; Test 8 [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (see if it's set too early) ;;;
+	;;; Test A [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (see if it's set too early) ;;;
 	JSR WaitForVBlank
 	LDA #02
 	STA $4014 ; sync with even CPU cycle
@@ -7744,8 +7919,15 @@ TEST_FrameCounterIRQ:
 	LDA $4015 ; If the flag *is* set, it was set too early, so you fail the test.
 	BNE FAIL_FrameCounterIRQ2
 	INC <currentSubTest
-
-	;;; Test 9 [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (see if it's set on the right CPU cycle) ;;;
+	BNE TEST_FrameCounterIRQ_Continue
+	
+FAIL_FrameCounterIRQ2:
+	LDA #$40
+	STA $4017	; disable the IRQ flag.
+	JMP TEST_Fail
+	
+TEST_FrameCounterIRQ_Continue:
+	;;; Test B [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (see if it's set on the right CPU cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
 	STA $4014 ; sync with even CPU cycle
@@ -7762,7 +7944,7 @@ TEST_FrameCounterIRQ:
 	BEQ FAIL_FrameCounterIRQ2
 	INC <currentSubTest
 
-	;;; Test A [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (If the write occurs on an even CPU cycle, the IRQ is delayed by 1 CPU cycle) ;;;
+	;;; Test C [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (If the write occurs on an even CPU cycle, the IRQ is delayed by 1 CPU cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
 	STA $4014 ; sync with even CPU cycle
@@ -7780,7 +7962,7 @@ TEST_FrameCounterIRQ:
 	BNE FAIL_FrameCounterIRQ2
 	INC <currentSubTest
 
-	;;; Test B [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (see if it's set on the correct cycle) ;;;
+	;;; Test D [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (see if it's set on the correct cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
 	STA $4014 ; sync with even CPU cycle
@@ -7797,15 +7979,8 @@ TEST_FrameCounterIRQ:
 	LDA $4015 ; If the flag is *not* set, it was set too late, so you fail the test.
 	BEQ FAIL_FrameCounterIRQ2
 	INC <currentSubTest
-	BNE TEST_FrameCounterIRQ_Continue
-	
-FAIL_FrameCounterIRQ2:
-	LDA #$40
-	STA $4017	; disable the IRQ flag.
-	JMP TEST_Fail
-	
-TEST_FrameCounterIRQ_Continue:
-	;;; Test C [APU Frame Counter IRQ]: Reading $4015 on the same cycle the IRQ flag is set, will not clear the IRQ flag (it gets set again on the following 2 CPU cycles) ;;;
+
+	;;; Test E [APU Frame Counter IRQ]: Reading $4015 on the same cycle the IRQ flag is set, will not clear the IRQ flag (it gets set again on the following 2 CPU cycles) ;;;
 	JSR WaitForVBlank
 	LDA #02
 	STA $4014 ; sync with even CPU cycle
@@ -7819,10 +7994,10 @@ TEST_FrameCounterIRQ_Continue:
 	JSR Clockslide_27
 	LDA $4015 ; Read on the same cycle the IRQ flag is set.
 	LDA $4015 ; Read again! But it won't be cleared, since the IRQ flag gets set again.
-	BEQ FAIL_FrameCounterIRQ2
+	BEQ FAIL_FrameCounterIRQ3
 	INC <currentSubTest
 	
-	;;; Test D [APU Frame Counter IRQ]: Reading $4015 on the cycle after the IRQ flag is set, will not clear the IRQ flag (it gets set again on the following CPU cycle) ;;;
+	;;; Test F [APU Frame Counter IRQ]: Reading $4015 on the cycle after the IRQ flag is set, will not clear the IRQ flag (it gets set again on the following CPU cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
 	STA $4014 ; sync with even CPU cycle
@@ -7836,10 +8011,10 @@ TEST_FrameCounterIRQ_Continue:
 	JSR Clockslide_28
 	LDA $4015 ; Read on the same cycle the IRQ flag is set.
 	LDA $4015 ; Read again! But it won't be cleared, since the IRQ flag gets set again.
-	BEQ FAIL_FrameCounterIRQ2
+	BEQ FAIL_FrameCounterIRQ3
 	INC <currentSubTest
 	
-	;;; Test E [APU Frame Counter IRQ]: Reading $4015 2 cycles after the IRQ flag is set, will not clear the IRQ flag (it gets set again on this CPU cycle) ;;;
+	;;; Test G [APU Frame Counter IRQ]: Reading $4015 2 cycles after the IRQ flag is set, will not clear the IRQ flag (it gets set again on this CPU cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
 	STA $4014 ; sync with even CPU cycle
@@ -7853,10 +8028,10 @@ TEST_FrameCounterIRQ_Continue:
 	JSR Clockslide_29
 	LDA $4015 ; Read on the same cycle the IRQ flag is set.
 	LDA $4015 ; Read again! But it won't be cleared, since the IRQ flag gets set again.
-	BEQ FAIL_FrameCounterIRQ2
+	BEQ FAIL_FrameCounterIRQ3
 	INC <currentSubTest
 	
-	;;; Test F [APU Frame Counter IRQ]: Reading $4015 3 cycles after the IRQ flag is set, will clear the IRQ flag (it does not get set again on this CPU cycle) ;;;
+	;;; Test H [APU Frame Counter IRQ]: Reading $4015 3 cycles after the IRQ flag is set, will clear the IRQ flag (it does not get set again on this CPU cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
 	STA $4014 ; sync with even CPU cycle
@@ -7872,8 +8047,15 @@ TEST_FrameCounterIRQ_Continue:
 	LDA $4015 ; Read again! But it will be cleared.
 	BNE FAIL_FrameCounterIRQ3
 	INC <currentSubTest
+	BNE TEST_FrameCounterIRQ_Continue2
+		
+FAIL_FrameCounterIRQ3:
+	LDA #$40
+	STA $4017	; disable the IRQ flag.
+	JMP TEST_Fail
 	
-	;;; Test G [APU Frame Counter IRQ]: Despite the "Suppress Frame Counter Interrupts flag" being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (this is timed 1 cycle too early) ;;;
+TEST_FrameCounterIRQ_Continue2:
+	;;; Test I [APU Frame Counter IRQ]: Despite the "Suppress Frame Counter Interrupts flag" being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (this is timed 1 cycle too early) ;;;
 	; This is a farily recent discovery as of writing this test, so I'm expecting some emulators to fail this one.
 	; Let me break this down:
 	; 29828 Cycles after frame counter reset: $4015.6 is set to 1.
@@ -7896,15 +8078,8 @@ TEST_FrameCounterIRQ_Continue:
 	AND #$40
 	BNE FAIL_FrameCounterIRQ3
 	INC <currentSubTest
-	BNE TEST_FrameCounterIRQ_Continue2
-		
-FAIL_FrameCounterIRQ3:
-	LDA #$40
-	STA $4017	; disable the IRQ flag.
-	JMP TEST_Fail
-	
-TEST_FrameCounterIRQ_Continue2:
-	;;; Test H [APU Frame Counter IRQ]: Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It happens on this cycle) ;;;
+
+	;;; Test J [APU Frame Counter IRQ]: Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It happens on this cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
 	STA $4014 ; sync with even CPU cycle
@@ -7921,7 +8096,7 @@ TEST_FrameCounterIRQ_Continue2:
 	BEQ FAIL_FrameCounterIRQ3
 	INC <currentSubTest
 
-	;;; Test I [APU Frame Counter IRQ]: Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It happens on this cycle too) ;;;
+	;;; Test K [APU Frame Counter IRQ]: Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It happens on this cycle too) ;;;
 	JSR WaitForVBlank
 	LDA #02
 	STA $4014 ; sync with even CPU cycle
@@ -7935,10 +8110,10 @@ TEST_FrameCounterIRQ_Continue2:
 	JSR Clockslide_29
 	LDA $4015
 	AND #$40
-	BEQ FAIL_FrameCounterIRQ3
+	BEQ FAIL_FrameCounterIRQ4
 	INC <currentSubTest
 
-	;;; Test J [APU Frame Counter IRQ]:  Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It does not happen on this cycle) ;;;
+	;;; Test L [APU Frame Counter IRQ]:  Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It does not happen on this cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
 	STA $4014 ; sync with even CPU cycle
@@ -7952,10 +8127,10 @@ TEST_FrameCounterIRQ_Continue2:
 	JSR Clockslide_30
 	LDA $4015
 	AND #$40
-	BNE FAIL_FrameCounterIRQ3
+	BNE FAIL_FrameCounterIRQ4
 	INC <currentSubTest
 
-	;;; Test K [APU Frame Counter IRQ]: Despite the frame counter interrupt flag being set for those two cycles, an IRQ will not occur even if the CPU I flag is clear. ;;;
+	;;; Test M [APU Frame Counter IRQ]: Despite the frame counter interrupt flag being set for those two cycles, an IRQ will not occur even if the CPU I flag is clear. ;;;
 	JSR TEST_IFlagLatency_IRQPrep
 	; This test is only relaible if the Interrupt Flag Latency test passes.
 	JSR WaitForVBlank
@@ -8810,14 +8985,17 @@ TEST_DMC_ConflictLoop: ; DMA every 432 CPU cycles.
 TEST_DMC_Conflict_AnswerLoop:
 	LDA $500, X
 	CMP TEST_DMC_Conflicts_AnswerKey, X
-	BNE FAIL_DMC_Conflicts
+	BNE TEST_DMC_Conflict_CheckFamicom
 	LDA #$00
 	STA $4017	; Keep the interrupt flag set, but refresh the timer.
 	INX
 	CPX #$40
 	BNE TEST_DMC_Conflict_AnswerLoop
-	BEQ TEST_DMC_Test3
+	LDA #5
+	STA <$50	; pass code 1. (nes)
+	BNE TEST_DMC_Test3
 	
+TEST_DMC_Conflict_CheckFamicom:
 	LDX #0
 TEST_DMC_Conflict_AnswerLoop_Famicom:
 	LDA $500, X
@@ -8828,6 +9006,8 @@ TEST_DMC_Conflict_AnswerLoop_Famicom:
 	INX
 	CPX #$40
 	BNE TEST_DMC_Conflict_AnswerLoop_Famicom
+	LDA #9
+	STA <$50	; pass code 2. (famicom)
 	
 TEST_DMC_Test3:
 	;;; Test 3 [DMA Bus Conflicts]: The bus conflicts clears the APU Frame Counter Interrupt Flag. ;;;
@@ -8835,9 +9015,10 @@ TEST_DMC_Test3:
 	AND #$40
 	BNE FAIL_DMC_Conflicts	; so if this is non-zero, the flag was still set, failing the test.
 	
+	;; END OF TEST ;;
 	LDA #$00
     STA $4015	; disable all audio channels.
-	LDA #1
+	LDA <$50
 	RTS
 ;;;;;;;
 	
@@ -8880,15 +9061,795 @@ TEST_VblSyncPreTest_BadEnding:
 	STA <result_VblankSync_PreTest
 	RTS
 ;;;;;;;
+
+TEST_ImpliedDummyRead_BRKed:
+	; This is where the PC *should* go after reading an opcode from $4015.
+	PLA
+	PLA
+	PLA; pull off 3 bytes from the BRK instruction.
+	PLA
+	PLA
+	PLA; pull off 3 more bytes from the JSR and PHA instructions.
+	LDA #1
+	STA <$60	; write to $51. $50 currently has the backup of address $A5 in it.
+	JMP TEST_ImpliedDummyRead_Post
+	
+TEST_ImpliedDummyRead_BRKed2:
+	; This is where the PC *should* go after reading an opcode from $2021.
+	PLA
+	PLA
+	PLA; pull off 3 bytes from the BRK instruction.
+	PLA
+	PLA; pull off 2 more bytes from the JSR instruction.
+	PLA
+	PLA; pull off 2 more bytes from the other JSR instruction.
+	LDA #1
+	STA <$60	; write to $60. $50 currently has the backup of address $A5 in it.
+	JMP TEST_ImpliedDummyRead_Post2
+	
+TEST_ImpliedDummyRead_BRKed3:
+	; This is where the PC *should* go after reading an opcode from $4015 during the third loop of tests.
+	PLA
+	PLA; pull off 2 bytes from the RTS prep.
+	PLA
+	PLA; pull off 2 bytes from the JSR
+	PLA
+	PLA
+	PLA; pull off 3 more bytes from the RTI.
+	LDA #1
+	STA <$60	; write to $51. $50 currently has the backup of address $A5 in it.
+	JMP TEST_ImpliedDummyRead_PostPHP
+	
+TEST_ImpliedDummyRead_BRKed4:
+	; This is where the PC *should* go after reading an opcode from $4015 during the third loop of tests.
+	PLA
+	PLA
+	PLA; pull off 3 bytes from the BRK instruction.
+	PLA
+	PLA
+	PLA; pull off 3 more bytes from the JSR and PHA instructions.
+	LDA #1
+	STA <$60	; write to $51. $50 currently has the backup of address $A5 in it.
+	JMP TEST_ImpliedDummyRead_PostPHA
+	
+TEST_ImpliedDummyRead_BRKed5:
+	; This is where the PC *should* go after reading an opcode from $4015 during the third loop of tests.
+	PLA
+	PLA
+	PLA; pull off 3 bytes from the BRK instruction.
+	PLA
+	PLA; pull off 2 more bytes from the JSR instruction.
+	PLA
+	PLA; pull off 2 more bytes from the JSR instruction.
+	LDA #1
+	STA <$60	; write to $51. $50 currently has the backup of address $A5 in it.
+	JMP TEST_ImpliedDummyRead_Post5
+	
+	TEST_ImpliedDummyRead_BRKed6:
+	; This is where the PC *should* go after reading an opcode from $4015 during the third loop of tests.
+	PLA
+	; Check if we ran a BRK or if this was an IRQ.
+	AND #$10
+	BEQ TEST_ImpliedDummyReadIRQed6
+	PLA
+	PLA; pull off 3 bytes from the RTI prep.
+	PLA
+TEST_ImpliedDummyReadIRQed6:
+	PLA
+	PLA; pull off 3 more bytes from the BRK.
+	; no need to write to $60 for this one.
+	JMP TEST_ImpliedDummyRead_Post6
+	
+Test_ImpliedDummyRead_WaitForFrameCounterFlag:
+	LDX <Copy_X			; +2 cycles (This makes it easier to follow in a tracelog.)
+	LDA #$4F			; +2 cycles.
+	STA $4010			; +4 cycles. Make this sample loop.
+	LDA #$00			; +2 cycles.
+	STA $4017			; +4 cycles. reset the frame counter.
+	JSR Clockslide_29780; +29780
+	JSR Clockslide_100	; +100. wait long enough for the frame counter to be set.
+	; so far, we've ran 29898 cycles since leaving our "DMA Sync in 50 CPU cycles." subroutine.
+	; Luckily, I set the DMA to loop every 432 CPU cycles.
+	; 113 cycles until the DMA
+	LDA #$0F			; +2 cycles.
+	STA $4010			; +4 cycles. Make this stop looping.
+	NOP	; stall for 2 cycles.
+	SEI ; set interrupt flag.
+	; 107 cycles until DMA
+	JSR Clockslide_38
+	RTS
+;;;;;;;
+	
+TEST_ImpliedDummyRead_BackupRAM:
+		; Let's copy this value to somewhere that won't get overwritten.
+	LDA <$A5
+	STA <$50
+	LDA <$A6
+	STA <$52
+	LDA <$81
+	STA <$53
+	LDA <$89
+	STA <$54
+	LDA <$91
+	STA <$55
+	LDA <$99
+	STA <$56
+	LDA <$A1
+	STA <$57
+	LDA <$A9
+	STA <$58
+	LDA <$B1
+	STA <$5A
+	LDA <$B9
+	STA <$5B
+	LDA <$F1
+	STA <$5C
+	LDA <$A4
+	STA <$5D
+	; and we can restore that at the end of the test/ when failing the test.
+	RTS
+;;;;;;;
+	
+FAIL_ImpliedDummyRead:
+	JSR TEST_ImpliedDummyRead_RestoreRAM
+	JMP TEST_Fail
+	
+TEST_ImpliedDummyRead:
+	JSR TEST_ImpliedDummyRead_BackupRAM
+	; Well, before the madness begins, let's make sure some pre-requisites are met.
+	;;; Test 1 [Implied Dummy Reads]: SLO Absolute, X is properly emulated. ;;;
+	; This is used to verify the timing that the Frame Counter Interrupt flag gets cleared.
+	JSR TEST_SLO_1F
+	LDX #1
+	STX <currentSubTest
+	CMP #1
+	BNE FAIL_ImpliedDummyRead1
+	INC <currentSubTest
+
+	;;; Test 2 [Implied Dummy Reads]: Prerequisite check. Does the frame counter interrupt flag get set if we enable it? ;;;
+	LDA #0
+	STA $4017
+	JSR Clockslide_29780
+	JSR Clockslide_100
+	LDA #0
+	LDA $4015
+	CMP #$40
+	BNE FAIL_ImpliedDummyRead1
+	; As a means of preventing these error codes from stretching beyond the alphabet, I'm going to also check for the even/odd cycle behavior of clearing this flag under error code 2.
+	; See [APU Frame Counter IRQ] test 6 and 7.
+	LDA #$00	
+	STA $4017	; 4-step mode, enable IRQ
+	JSR Clockslide_30000 ; wait long enough that the IRQ flag would be set.
+	LDA #02
+	STA $4014 ; align with even cycle.
+	LDA #0
+	LDX #0
+	.byte $1F	; SLO Absolute, X
+	.word $4015 ; This reads from $4015 twice!
+	BNE FAIL_ImpliedDummyRead1 ; If SLO is properly emulated, you might see bit 7 set here (failing the test). The flag is actually cleared before the second read, so it bit 7 should be 0.
+	; This test *very deliberately* makes sure the double-reads from $4015 will always have bit 6 cleared before the second read, so we don't need to test for the alternate alignment here.
+
+	INC <currentSubTest
+	BNE TEST_ImpliedDummyReadPreReqContinue
+
+FAIL_ImpliedDummyRead1:
+	JMP FAIL_ImpliedDummyRead
+;;;;;;;;;;;;;;;;;
+TEST_ImpliedDummyReadPreReqContinue:
+	; This test will require Addreass $00A5 to be the opcode we want to test, but address $A5 is currently used to store some information about the page of tests for the main menu.
+	;;; Test 3 [Implied Dummy Reads]: Prerequisite check. Does a modified version of DMA + Open Bus pass? ;;;
+	LDA <result_DMADMASync_PreTest	; If this emulator fails the pre-test for the DMA sync routine, then don't even bother trying.
+	CMP #1
+	BNE FAIL_ImpliedDummyRead1
+	; I specifically need to know if the DMA + Open bus test would pass if I also stall long enough for the Frame Counter Interrupt Flag. It should still be in sync, and all that.
+	JSR DMASyncWith48
+	LDX <Copy_X			; +2 cycles (This makes it easier to follow in a tracelog.)
+	LDA #$4F			; +2 cycles.
+	STA $4010			; +4 cycles. Make this sample loop.
+	LDA #$00			; +2 cycles.
+	STA $4017			; +4 cycles. reset the frame counter.
+	JSR Clockslide_29780; +29780
+	JSR Clockslide_100	; +100. wait long enough for the frame counter to be set.
+	LDA #$0F			; +2 cycles.
+	STA $4010			; +4 cycles. Make this stop looping.
+	NOP	; stall for 2 cycles.
+	SEI ; set interrupt flag.
+	; 107 cycles until DMA
+	JSR Clockslide_50
+	JSR Clockslide_50;  8 cycles until DMA
+	LDA #$A5 ; 6 cycles until DMA
+	LDA $4000
+	CMP #$48
+	BNE FAIL_ImpliedDummyRead1
+	INC <currentSubTest
+	
+	;;; Test 4 [Implied Dummy Reads]: Prerequisite check. Is open bus accurate enough for this test? ;;;
+	; This test actually does work on an everdrive (and it would be nice not to fail because of unrelated open bus issues.)
+	; ... we pretty much just need to verify that open bus from $4000 to $401F is good, and if address $4015 updates the databus or not.
+	LDA #$5A
+	STA $2002	; ppu bus is now $5A
+	LDX #$10
+	LDA $3FF0, X	; Read ppu bus, read open bus. (this works on an everdrive too.)
+	CMP #$5A
+	BNE FAIL_ImpliedDummyRead1
+	; We already confirmed SLO Absolute, X is accurate, so...
+	LDX #3
+	.byte $1F
+	.word $4015 ; SLO $4015, X
+	; despite the first read being from $4015, the data bus won't be updated. The second read is from $4018, which will read #$40.
+	; Then it gets SLO'd to be $80
+	BPL FAIL_ImpliedDummyRead1
+	
+	; Check the open bus bits of the controller port.
+	JSR WaitForVBlank
+	LDA #$F0
+	STA $2002	; Set the PPU databus to $F0
+	LDX #$17
+	LDA $3FFF, X ; dummy read $2006. (The data bus is now $F0) The offset moves the address bus to $4016, reading from controller 1 when the databus was $F0.
+	AND #$E0
+	CMP #$E0 ; The open bus bits are all set.
+	BNE FAIL_ImpliedDummyRead1
+	LDA #$FF
+	JSR SetPPUReadBufferToA
+	LDX #$18
+	LDA $3FFF, X ; dummy read $2007 (The data bus is now $F0) The offset moves the address bus to $4017, reading from controller 1 when the databus was $F0.
+	PHA
+	JSR ResetScroll	; And reset the scroll, since we just moved "v" to $2400.
+	PLA
+	AND #$E0
+	CMP #$E0 ; The open bus bits are all set.
+	BNE FAIL_ImpliedDummyRead1
+	
+	; This next pre-requisite doesn't have an error code, because I assume the emulator will crash if it gets this wrong.
+	; This is something you would have fixed if you pass the [Open Bus] test.
+
+	; JSR works like this. (simplified)
+	;	Read Opcode
+	;	Read Operand
+	;	Dummy read from the stack.
+	;	Push PCH
+	;	Push PCL
+	;	Read Operand
+	;
+	; And yes, pushing to the stack updates the databus.
+	;
+	; This is another test that would have been verified if I just ran the full [Open Bus] test, but you know... I really want the everdrive to be able to run this test.
+	;
+	; So we're going to JSR to open bus, and then RTS. And if we fail the test, it will probably crash or something. I don't know.
+	; It's not really possible to know how an emulator would act if they got the order of operations wrong here. Something other than the 2nd operand would be on the data bus.
+	JSR DMASyncWith60
+	JSR Clockslide_43
+	JSR $4000
+	; and if we didn't crash, we passed the pre-requisite test. woo hoo.
+	
+	; And that should be all the pre-requisites.
+	INC <currentSubTest
+
+	;;; Test 5 [Implied Dummy Reads]: Do the implied instructions have dummy reads? (They should). ;;;
+	; This test extends to every error code after this.
+	
+	; What are we testing for here?
+	; The Implied Addressing mode instructions (NOP, ASL A, INX...) all have dummy reads on their second CPU cycle, reading from wherever the PC is.
+	; So for instance, a NOP at address $8000 will dummy-read from address $8001. (since the PC is incremented before the second cycle)
+	; pretty simple stuff, right?
+	;
+	; I suggest leaving it at that. You know what this test is checking for. Go forth and make those dummy reads. 
+	; Trying to understand the following code is not necessary, and will drive you to madness.
+	;
+	; Do you even dare know how one tests for this?
+	;
+	; Abandon hope all ye who enter here.
+	; This is without exaggeration, the most insane assembly code I have ever written.	
+	
+	; The idea:
+	; Dummy read a read-sensitive register.
+	;
+	; Issue: The PPU registers have clock-alignment specific behavior changes, making the test too inconsistent. So we need to rely on the APU registers.
+	;
+	; The Idea take 2:
+	; Dummy read $4015 to clear the Frame Counter Interrupt Flag, which will be clear when reading the next opcode.
+	;
+	; Issues:
+	; Preparing an entire function to run inside open bus (setting up the opcode to be the instruction we want on the address we want to test) is not easy.
+	; I need to sync a DMA while keeping the Frame Counter Interrupt Flag set. This DMA is used to change the data bus on the cycle after jumping to Open Bus.
+	; The Frame Counter Interrupt Flag is only cleared when transitioning from a put cycle to a get cycle. (see [Frame Counter IRQ] test 6 and 7.)
+	; When reading from $4015 as the opcode, bit 5 will be set if the opcode we tested had bit 5 set.
+	; So making the Pass/Fail translate to a BRK/RTI will only work for half the instructions. The rest will be JSR/RTS.
+	; I would *really* like it if this test did not crash in the event of failure, so I actually do need to make sure both cases are managed.
+	; This means I need to manage a bunch of BRK, RTI, JSR, and RTS's, while making sure the stack pointer stays sane in the event of passing or failure.
+	; If a JSR happens, the controller ports will be the operands. 
+	; The controller ports have open bus in the upper 3 bits (controller 1 has 5 bits on famicom), which will leech off the value read from the opcode. (reading $4015 doesn't update the databus)
 	
 	
+	; Let's set up the brk routine.
+	LDA #$4C
+	STA $600
+	LDA #Low(TEST_ImpliedDummyRead_BRKed)
+	STA $601
+	LDA #High(TEST_ImpliedDummyRead_BRKed)
+	STA $602
+		
+	LDX #0
+TEST_ImpliedDummyRead_Loop:	; This loop tests the opcodes that don't have bit 5 set. ($20)
+	STX <Copy_X
+	LDA TEST_ImpliedDummyRead_OpsToTest_NoBit5, X
+	STA <$A5
+	LDA #$A5
+	STA <$A4
+	; Current objective: move the PC to $4011 with the databus set to $48
+	; The plan: 
+	; JSR $4011, and then a DMC DMA occurs. (DMC DMA will have set the value $48 to the databus.)
+	; It's the simplest thing that could possibly work.
+	; 
+	; Here's how it will play out.
+	; JSR $4011
+	; DMC DMA (databus = $48)
+	; PHA (Databus = $A4)
+	; LDY <$A4 (Address $A4 = $A5, so thedatabus will now be $A5)
+	; LDA <$A5 (Databus = the contents of address $A5. This is where we store the opcode we want to test)
+	; The opcode in question runs. Dummy reads $4015, clearing the frame counter interrupt flag.
+	; Fetch opcode from $4015
+	; BRK if PASS, RTI if FAIL. (This is why we had to PHA after the JSR)
+	LDA #0
+	STA <$60	; address $51 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
+	JSR DMASyncWith48	; 50 cycles until DMA.
+	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag
+	JSR Clockslide_36	;19 cycles until DLA
+	LDA #HIGH(TEST_ImpliedDummyRead_Post)
+	PHA
+	LDA #LOW(TEST_ImpliedDummyRead_Post)
+	PHA
+	TSX	; For the TXS test.
+	DEX	; Also DEX since we're gonna PHA before the TXS runs.
+	LDA #$A4 ; 3 cycles until DMA
+	JMP $400F; [Read opcode] [Read operand] [Read operand] 
+	; [DMC DMA, databus = $48]
+	; PHA [databus = A (A = $A4)] [also dummy read.]
+	; LDY <$A4 [Read opcode] [Read operand] [read address $A6, a value of $A5]
+	; LDA <$A5 [Read opcpde] [Read operand] [Read address $A5, the opcode we want to test.]
+	; NOP [Read Opcode] [Dummy Read $4015 (This should clear the Frame Counter interrupt.)]
+	; [Read opcode from $4015. Hopefully, a BRK.]
+	;
+	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed, which sets $51 and jumps to TEST_ImpliedDummyRead_Post.
+TEST_ImpliedDummyRead_Post:
+
+	LDA <$60
+	BEQ FAIL_ImpliedDummyRead2
+	INC <currentSubTest	
+
+	LDX <Copy_X
+	INX
+	CPX #11	; this loops tests 11 opcodes.
+	BNE TEST_ImpliedDummyRead_Loop
+	BEQ TEST_ImpliedDummyRead_Continue
+
+FAIL_ImpliedDummyRead2:
+	JMP FAIL_ImpliedDummyRead
+;;;;;;;;;;;;;;;;;
+TEST_ImpliedDummyRead_Continue:
 	
+	LDA #Low(TEST_ImpliedDummyRead_BRKed2)
+	STA $601
+	LDA #High(TEST_ImpliedDummyRead_BRKed2)
+	STA $602
+	
+	; now we test for the instructions that have bit 5 set.
+	; instead of BRK for pass, and RTI for fail, we're looking at JSR for pass, and RTS for fail!
+	
+	; Due to the upper 3 bits of a controller (or 5 bits on famicom) being open bus, (and $4015 doesn't upodate the databus) the low byte operand of the JSR instruction could have anything in those bits.
+	
+	LDA #$00	; We need a series of bytes to be BRKs
+	STA <$01	; This byte isn't being used in this test, so we're good to overwrite it.
+	STA <$09	; This byte isn't being used in this test, so we're good to overwrite it.
+	STA <$11	; This byte isn't being used in this test, so we're good to overwrite it.
+	STA <$19	; This byte isn't being used in this test, so we're good to overwrite it.
+	STA <$21	; This byte isn't being used in this test, so we're good to overwrite it.
+	STA <$29	; This byte isn't being used in this test, so we're good to overwrite it.
+	STA <$31	; This byte isn't being used in this test, so we're good to overwrite it.
+	STA <$39	; This byte isn't being used in this test, so we're good to overwrite it.
+	STA <$41	; So far, nothing uses this byte. So we're good to overwrite it.
+	STA <$49	; So far, nothing uses this byte. So we're good to overwrite it.
+	STA <$51	; This byte isn't being used in this test, so we're good to overwrite it.
+	STA <$59	; This byte isn't being used in this test, so we're good to overwrite it.
+	STA <$61	; This byte isn't being used in this test, so we're good to overwrite it.
+	STA <$69	; This byte isn't being used in this test, so we're good to overwrite it.
+	STA <$71	; So far, nothing uses this byte. So we're good to overwrite it.
+	STA <$79	; So far, nothing uses this byte. So we're good to overwrite it.
+	STA <$81	; This byte is being used for the page stuff, so it's a good thing we copied that one too at the start of the test.	
+	STA <$89	; This byte is being used for the page stuff, so it's a good thing we copied that one too at the start of the test.
+	STA <$91	; This byte is being used for the page stuff, so it's a good thing we copied that one too at the start of the test.
+	STA <$99	; This byte is being used for the page stuff, so it's a good thing we copied that one too at the start of the test.
+	STA <$A1	; This byte is being used for the page stuff, so it's a good thing we copied that one too at the start of the test.	
+	STA <$A9	; This byte is being used for the page stuff, so it's a good thing we copied that one too at the start of the test.
+	STA <$B1	; This byte is being used for the page stuff, so it's a good thing we copied that one too at the start of the test.
+	STA <$B9	; This byte is being used for the page stuff, so it's a good thing we copied that one too at the start of the test.
+	STA <$C1	; So far, nothing uses this byte. So we're good to overwrite it.
+	STA <$C9	; So far, nothing uses this byte. So we're good to overwrite it.
+	STA <$D1	; So far, nothing uses this byte. So we're good to overwrite it.
+	STA <$D9	; So far, nothing uses this byte. So we're good to overwrite it.
+	STA <$E1	; So far, nothing uses this byte. So we're good to overwrite it.
+	STA <$E9	; So far, nothing uses this byte. So we're good to overwrite it.
+	STA <$F1	; This byte is being used for the PPUCTRL_COPY, so it's a good thing we copied that one too at the start of the test.
+	STA <$F9	; So far, nothing uses this byte. So we're good to overwrite it.
+
+	; I recognize this is more bytes than opcodes I'm testing, but better safe than sorry.
+
+	LDX #0
+TEST_ImpliedDummyRead_Loop2:	; This loop tests the opcodes that do have bit 5 set. ($20)
+	STX <Copy_X
+	LDA TEST_ImpliedDummyRead_Bit5OpsToTest, X
+	STA <$A5
+	; Current objective: move the PC to $4012 with the databus set to $A5
+	; The plan: 
+	; JSR $4012, and then a DMC DMA occurs. (DMC DMA will have set the value $A5 to the databus.)
+	; It's the simplest thing that could possibly work.
+	; 
+	; Here's how it will play out.
+	; JSR $4012
+	; DMC DMA (databus = $A5)
+	; LDA <$A5 (Databus = the contents of address $A5. This is where we store the opcode we want to test)
+	; The opcode in question runs. Dummy reads $4015, clearing the frame counter interrupt flag. (Except bit 5 will be set this time)
+	; Fetch opcode from $4015
+	; JSR $0021 if PASS, RTS if FAIL.
+	JSR ReadController1; We need controller 1 to be fully clocked, and controller 2 unclocked.
+
+	LDA #0
+	STA <$60	; address $51 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
+	JSR DMASyncWithA5	; 50 cycles until DMA.
+	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag
+	JSR Clockslide_47; 95 cycles from clockslides. 8 cycles until DMA
+	LDA #$A5 ; 6 cycles until DMA
+	JSR $4012; [Read opcode] [Read operand] [Dummy Read] [Push PCH] [Push PCL] [Read operand] 
+	; [DMC DMA, databus = $A5]
+	; LDA <$A5 [Read opcode] [Read operand] [read address $A5, Databus = the opcode of the isntruction we want to test.]
+	; NOP [Read Opcode] [Dummy Read $4015 (This should clear the Frame Counter interrupt.)]
+	; [Read opcode from $4015. Hopefully, a JSR.]
+	; And here's how the JSR instruction will work:
+	; [Read $4015: 20] [Read $4016: 21] [dummy read stack] [Push PCH: 40] [Push PHL: 16] [read $4017: 00]
+	; Keep in mind, the open bus value when reading controller 2 will be 16, which gets masked away, as only the upper 3 bits of controller 2 matter.
+	;
+	; and hopefully the JSR takes you to $0021, a BRK to TEST_ImpliedDummyRead_BRKed2, which sets $51 and jumps to TEST_ImpliedDummyRead_Post2.
+TEST_ImpliedDummyRead_Post2:
+	LDA <$60
+	BEQ FAIL_ImpliedDummyRead3
+	INC <currentSubTest	
+
+	LDX <Copy_X
+	INX
+	CPX #11	; this loops tests 11 opcodes.
+	BNE TEST_ImpliedDummyRead_Loop2
+	BEQ TEST_ImpliedDummyRead_Continue2
+FAIL_ImpliedDummyRead3:
+	JMP FAIL_ImpliedDummyRead
+TEST_ImpliedDummyRead_Continue2:
+
+	; Okay cool, that's 22 opcodes down.
+	; All that's left (ignoring the unofficial NOPs) is:
+	; BRK, PHP, PLP, PHA, PLA, RTI, And RTS.
+	; Due to how these instructions update the stack pointer, I didn't want to run these instructions in the previous loops.
+	; Oh- also branches, which don't update the stack, but *do* have dummy reads.
+	
+	; Let's start with PHP
+	LDA #Low(TEST_ImpliedDummyRead_BRKed3)
+	STA $601
+	LDA #High(TEST_ImpliedDummyRead_BRKed3)
+	STA $602
+
+	LDA #08	; PHP
+	STA <$A5
+	LDA #$A5
+	STA <$A6
+
+	LDA #0
+	STA <$60	; address $51 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
+	JSR DMASyncWith68	; 50 cycles until DMA.
+	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag
+	JSR Clockslide_40; 99 cycles from clockslides. 19 cycles until DMA
+	LDA #HIGH(TEST_ImpliedDummyRead_PostPHP) ; 17 cycles until DMA
+	PHA		 ; 15 cycles until DMA
+	LDX #$A5
+	LDA #$A6 ; 6 cycles until DMA
+	PHA
+	; Despite PHA's opcode not having bit 5 set, writing A5 will set that bit.
+	JMP $400F; [Read opcode] [Read operand] [Dummy Read] [Push PCH] [Push PCL] [Read operand] 
+	; [DMC DMA, databus = $68]
+	; PLA [Pull off A6] [also dummy read.] (4 cycles)
+	; LDX <$A6 [Read opcode] [Read operand] [read address $A6, Databus = $A5.] (3)
+	; LDA <$A5 [Read opcode] [Read operand] [read address $A5, Databus = the opcode of the instruction we want to test.] (3)
+	; PHA [Read Opcode] [Dummy Read $4015 (This should clear the Frame Counter interrupt.)] [Push A ($48) to stack]
+	; [Read opcode from $4015. Hopefully, a JSR.]
+	;
+	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed3, which sets $51 and jumps to TEST_ImpliedDummyRead_PostPHP.
+	.org $D23D	; PHP should push $3C to the stack, so the RTS instruction would return here:
+TEST_ImpliedDummyRead_PostPHP:
+	LDA <$60
+	BEQ FAIL_ImpliedDummyRead4
+	INC <currentSubTest	
+	; Okay cool, that's 22 opcodes down now.
+	; Let's test PHA now.
+
+	LDA #Low(TEST_ImpliedDummyRead_BRKed4)
+	STA $601
+	LDA #High(TEST_ImpliedDummyRead_BRKed4)
+	STA $602
+
+	LDA #$48	; PHA
+	STA <$A5
+	LDA #$A5
+	STA <$A6
+
+	LDA #0
+	STA <$60	; address $51 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
+	JSR DMASyncWith68	; 50 cycles until DMA.
+	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag
+	JSR Clockslide_35; 99 cycles from clockslides. 19 cycles until DMA
+	LDA #HIGH(TEST_ImpliedDummyRead_PostPHA) ; 17 cycles until DMA
+	PHA		 ; 15 cycles until DMA
+	LDA #LOW(TEST_ImpliedDummyRead_PostPHA)
+	PHA
+	LDX #$A5
+	LDA #$A6 ; 6 cycles until DMA
+	PHA
+	; Despite PHA's opcode not having bit 5 set, writing A5 will set that bit.
+	JMP $400F; [Read opcode] [Read operand] [Dummy Read] [Push PCH] [Push PCL] [Read operand] 
+	; [DMC DMA, databus = $48]
+	; PLA [Pull off A6] [also dummy read.] (4 cycles)
+	; LDX <$A6 [Read opcode] [Read operand] [read address $A6, Databus = $A5.] (3)
+	; LDA <$A5 [Read opcode] [Read operand] [read address $A5, Databus = the opcode of the instruction we want to test.] (3)
+	; PHA [Read Opcode] [Dummy Read $4015 (This should clear the Frame Counter interrupt.)] [Push A ($48) to stack]
+	; [Read opcode from $4015. Hopefully, a BRK.]
+	;
+	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed3, which sets $51 and jumps to TEST_ImpliedDummyRead_PostPHA.
+TEST_ImpliedDummyRead_PostPHA:
+
+	LDA <$60
+	BEQ FAIL_ImpliedDummyRead4
+	INC <currentSubTest	
+	BNE TEST_ImpliedDummyRead_Continue3
+FAIL_ImpliedDummyRead4:
+	JMP FAIL_ImpliedDummyRead
+TEST_ImpliedDummyRead_Continue3:
+	
+	; Okay cool, that's 24 opcodes down now.
+	; I still want to test:
+	; BRK, PLP, PLA, RTI, RTS, and branches.
+	;
+	; Let's take care of PLP and PHP next.
+	LDA #$4C
+	STA $600
+	LDA #Low(TEST_ImpliedDummyRead_BRKed5)
+	STA $601
+	LDA #High(TEST_ImpliedDummyRead_BRKed5)
+	STA $602
+	LDX #0
+TEST_ImpliedDummyRead_Loop5:	; This loop tests PLP and PLA
+	STX <Copy_X
+	LDA TEST_ImpliedDummyRead_PullOpsToTest, X
+	STA <$A5
+
+	LDA #0
+	STA <$60	; address $51 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
+	JSR DMASyncWith48	; 50 cycles until DMA.
+	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag
+	JSR Clockslide_39; 99 cycles from clockslides. 19 cycles until DMA
+	LDA #HIGH(TEST_ImpliedDummyRead_Post5) ; 17 cycles until DMA
+	PHA		 ; 15 cycles until DMA
+	LDA #LOW(TEST_ImpliedDummyRead_Post5)-1 ; 11 cycles until DMA
+	PHA		 ; 12 cycles until DMA
+	LDA <$A5 ; 6 cycles until DMA
+	JMP $4013; [Read opcode] [Read operand] [Dummy Read] [Push PCH] [Push PCL] [Read operand] 
+	; [DMC DMA, databus = $48]
+	; PHA [databus = A (A = the opcode we want to test)] [also dummy read.]
+	; PLA [Read Opcode] [Dummy Read $4015 (This should clear the Frame Counter interrupt.)] [Dummy Read from stack (no way to test for this)] [Pull A from stack]
+	; [Read opcode from $4015. Hopefully, a BRK.]
+	;
+	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed5, which sets $51 and jumps to TEST_ImpliedDummyRead_Post5.
+TEST_ImpliedDummyRead_Post5:
+	LDA <$60
+	BEQ FAIL_ImpliedDummyRead5
+	INC <currentSubTest	
+
+	LDX <Copy_X
+	INX
+	CPX #2	; this loops tests 2 opcodes. (PLP and PLA)
+	BNE TEST_ImpliedDummyRead_Loop5
+
+	; Alright! That's 26 opcodes tested now.
+	; I still want to test:
+	; BRK, RTI, RTS, and branches.
+
+	; BRK, RTI, and RTS sound pretty easy. I don't even need to worry about the even/odd cycle thing. I just run the dummy read, then after jumping to a stable point, read $4015 for the interrupt flag.
+
+	LDA #$4C
+	STA $600
+	LDA #Low(TEST_ImpliedDummyRead_BRKed6)
+	STA $601
+	LDA #High(TEST_ImpliedDummyRead_BRKed6)
+	STA $602
+	LDX #0
+TEST_ImpliedDummyRead_Loop6:	; This loop tests BRK and RTI
+	STX <Copy_X
+	LDA TEST_ImpliedDummyRead_IntOpsToTest, X
+	STA <$A5
+	LDA #$A5
+	STA <$A6
+
+	LDA #0
+	STA <$60	; address $51 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
+	JSR DMASyncWith48	; 50 cycles until DMA.
+	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag
+	JSR Clockslide_39; 99 cycles from clockslides. 19 cycles until DMA
+	LDA #HIGH(TEST_ImpliedDummyRead_Post6) ; 17 cycles until DMA
+	PHA		 ; 15 cycles until DMA
+	LDA #LOW(TEST_ImpliedDummyRead_Post6) ; 11 cycles until DMA
+	PHA		 ; 12 cycles until DMA
+	LDA <$A5 ; 6 cycles until DMA
+	; This one doesn't need to worry about even/odd cycle polarity, since we're not double-reading $4015. We dummy read it, and the PC is moved *far away*.
+	JMP $4013; [Read opcode] [Read operand] [Dummy Read] [Push PCH] [Push PCL] [Read operand] 
+	; [DMC DMA, databus = $48]
+	; PHA [databus = A (A = the opcode we want to test)] [also dummy read.]
+	; BRK [Read Opcode] [Dummy Read $4015 (This should clear the Frame Counter interrupt.)] [The rest of BRK/RTI...]
+	; We don't read $4015 for the operand this time, so we're just going to LDA $4015 after returning to stable code to verify the dummy read happened.
+	;
+	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed6, which sets $51 and jumps to TEST_ImpliedDummyRead_Post6.
+TEST_ImpliedDummyRead_Post6:
+	; Fun fact, the RTI instruction will immediately lead into an IRQ, so the "BRK routine" does some checks for that.
+	SEI
+	LDA $4015
+	AND #$40
+	BNE FAIL_ImpliedDummyRead5
+	INC <currentSubTest	
+
+	LDX <Copy_X
+	INX
+	CPX #2	; this loops tests 2 opcodes. (BRK and RTI)
+	BNE TEST_ImpliedDummyRead_Loop6
+	BEQ TEST_ImpliedDummyRead_Continue4
+
+FAIL_ImpliedDummyRead5:
+	JMP FAIL_ImpliedDummyRead
+TEST_ImpliedDummyRead_Continue4:
+
+	; Great! That's 28 opcodes tested now.
+	; I still want to test:
+	; RTS and branches.
+	
+
+	LDA #$60
+	STA <$A5
+	LDA #0
+	STA <$60	; address $51 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
+	JSR DMASyncWith68	; 50 cycles until DMA.
+	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag
+	JSR Clockslide_36; 99 cycles from clockslides. 19 cycles until DMA
+	LDA #HIGH(TEST_ImpliedDummyRead_PostJSR) ; 17 cycles until DMA
+	PHA		 ; 15 cycles until DMA
+	LDA #LOW(TEST_ImpliedDummyRead_PostJSR)-1 ; 11 cycles until DMA
+	PHA		 ; 12 cycles until DMA
+	LDA <$A5 ; 6 cycles until DMA
+	PHA
+	; This one doesn't need to worry about even/odd cycle polarity, since we're not double-reading $4015. We dummy read it, and the PC is moved *far away*.
+	JMP $4013; [Read opcode] [Read operand] [Read operand] 
+	; [DMC DMA, databus = $48]
+	; PHA [databus = A (A = the opcode we want to test)] [also dummy read.]
+	; BRK [Read Opcode] [Dummy Read $4015 (This should clear the Frame Counter interrupt.)] [The rest of BRK/RTI...]
+	; We don't read $4015 for the operand this time, so we're just going to LDA $4015 after returning to stable code to verify the dummy read happened.
+	;
+	; and hopefully the JSR just takes you here.
+TEST_ImpliedDummyRead_PostJSR:
+	LDA $4015
+	AND #$40
+	BNE FAIL_ImpliedDummyRead5
+	INC <currentSubTest	
+
+	; 29 opcodes tested now.
+	; I still want to test branches, though to be honest, I'm not currently sure how to safely do that.
+	; I think my DMA sync routines take a variable amount of time, so I can't rely on a dummy read reading $2002, since the Vblank flag could be cleared whjile waiting for the DMA to sync.
+
+	JSR TEST_ImpliedDummyRead_RestoreRAM
+	LDA #1
+	RTS
+;;;;;;;
+	
+TEST_ImpliedDummyRead_RestoreRAM:
+	SEI
+	LDA $4015
+	LDA <$50
+	STA <$A5
+	LDA <$52
+	STA <$A6
+	LDA <$53
+	STA <$81
+	LDA <$54
+	STA <$89
+	LDA <$55
+	STA <$91
+	LDA <$56
+	STA <$99
+	LDA <$57
+	STA <$A1
+	LDA <$58
+	STA <$A9
+	LDA <$5A
+	STA <$B1
+	LDA <$5B
+	STA <$B9
+	LDA <$5C
+	STA <$F1
+	LDA <$5D
+	STA <$A4
+	RTS
+;;;;;;;
+	
+TEST_ImpliedDummyRead_OpsToTest_NoBit5:
+	; BRK does a dummy read. (test seperately)
+	; PHP does a dummy read. (test seperately)
+	ASL A
+	; Branches do a dummy read. (test seperately)
+	CLC
+	; RTI does a dummy read. (test seperately)
+	; PHA does a dummy read. (test seperately)
+	LSR A
+	CLI	; make sure no interrupts will happen, ha!
+	; PLA does a dummy read. (test seperately)
+	DEY
+	TXA
+	TYA
+	TXS
+	INY
+	DEX
+	CLD
+;;;;;;;
+TEST_ImpliedDummyRead_Bit5OpsToTest:
+	; JSR does a dummy read. (test seperately)
+	; PLP does a dummy read. (test seperately)
+	ROL A
+	SEC
+	; RTS does a dummy read. (test seperately)
+	ROR A
+	SEI
+	TAY
+	TAX
+	CLV
+	TSX
+	INX
+	SED
+	NOP
+;;;;;;;
+TEST_ImpliedDummyRead_PullOpsToTest:
+	PLP
+	PLA
+;;;;;;;
+TEST_ImpliedDummyRead_IntOpsToTest:
+	BRK
+	RTI
+;;;;;;;
 	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                ENGINE                   ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	
 	.bank 3
+	.org $EE40	
+DPCM_Sample_68:
+	.byte $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68
+	.byte $68
+	
+	.org $EE80	
+DPCM_Sample_A5:
+	.byte $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5
+	.byte $A5
+	
+	.org $EEC0	
+DPCM_Sample_60:
+	.byte $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60
+	.byte $60
+
+	.org $EF00	
+DPCM_Sample_48:
+	.byte $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48
+	.byte $48
+	
 	.org $EF40
 TEST_DMC_Conflicts_AnswerKey:
 	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00

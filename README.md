@@ -209,21 +209,23 @@ For more information, I recommend reading the fully commented assembly code for 
   3: The IRQ flag should not be set when the APU Frame counter is in the 5-step mode, and the IRQ flag is enabled.  
   4: The IRQ flag should not be set when the APU Frame counter is in the 5-step mode, and the IRQ flag is disabled.  
   5: Reading the IRQ flag should clear the IRQ flag.  
-  6: Changing the Frame Counter to 5-step mode after the flag was set should not clear the flag.  
-  7: Disabling the IRQ flag should clear the IRQ flag.  
-  8: The IRQ flag was enabled too early. (writing to $4017 on an odd CPU cycle.)  
-  9: The IRQ flag was enabled too late. (writing to $4017 on an odd CPU cycle.)  
-  A: The IRQ flag was enabled too early. (writing to $4017 on an even CPU cycle.)  
-  B: The IRQ flag was enabled too late. (writing to $4017 on an even CPU cycle.)  
-  C: Reading $4015 on the same cycle the IRQ flag is set, should not clear the IRQ flag. (it gets set again on the following 2 CPU cycles)  
-  D: Reading $4015 1 cycle later than the previous test should not clear the IRQ flag. (it gets set again on the following CPU cycle)  
-  E: Reading $4015 1 cycle later than the previous test should not clear the IRQ flag. (it gets set again on this CPU cycle)  
-  F: Reading $4015 1 cycle later than the previous test should clear the IRQ flag.  
-  G: The Frame Counter Interrupt flag should not have been set 29827 cycles after resetting the frame counter.  
-  H: The Frame Counter Interrupt flag should have been set 29828 cycles after resetting the frame counter, even if suprressing Frame Counter Interrupts.  
-  I: The Frame Counter Interrupt flag should have been set 29829 cycles after resetting the frame counter, even if suprressing Frame Counter Interrupts.  
-  J: The Frame Counter Interrupt flag should not have been set 29830 cycles after resetting the frame counter if suprressing Frame Counter Interrupts.  
-  K: Despite the Frame Counter Interrupt flag being set for those 2 CPU cycles, if suppressing Frame Counter Interrupts, an IRQ should not occur.  
+  6: The IRQ flag should be cleared when the APU transitions from a "put" cycle to a "get" cycle.  
+  7: The IRQ flag should be cleared when the APU transitions from a "put" cycle to a "get" cycle.  
+  8: Changing the Frame Counter to 5-step mode after the flag was set should not clear the flag.  
+  9: Disabling the IRQ flag should clear the IRQ flag.  
+  A: The IRQ flag was enabled too early. (writing to $4017 on an odd CPU cycle.)  
+  B: The IRQ flag was enabled too late. (writing to $4017 on an odd CPU cycle.)  
+  C: The IRQ flag was enabled too early. (writing to $4017 on an even CPU cycle.)  
+  D: The IRQ flag was enabled too late. (writing to $4017 on an even CPU cycle.)  
+  E: Reading $4015 on the same cycle the IRQ flag is set, should not clear the IRQ flag. (it gets set again on the following 2 CPU cycles)  
+  F: Reading $4015 1 cycle later than the previous test should not clear the IRQ flag. (it gets set again on the following CPU cycle)  
+  G: Reading $4015 1 cycle later than the previous test should not clear the IRQ flag. (it gets set again on this CPU cycle)  
+  H: Reading $4015 1 cycle later than the previous test should clear the IRQ flag.  
+  I: The Frame Counter Interrupt flag should not have been set 29827 cycles after resetting the frame counter.  
+  J: The Frame Counter Interrupt flag should have been set 29828 cycles after resetting the frame counter, even if suprressing Frame Counter Interrupts.  
+  K: The Frame Counter Interrupt flag should have been set 29829 cycles after resetting the frame counter, even if suprressing Frame Counter Interrupts.  
+  L: The Frame Counter Interrupt flag should not have been set 29830 cycles after resetting the frame counter if suprressing Frame Counter Interrupts.  
+  M: Despite the Frame Counter Interrupt flag being set for those 2 CPU cycles, if suppressing Frame Counter Interrupts, an IRQ should not occur.  
 
 ### Frame Counter 4-step
   1: The first clock of the length counters was early.  
@@ -407,3 +409,50 @@ For more information, I recommend reading the fully commented assembly code for 
   2: This extra write should not occur when "v" is pointing to Palette RAM.  
   3: If "v" is pointing to Palette RAM, this extra write should not get written to the nametable.  
   4: If "v" is pointing to Palette RAM, this extra write should simply occur at "v" after it was incremented from the read cycle.  
+
+### Implied Dummy Reads
+  1: Your emulator did not pass the SLO Absolute, X test.  
+  2: Your emulator did not implement the Frame Counter Interrupt flag properly.  
+  3: Your emulator did not update the data bus when the DMC DMA occured, or your DMA timing is off.  
+  4: Your emulator did not correctly emulate open bus behavior. (Or if your emulator crashes here, the cycles of JSR are in the wrong order.)  
+  5: ASL A should perform a dummy read on cycle 2. (The PC was incremented after reading the opcode in the previous cycle, so these dummy reads should occur from the new location of the PC.)  
+  6: CLC should perform a dummy read on cycle 2.  
+  7: LSR A should perform a dummy read on cycle 2.  
+  8: CLI should perform a dummy read on cycle 2.  
+  9: DEY should perform a dummy read on cycle 2.  
+  A: TXA should perform a dummy read on cycle 2.  
+  B: TYA should perform a dummy read on cycle 2.  
+  C: TXS should perform a dummy read on cycle 2.  
+  D: INY should perform a dummy read on cycle 2.  
+  E: DEX should perform a dummy read on cycle 2.  
+  F: CLD should perform a dummy read on cycle 2.  
+  G: ROL A should perform a dummy read on cycle 2.  
+  H: SEC should perform a dummy read on cycle 2.  
+  I: ROR A should perform a dummy read on cycle 2.  
+  J: SEI should perform a dummy read on cycle 2.  
+  K: TAY should perform a dummy read on cycle 2.  
+  L: TAX should perform a dummy read on cycle 2.  
+  M: CLV should perform a dummy read on cycle 2.  
+  N: TSX should perform a dummy read on cycle 2.  
+  O: INX should perform a dummy read on cycle 2.  
+  P: SED should perform a dummy read on cycle 2.  
+  Q: NOP should perform a dummy read on cycle 2.  
+  R: PHP should perform a dummy read on cycle 2.  
+  S: PHA should perform a dummy read on cycle 2.  
+  T: PLP should perform a dummy read on cycle 2.  
+  U: PLA should perform a dummy read on cycle 2.  
+  V: BRK should perform a dummy read on cycle 2.  
+  W: RTI should perform a dummy read on cycle 2.  
+  X: RTS should perform a dummy read on cycle 2.  
+
+# Success Codes
+Some tests have multiple acceptable behaviors that are tested for in this ROM. The behavior used will either be printed on screen after running the test, or you'll see a "success code" on the all-test table.  
+
+### Unofficial Instructions: SHA, SHS
+  1: The instruction behaved the way an old RP2A03G CPU or previous revision CPU would run this instruction.
+  2: The instruction behaved the way a new RP2A03G CPU or later revision CPU would run this instruction.
+  
+### DMC DMA Bus Conflicts
+  1: The controller was read how a US released NES should read controllers.
+  2: The controller was read how a Famicom should read controllers.
+  
