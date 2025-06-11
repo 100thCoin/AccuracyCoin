@@ -326,7 +326,7 @@ VblLoop:
 	
 	; Let's also see if the magic number was written, to verify if the reset flag exists.
 	; It's worth noting that in its current state, this test fails on my console.
-	LDA #$9
+	LDA #6
 	STA PowerOnTest_PPUReset ; set to FAIL (error code $1) by default. Overwrite with PASS if it passes.
 	LDA #$27
 	STA $2006
@@ -337,7 +337,7 @@ VblLoop:
 	CMP #$5A
 	BEQ PostResetFlagTest
 	; The value of $5A was not written to VRAM, so the reset flag does exist!
-	LDA #5
+	LDA #1
 	STA PowerOnTest_PPUReset ; Store a passing result here.
 	;; End of test ;;
 PostResetFlagTest:
@@ -1920,28 +1920,6 @@ TEST_PowerOnState_PPU_Palette:
 
 TEST_PowerOnState_PPU_ResetFlag:
 	;;; Test 1 [PPU Reset Flag]: Print the value recorded at power on ;;;
-	LDA <RunningAllTests
-	BNE TEST_PPU_ResetFlag_End
-	JSR ClearNametableFrom2240
-	JSR ResetScrollAndWaitForVBlank
-	LDA #0
-	STA <dontSetPointer
-	LDA PowerOnTest_PPUReset
-	CMP #5 
-	BNE TEST_PPU_ResetFlag_Nope
-	JSR PrintTextCentered
-	.word $2252
-	.byte "Reset flag detected", $FF
-	JMP TEST_PPU_ResetFlag_End
-TEST_PPU_ResetFlag_Nope:	
-	;; END OF TEST ;;
-	JSR PrintTextCentered
-	.word $2252
-	.byte "Reset flag not detected", $FF
-TEST_PPU_ResetFlag_End:	
-	JSR ResetScroll
-	LDA #1
-	STA <dontSetPointer
 	LDA PowerOnTest_PPUReset
 	RTS
 ;;;;;;;
