@@ -326,7 +326,7 @@ VblLoop:
 	
 	; Let's also see if the magic number was written, to verify if the reset flag exists.
 	; It's worth noting that in its current state, this test fails on my console.
-	LDA #$6
+	LDA #$9
 	STA PowerOnTest_PPUReset ; set to FAIL (error code $1) by default. Overwrite with PASS if it passes.
 	LDA #$27
 	STA $2006
@@ -337,7 +337,7 @@ VblLoop:
 	CMP #$5A
 	BEQ PostResetFlagTest
 	; The value of $5A was not written to VRAM, so the reset flag does exist!
-	LDA #1
+	LDA #5
 	STA PowerOnTest_PPUReset ; Store a passing result here.
 	;; End of test ;;
 PostResetFlagTest:
