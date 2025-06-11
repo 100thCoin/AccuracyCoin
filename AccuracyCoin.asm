@@ -1920,10 +1920,29 @@ TEST_PowerOnState_PPU_Palette:
 
 TEST_PowerOnState_PPU_ResetFlag:
 	;;; Test 1 [PPU Reset Flag]: Print the value recorded at power on ;;;
+	LDA <RunningAllTests
+	BNE TEST_PPU_ResetFlag_End
 	JSR ClearNametableFrom2240
 	JSR ResetScrollAndWaitForVBlank
+	LDA #0
+	STA <dontSetPointer
 	LDA PowerOnTest_PPUReset
+	CMP #5 
+	BNE TEST_PPU_ResetFlag_Nope
+	JSR PrintTextCentered
+	.word $2252
+	.byte "Reset flag detected", $FF
+	JMP TEST_PPU_ResetFlag_End
+TEST_PPU_ResetFlag_Nope:	
 	;; END OF TEST ;;
+	JSR PrintTextCentered
+	.word $2252
+	.byte "Reset flag not detected", $FF
+TEST_PPU_ResetFlag_End:	
+	JSR ResetScroll
+	LDA #1
+	STA <dontSetPointer
+	LDA PowerOnTest_PPUReset
 	RTS
 ;;;;;;;
 
@@ -6569,6 +6588,12 @@ TEST_DMA_Plus_4015R:
 	RTS
 ;;;;;;;
 
+	.bank 2	; If I don't do this, the ROM won't compile.
+	.org $C000
+	
+	; and 33 00s in a row for a nice and neat silent DPCM sample.
+	.byte $00,  $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+
 TEST_DMA_Plus_4016R:
 	;;; Test 1 [DMA + $4016 Read]: Does the DMA Update the read-sensitive controller port? (also doubles as a test for DMA timing) ;;;
 	
@@ -6675,11 +6700,7 @@ TEST_ControllerStrobing:
 	RTS
 ;;;;;;;
 
-	.bank 2	; If I don't do this, the ROM won't compile.
-	.org $C000
-	
-	; and 33 00s in a row for a nice and neat silent DPCM sample.
-	.byte $00,  $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+
 
 FAIL_InstructionTiming:
 	JMP TEST_Fail
@@ -9039,6 +9060,8 @@ TEST_DMC_Conflict_AnswerLoop_Famicom:
 	STA <$50	; pass code 2. (famicom)
 	
 TEST_DMC_Test3:
+	INC <currentSubTest
+
 	;;; Test 3 [DMA Bus Conflicts]: The bus conflicts clears the APU Frame Counter Interrupt Flag. ;;;
 	LDA $4015	; The bus conflict will read from $4015, clearing the frame counter's interrupt flag. 
 	AND #$40
