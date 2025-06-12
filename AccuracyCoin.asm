@@ -162,7 +162,7 @@ result_UnOp_ANE_8B	= $414
 result_UnOp_LXA_AB	= $415
 result_UnOp_AXS_CB	= $416
 result_UnOp_SBC_EB	= $417
-result_UnOp_Magic = $418
+result_UnOp_Magic   = $3FB ; page 3 omits the test from the all-test-result-table.
 
 result_UnOp_RLA_23 = $419
 result_UnOp_RLA_27 = $41A
@@ -223,7 +223,7 @@ result_UnOp_SHX_9E = $44A
 result_UnOp_LAE_BB = $44B
 
 result_DMA_Plus_2007R = $44C
-result_FFFF_Plus_X_Wraparound = $44D
+result_ProgramCounter_Wraparound = $44D
 result_PPUOpenBus = $044E
 result_DMA_Plus_2007W = $44F
 
@@ -263,11 +263,23 @@ result_DMA_Plus_OpenBus = $46C
 
 result_ImpliedDummyRead = $46D
 
-result_PowOn_CPURAM = $0480
-result_PowOn_CPUReg = $0481
-result_PowOn_PPURAM = $0482
-result_PowOn_PPUPal = $0483
-result_PowOn_PPUReset = $0484
+result_AddrMode_AbsIndex = $46E
+result_AddrMode_ZPgIndex = $46F
+result_AddrMode_Indirect = $470
+result_AddrMode_IndIndeX = $471
+result_AddrMode_IndIndeY = $472
+result_AddrMode_Relative = $473
+
+result_DecimalFlag = $474
+result_BFlag = $475
+
+result_PPUReadBuffer = $476
+
+result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
+result_PowOn_CPUReg = $03FD ; page 3 omits the test from the all-test-result-table.
+result_PowOn_PPURAM = $03FE ; page 3 omits the test from the all-test-result-table.
+result_PowOn_PPUPal = $03FF ; page 3 omits the test from the all-test-result-table.
+result_PowOn_PPUReset = $0418
 
 ;$500 is dedicated to RAM needed for tests.
 ;$600 is dedicated to the IRQ routine
@@ -365,6 +377,12 @@ ReloadMainMenu:
 	
 	LDA #0
 	STA $100 ; initialize the placeholder test results.
+	; and also initialize the "print tests" results, as these tests use page 3, which is mostly uninitilized.
+	STA result_UnOp_Magic
+	STA result_PowOn_CPURAM
+	STA result_PowOn_CPUReg
+	STA result_PowOn_PPURAM
+	STA result_PowOn_PPUPal
 	
 	STA $6000 ; An incorrect open bus implementation might end up executing address $6000, so let's initialzie these 3 bytes to BRKs.
 	STA $6001 ; Though I would prefer if this was a NES 2.0 cartridge without any PRG RAM, so writing here might do nothing anyway.
@@ -399,6 +417,7 @@ InfiniteLoop:
 	; Here is how the pages of tests are organized.
 TableTable:
 	.word Suite_CPUBehavior
+	.word Suite_CPUInstructions
 	.word Suite_UnofficialOps_SLO
 	.word Suite_UnofficialOps_RLA
 	.word Suite_UnofficialOps_SRE
@@ -412,6 +431,7 @@ TableTable:
 	.word Suite_DMATests
 	.word Suite_APUTiming
 	.word Suite_PowerOnState
+	.word Suite_PPUBehavior
 	.word Suite_PPUTiming
 	.word Suite_SpriteZeroHits
 	.word Suite_PPUMisc
@@ -434,14 +454,23 @@ Suite_CPUBehavior:
 	.byte "CPU Behavior", $FF
 	table "ROM is not writable", 	 $FF, result_ROMnotWritable, TEST_ROMnotWritable
 	table "RAM Mirroring", 			 $FF, result_RAMMirror, TEST_RamMirroring
-	table "$FFFF + X Wraparound", 	 $FF, result_FFFF_Plus_X_Wraparound, Test_FFFF_Plus_X_Wraparound
-	table "PPU Register Mirroring",  $FF, result_PPURegMirror, TEST_PPURegMirroring
-	table "PPU Register Open Bus",	 $FF, result_PPUOpenBus, TEST_PPU_Open_Bus
+	table "PC Wraparound",           $FF, result_ProgramCounter_Wraparound, Test_ProgramCounter_Wraparound
+	table "The Decimal Flag",		 $FF, result_DecimalFlag, TEST_DecimalFlag
+	table "The B Flag",              $FF, result_BFlag, TEST_BFlag
 	table "Dummy read cycles", 		 $FF, result_DummyReads, TEST_DummyReads
 	table "Dummy write cycles", 	 $FF, result_DummyWrites, TEST_DummyWrites
 	table "Open Bus", 				 $FF, result_OpenBus, TEST_OpenBus
-	;table "CPU Instructions", 		 $FF, result_CPUInstr, DebugTest
 	table "Unofficial Instructions", $FF, result_UnofficialInstr, TEST_UnofficialInstructionsExist
+	.byte $FF
+	
+Suite_CPUInstructions:
+	.byte "Addressing mode wraparound", $FF
+	table "Absolute Indexed",  $FF, result_AddrMode_AbsIndex, TEST_AddrMode_AbsIndex
+	table "Zero Page Indexed", $FF, result_AddrMode_ZPgIndex, TEST_AddrMode_ZPgIndex
+	table "Indirect",          $FF, result_AddrMode_Indirect, TEST_AddrMode_Indirect
+	table "Indirect, X",       $FF, result_AddrMode_IndIndeX, TEST_AddrMode_IndIndeX
+	table "Indirect, Y",       $FF, result_AddrMode_IndIndeY, TEST_AddrMode_IndIndeY
+	table "Relative",          $FF, result_AddrMode_Relative, TEST_AddrMode_Relative
 	.byte $FF
 	
 	;; Unofficial Instructions: SLO ;;
@@ -556,7 +585,6 @@ Suite_UnofficialOps_Immediates:
 	table "Print magic values",  $FF, result_UnOp_Magic, TEST_MAGIC
 	.byte $FF
 	
-	
 	;; CPU Interrupts ;;
 Suite_CPUInterrupts:
 	.byte "CPU Interrupts", $FF
@@ -599,6 +627,14 @@ Suite_PowerOnState:
 	table "Palette RAM", $FF, result_PowOn_PPUPal, TEST_PowerOnState_PPU_Palette
 	.byte $FF
 	
+	;; PPU Behavior ;;
+Suite_PPUBehavior:
+	.byte "PPU Behavior", $FF
+	table "PPU Register Mirroring",  $FF, result_PPURegMirror, TEST_PPURegMirroring
+	table "PPU Register Open Bus",	 $FF, result_PPUOpenBus, TEST_PPU_Open_Bus
+	table "PPU Read Buffer", $FF, result_PPUReadBuffer, TEST_PPUReadBuffer
+	.byte $FF
+	
 	;; PPU VBL Timing ;;
 Suite_PPUTiming:
 	.byte "PPU VBlank Timing", $FF
@@ -621,7 +657,6 @@ Suite_SpriteZeroHits:
 	table "Misaligned OAM behavior", $FF, result_MisalignedOAM_Behavior, TEST_MisalignedOAM_Behavior
 	table "Address $2004 behavior", $FF, result_Address2004_Behavior, TEST_Address2004_Behavior
 	.byte $FF
-	
 	
 	;; PPU Misc ;;
 Suite_PPUMisc:
@@ -658,18 +693,17 @@ AutomaticallyRunEntireROM_Loop:
 	JSR LoadSuiteMenuNoRendering  ; Set up the menuHeight, and all the pointers for these tests and results.
 	LDX #0
 AutomaticallyRunEntireROM_Loop2:  ; Run every test on page Y.
-	CPY #9                        ; Skip running the few tests that don't actaully test for anything.
-	BNE AREROM_RT_CheckPage13     ; Some tests just print data on screen, and always return "PASS"
-	CPX #8                        ; These are ignored in the tally.
-	BNE AREROM_RT_NoPrintTests	  ; ^
-	JMP AERROP_RT_Skip            ; ^
-AREROM_RT_CheckPage13:            ; ^
-	CPY #13                       ; ^
-	BNE AREROM_RT_NoPrintTests    ; ^
-	CPX #0                        ; ^
-	BEQ AREROM_RT_NoPrintTests    ; ^
-	JMP AERROP_RT_Skip
-AREROM_RT_NoPrintTests:
+	TXA
+	PHA
+	ASL A
+	TAX
+	LDA <suitePointerList+1,X
+	STA <$00
+	PLA
+	TAX
+	LDA <$00
+	CMP #3	; if the page used to store the results is page 3 instead of page 4, we skip this test.
+	BEQ AERROP_RT_Skip
 	STX <menuCursorYPos           ; The "menuCursorYPos" variable is used inside RunTest to determing what code to run.
 	JSR RunTest                   ; Run the test at index X of page Y.
 	JSR WaitForVBlank
@@ -708,7 +742,7 @@ AERROP_RT_Skip:
 	STA <PostAllTestTally
 	JSR ClearNametable	
 	JSR SetPPUADDRFromWord
-	.byte $20, $E7
+	.byte $20, $E5
 	LDA #$D0	; Upper left corner.
 	STA $2007
 	LDA #$D5	; horizontal bar.
@@ -722,7 +756,7 @@ AREROM_MenuLoop1:
 	STA $2007
 	; And the tallest page has 10 tests, so let's make this ten tiles tall.
 	JSR SetPPUADDRFromWord
-	.byte $22, $47
+	.byte $22, $45
 	LDA #$D2	; Bottom left corner.
 	STA $2007
 	LDA #$D5	; horizontal bar.
@@ -738,7 +772,7 @@ AREROM_MenuLoop2:
 	LDA #4
 	STA $2000	; keep NMI disabled, but set the increment mode to 32 instead of 1.
 	JSR SetPPUADDRFromWord
-	.byte $21, $07
+	.byte $21, $05
 	LDA #$D4	; horizontal bar.
 	LDX #0
 AREROM_MenuLoop3:
@@ -747,7 +781,7 @@ AREROM_MenuLoop3:
 	CPX #10 ; once X = 11, stop.
 	BNE AREROM_MenuLoop3
 	JSR SetPPUADDRFromWord
-	.byte $21, $07+((EndTableTable - TableTable)/2)+1
+	.byte $21, $05+((EndTableTable - TableTable)/2)+1
 	LDA #$D4	; horizontal bar.
 	LDX #0
 AREROM_MenuLoop4:
@@ -761,30 +795,27 @@ AREROM_PageColumnLoop1:
 	STY <menuTabXPos
 	JSR SetUpSuitePointer         ; Set up the suite pointer.
 	JSR LoadSuiteMenuNoRendering  ; Set up the menuHeight, and all the pointers for these tests and results.
-	; set the v register to 2108 + Y
+	; set the v register to 2106 + Y
 	LDA #$21
 	STA $2006
 	TYA
 	CLC
-	ADC #08
+	ADC #06
 	STA $2006
 	LDX #0
 AREROM_PageColumnLoop2:           ; Check results of every test on the page Y.
 	; Check for the "print" tests, like "CPU RAM at power on", which isn't really testing anything. These don't need to be counted.
-	CPY #9
-	BNE AREROM_CheckPage13
-	CPX #8
-	BNE AREROM_NoPrintTests	
-	LDA $2007
-	JMP AERROP_Skip
-AREROM_CheckPage13:
-	CPY #13
-	BNE AREROM_NoPrintTests
-	CPX #0
-	BEQ AREROM_NoPrintTests
-	LDA $2007
-	JMP AERROP_Skip
-AREROM_NoPrintTests:
+	TXA
+	PHA
+	ASL A
+	TAX
+	LDA <suitePointerList+1,X
+	STA <$00
+	PLA
+	TAX
+	LDA <$00
+	CMP #3	; if the page used to store the results is page 3 instead of page 4, we skip this test.
+	BEQ AERROP_Skip
 	INC <PostAllTestTally
 	STX <Copy_X
 	TXA
@@ -803,7 +834,7 @@ AREROM_NoPrintTests:
 	BEQ AERROP_Next	; Check if theres an "error code". If not, move on.
 	; If so, let's figure out what the coordinates of this test is.
 	; X is, humorously going to give us the Y coordinate, and Y is likewise the X coordinate.
-	; starting at X coordinate $40, and Y coodinate $40 (-1)
+	; starting at X coordinate $30, and Y coodinate $40 (-1)
 	; Each value of X or Y translates to 8 pixels.
 	PHA
 	STX <Copy_X2
@@ -833,7 +864,7 @@ AREROM_NoPrintTests:
 	ASL A
 	ASL A		; multiply by 8
 	CLC
-	ADC #$40
+	ADC #$30
 	STA $203,X
 	INC <$10
 	LDX <Copy_X2
@@ -860,22 +891,22 @@ AREROM_PageColumnLoopEnd:
 	STA $2000	; keep NMI disabled, but set the increment mode back to 1.
 	; and set up attributes for this table.
 	JSR SetPPUADDRFromWord
-	.byte $23, $D2
+	.byte $23, $D1
 	LDX #0
 AERROP_AttributeLoop:
 	LDA AERROP_Attributes, X
 	STA $2007
 	INX
-	CPX #21
+	CPX #22
 	BNE AERROP_AttributeLoop
 
 	; Let's print how many tests passed.
-	JSR PrintTextCentered
-	.word $2290
-	.byte "Tests passed:        ", $FF
+	JSR PrintText
+	.word $2285
+	.byte "Tests passed:", $FF
 	;     "Tests passed: xyz / xyz"
 	JSR SetPPUADDRFromWord
-	.byte $22, $94
+	.byte $22, $93
 	LDA <PostAllPassTally
 	JSR PrintByteDecimal_MinDigits
 	LDA #$24
@@ -888,14 +919,17 @@ AERROP_AttributeLoop:
 
 	; I'd like to also like to label each of these columns with a page number.
 	JSR PrintText
-	.word $206F
+	.word $206E
 	.byte "Page", $FF
 	JSR PrintText
-	.word $20A8
-	.byte "123456789111111111", $FF
+	.word $20A6
+	.byte "12345678911111111112", $FF
 	JSR PrintText
-	.word $20D1
-	.byte "012345678", $FF
+	.word $20CF
+	.byte "01234567890", $FF
+
+	LDA #0
+	STA <menuTabXPos
 
 	JSR WaitForVBlank
 	JSR SetUpAllTestMenuPalette
@@ -916,9 +950,9 @@ AERROP_AttributeLoop:
 ;;;;;;;
 
 AERROP_Attributes:
-	.byte $FF, $FF, $FF, $FF, $33, $00, $00, $00
-	.byte $FF, $FF, $FF, $FF, $33, $00, $00, $00
-	.byte $0F, $0F, $0F, $0F, $03
+	.byte $CC, $FF, $FF, $FF, $FF, $33, $00, $00
+	.byte $CC, $FF, $FF, $FF, $FF, $33, $00, $00
+	.byte $0C, $0F, $0F, $0F, $0F, $03
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 PressStartToContinue:
@@ -4413,60 +4447,8 @@ TEST_Fail8:
 	JSR EnableRendering_BG	
 	JMP TEST_Fail
 
-Test_FFFF_Plus_X_Wraparound:
-	;;; Test 1 [$FFFF + X Wraparound]: LDA $FFFF + X (X=1) wraps around to $0000 ;;;
-	LDA #$5A
-	STA <$00
-	LDX #$01
-	LDA $FFFF,X
-	CMP #$5A
-	BNE TEST_Fail8
-	INC <currentSubTest
-	;;; Test 2 [$FFFF + X Wraparound]: LDA $FFFF + Y (Y=1) wraps around to $0000 ;;;
-	LDA #$A5
-	STA <$00
-	LDY #$01
-	LDA $FFFF,Y
-	CMP #$A5
-	BNE TEST_Fail8
-	INC <currentSubTest
-	;;; Test 3 [$FFFF + X Wraparound]: STA $FFFF + X (X=1) wraps around to $0000 ;;;
-	LDA #$A5
-	STA <$00
-	LDX #$01
-	STA $FFFF,Y
-	LDA <$00
-	CMP #$A5
-	BNE TEST_Fail8
-	INC <currentSubTest
-	
-	;;; Test 4 [$FFFF + X Wraparound]: Branching from $FFF4 to $0050 ;;;
-Test_FFFF_Plus_X_PrepIRQLoop:
-	LDA TEST_OpenBus_IRQRoutine,X ; USe the same routine as the open bus IRQ. PLA 5 times, and JUMP to the fail condition.
-	STA $600, X
-	INX
-	CPX #8
-	BNE Test_FFFF_Plus_X_PrepIRQLoop
-	; Some emulators might implement this poorly, such that executing beyond address $FFFF crashes or maybe executes all zeroes? So let's set up the IRQ routine in case a BRK runs.
-	; I have no idea what Wii VC is doing here, but it just crashes. Notably, it would pass test 4 if it made it that far, though braches specifically break it.
-	LDA #$E6
-	STA <$50
-	LDA #$55
-	STA <$51
-	LDA #$80
-	STA <$55
-	LDA #$D0
-	STA <$52
-	LDA #$A5
-	STA <$53
-	JSR TEST_FFFF_Branch_Wraparound
-	LDA <$55
-	CMP #$81
-	BNE TEST_Fail8
-	INC <currentSubTest
-	
-
-	;;; Test 5 [$FFFF + X Wraparound]: Executing from $FFFF to $0000 ;;;
+Test_ProgramCounter_Wraparound:
+	;;; Test 1 [Program Counter Wraparound]: Executing from $FFFF should wrap around to address $0000 ;;;
 	LDA #$00
 	STA <$00
 	LDA #$60
@@ -7602,16 +7584,8 @@ TEST_RMW2007_ClearNametableLoop:
 	.byte $27, $2B
 	CMP #$2B
 	BEQ FAIL_RMW2007
-	INC <currentSubTest
-
-	;;; Test 4 [RMW $2007]: Did we write to the correct palette RAM address? ;;;
-	JSR SetPPUADDRFromWord
-	.byte $3F, $0E
-	LDA $2007 ; Palette RAM doesn't use the PPU Read buffer.
-	CMP #$2E
-	BNE FAIL_RMW2007
-	INC <currentSubTest
-		
+	
+	; I'd like to test for where we *did* write to palette RAM, but that seems inconsistent across consoles, so I'm ending the test here.
 	;; END OF TEST ;;
 	JSR ResetScroll
 	JSR WaitForVBlank
@@ -9773,7 +9747,8 @@ TEST_ImpliedDummyRead_PostJSR:
 	; 29 opcodes tested now.
 	; I still want to test branches, though to be honest, I'm not currently sure how to safely do that.
 	; I think my DMA sync routines take a variable amount of time, so I can't rely on a dummy read reading $2002, since the Vblank flag could be cleared whjile waiting for the DMA to sync.
-
+	
+	;; END OF TEST ;;
 	JSR TEST_ImpliedDummyRead_RestoreRAM
 	LDA #1
 	RTS
@@ -9853,6 +9828,590 @@ TEST_ImpliedDummyRead_IntOpsToTest:
 	RTI
 ;;;;;;;
 	
+TEST_AddrMode_AbsIndex:
+	;;; Test 1 [Absolute Indexed Wraparound]: Does LDA Absolute, X read from the expected address ;;;
+	; Let's just start with crossing a page boundary, as I would be bewildered if an emulator could even make it this far without indexed LDAs working at all.
+	LDA #$5A
+	STA $680 ; Set up address $680
+	LDX #$F0 ; Set up X
+	LDA $590, X ; Read from address $680
+	CMP #$5A ; Check if it was the correct address.
+	BNE FAIL_AddrMode_AbsIndex
+	INC <currentSubTest
+	
+	;;; Test 2 [Absolute Indexed Wraparound]: Wrapping around from address $FFFF to $0000 ;;;
+	LDA #$5A
+	STA <$50
+	LDX #$51
+	LDA $FFFF, X	; $FFFF + $51 = $0050
+	CMP #$5A ; Check if it was the correct address.
+	BNE FAIL_AddrMode_AbsIndex
+	; Make sure it wasn't a fluke. (I don't know. You could somehow incorrectly implement a hypothetical address $10050, and it might just happen to hold $5A.)
+	LDA #$A5
+	STA <$50
+	LDA $FFFF, X	; $FFFF + $51 = $0050
+	CMP #$A5 ; Check if it was the correct address.
+	BNE FAIL_AddrMode_AbsIndex
+	INC <currentSubTest
+	
+	;;; Test 3 [Absolute Indexed Wraparound]: The same applies to indexing with Y ;;;
+	LDY #$51
+	LDA $FFFF, Y	; $FFFF + $51 = $0050
+	CMP #$A5 ; Check if it was the correct address.
+	BNE FAIL_AddrMode_AbsIndex
+	
+	;; END OF TEST ;;
+	LDA #1
+	RTS
+;;;;;;;
+
+FAIL_AddrMode_AbsIndex:
+	JMP TEST_Fail
+
+TEST_AddrMode_ZPgIndex:
+	;;; Test 1 [Zero Page Indexed Wraparound]: Does LDA <ZeroPage, X read from the expected address ;;;
+	LDA #$A5
+	STA <$58	; We'll read from address $58 just to test if this instruction is working as expected, with no edge cases.
+	LDX #8
+	LDA #0
+	LDA <$50, X ; read from address $58
+	CMP #$A5	; compare with $A5
+	BNE FAIL_AddrMode_ZPgIndex ; And fail the test if the expected value wasn't read.
+	INC <currentSubTest
+
+	;;; Test 2 [Zero Page Indexed Wraparound]: Indexing should always remain on the zero page. ;;;
+	; For instance, suppose X = $20. LDA <$F0, X won't read from address $0110, rather, it will read from address $0010.
+	STA <$00
+	LDA #$5A
+	STA $100
+	LDX #1
+	LDA <$FF, X
+	CMP #$A5
+	BNE FAIL_AddrMode_ZPgIndex
+	INC <currentSubTest
+
+	;;; Test 3 [Zero Page Indexed Wraparound]: This also applies to Zero Page with Y indexing. ;;;
+	LDY #1
+	LDX <$FF, Y
+	CPX #$A5
+	BNE FAIL_AddrMode_ZPgIndex
+	
+	;; END OF TEST ;;
+	LDA #1
+	RTS
+;;;;;;;
+
+FAIL_AddrMode_ZPgIndex
+	JMP TEST_Fail
+;;;;;;;;;;;;;;;;;
+
+TEST_AddrMode_Indirect:
+	;;; Test 1 [Indirect Addressing Wraparound]: Does JMP (indirect) move the program counter to the correct location? ;;;
+	; I guess if it doesn't then the emulator would likely crash, huh?
+	LDA #LOW(TEST_AddrMode_Indirect_Pass1)
+	STA $500
+	LDA #HIGH(TEST_AddrMode_Indirect_Pass1)
+	STA $501
+	LDX #0
+	JMP [$0500]
+	INX	; I don't know... I guess an emulator could just choose not to move the PC anywhere at all?
+TEST_AddrMode_Indirect_Pass1:
+	CPX #0
+	BNE FAIL_AddrMode_Indirect
+	INC <currentSubTest
+	
+	;;; Test 2 [Indirect Addressing Wraparound]: The Address bus wraps around the page when reading the low and high bytes with indirect addressing ;;;
+	; Basically, if the indirect jump is at a page boundary, (address $5FF, for instance) the high byte will be read from the same page as the low byte.
+	; So instead of reading $5FF and $600, it reads $5FF and $500.	
+	LDY #0	; both X and Y are now zero.
+	LDA #$60	; the opcode for RTS
+	STA $580	; store at $580, where ths upcoming indirect jump should move the PC.
+	STA $681	; also store at 681. An incorrect emulation of the behavior tested here will mvoe the PC to $680, where I will run INX, RTS.
+	LDA #$E8	; the opcode for INX
+	STA $680	; Store at $680, as mentioned above.
+	; And now to set up the test.
+	LDA #$80
+	STA $5FF	; The low byte of the indirect jump is $80.
+	LDA #5
+	STA $500	; the correct indirect address is $580
+	LDA #6
+	STA $600	; while the incorrect address is $680
+	JSR TEST_AddrMode_Indirect_Here ; RTS will move the PC back here after the test.
+TEST_AddrMode_Indirect_Here: ; Yeah, this set up is a little cursed, but I wanted to use RTS at the locations in RAM instead of JMP.
+	CPY #1
+	BEQ TEST_AddrMode_Indirect_Next ; If this is executing after the RTS, this test won't need ran a second time.
+	INY
+	JMP [$05FF] ; If this jumps to $580, pass. if this jumps to $680, fail.	
+TEST_AddrMode_Indirect_Next:
+	CPX #01
+	BEQ FAIL_AddrMode_Indirect
+	;; END OF TEST ;;
+	LDA #1
+	RTS
+;;;;;;;
+	
+FAIL_AddrMode_Indirect:
+	JMP TEST_Fail
+;;;;;;;;;;;;;;;;;
+
+TEST_AddrMode_IndIndeX:
+	;;; Test 1 [Indirect Addressing, X Wraparound]: Does LDA (indirect, X) read from the expected address ;;;
+	; Indirect addressint, X works like this:
+	; The operand is a byte on the zero page. Add X to that address, the value of which will be the low byte of the target address of the instruction.
+	; The following byte in memory will be the high byte of the target address.
+	; For example, LDA ($50, X) would work like this: (Assume X = $10, address $60 has the value $00, and address $61 has the value $80)
+	; Cycle 1: Read the opcode: $A1
+	; Cycle 2: Read the operand: $50
+	; Cycle 3: Dummy Read address $0050, and add X to this address.
+	; Cycle 4: Read address $0060: $00
+	; Cycle 5: Read address $0061: $80
+	; Cycle 6: Read address $8000
+	;
+	; For my test, I'm going to start with something just as simple as that.
+	; Address $580 will hold the value $5A
+	LDA #$5A
+	STA $580
+	; and address $58 will be set up with a pointer to address $580
+	LDA #$80
+	STA <$58
+	LDA #$05
+	STA <$59
+	; And now I set X to $08
+	LDX #$08
+	; And low we run the LDA instruction.
+	LDA [$0050, X]
+	; The result of which, should be the value at address $580
+	CMP #$5A
+	BNE FAIL_AddrMode_IndIndeX
+	INC <currentSubTest
+
+	;;; Test 2 [Indirect Addressing, X Wraparound]: The X indexing is confined to the zero page. ;;;
+	; Set up $158 to point to address $680
+	LDA #$80
+	STA $158
+	LDA #$06
+	STA $159
+	; Set X to $F0
+	LDX #$F0
+	; And low we run the LDA instruction.
+	LDA [$0068, X]
+	CMP #$5A
+	BNE FAIL_AddrMode_IndIndeX
+	INC <currentSubTest
+	
+	;;; Test 3 [Indirect Addressing, X Wraparound]: The Address bus wraps around the page when reading the low and high bytes with indirect addressing ;;;
+	LDA #$80
+	STA <$FF
+	LDA #$05
+	STA <$00
+	LDA #$06
+	STA $100
+	; Set X to $00
+	LDX #$00
+	; And low we run the LDA instruction.
+	LDA [$00FF, X]
+	CMP #$5A
+	BNE FAIL_AddrMode_IndIndeX
+	
+	;; END OF TEST ;;
+	LDA #1
+	RTS
+;;;;;;;
+
+FAIL_AddrMode_IndIndeX:
+	JMP TEST_Fail
+;;;;;;;;;;;;;;;;;
+
+TEST_AddrMode_IndIndeY:
+	;;; Test 1 [Indirect Addressing, Y Wraparound]: Does LDA (indirect), Y read from the expected address ;;;
+	; Indirect addressing, Y works like this:
+	; The operand is a byte on the zero page, the value of which will be the low byte of the target address of the instruction.
+	; The following byte in memory will be the high byte of the target address.
+	; For example: LDA ($50), Y would work like this: (Assume Y= $20, address $50 has the value $F0, and address $51 has the value $80)
+	; Cycle 1: Read the opcode: $B1
+	; Cycle 2: Read the operand: $50
+	; Cycle 3: Read address $0050: $F0
+	; Cycle 4: Read address $0051: $80. Add Y to the low byte. The address bus is now pointing to $8010.
+	; Cycle 5: Dummy Read address $8010. Fix the high byte of the address bus, since the Y indexing crossed a page boundary.
+	; Cycle 6: Read from address $8110. (This cycle only occurs if the Y indexing crossed a page boundary.)
+	;
+	; For my test though, I'm just going to start with something simple.
+	; Address $580 will hold the value $5A.
+	LDA #$5A
+	STA $580
+	; and address $50 will be set up with a pointer to address $570
+	LDA #$70
+	STA <$50
+	LDA #$05
+	STA <$51
+	; And now I set Y to $10
+	LDY #$10
+	; And low we run the LDA instruction.
+	LDA [$0050], Y
+	; The result of which, should be the value at address $580
+	CMP #$5A
+	BNE FAIL_AddrMode_IndIndeY
+	INC <currentSubTest
+	
+	;;; Test 2 [Indirect Addressing, Y Wraparound]: The Y indexing is allowed to cross page boundaries. ;;;
+	; Address $610 will hold the value $5A.
+	LDA #$5A
+	STA $610
+	; and address $50 will be set up with a pointer to address $5F0
+	LDA #$F0
+	STA <$50
+	LDA #$05
+	STA <$51
+	; And now I set Y to $20
+	LDY #$20
+	; And low we run the LDA instruction.
+	LDA [$0050], Y
+	; The result of which, should be the value at address $610
+	CMP #$5A
+	BNE FAIL_AddrMode_IndIndeY
+	INC <currentSubTest
+	
+	;;; Test 3 [Indirect Addressing, Y Wraparound]: The Address bus wraps around the page when reading the low and high bytes with indirect addressing ;;;
+	; LDA ($FF), Y works like this:
+	; Cycle 1: Read the opcode: $B1
+	; Cycle 2: Read the operand: $FF
+	; Cycle 3: Read address $00FF:
+	; Cycle 4: Read address $0000: (NOTE: This is NOT address $100. The high byte remains $00)
+	; Cycle 5: etc.
+	;
+	; Address $610 will hold the value $5A.
+	LDA #$5A
+	STA $555
+	; and address $FF will be set up with a pointer to address $555
+	LDA #$55
+	STA <$FF
+	LDA #$05
+	STA <$00
+	; I also make sure address $100 is not #05
+	LDA #$06
+	STA $100 ; Address $655 should be $00, since that page gets cleared before hte test runs.
+	; And now I set Y to $0
+	LDY #$0
+	; And low we run the LDA instruction.
+	LDA [$00FF], Y
+	; The result of which, should be the value at address $555, NOT the value at $655
+	CMP #$5A
+	BNE FAIL_AddrMode_IndIndeY	
+	
+	;; END OF TEST ;;
+	LDA #1
+	RTS
+;;;;;;;
+
+FAIL_AddrMode_IndIndeY:
+	JMP TEST_Fail
+;;;;;;;;;;;;;;;;;
+
+TEST_AddrMode_Relative:
+	;;; Test 1 [Relative Addressing]: Branching from page $00 to page $FF ;;;
+	LDA TEST_OpenBus_IRQRoutine,X ; Use the same routine as the [Open Bus] test IRQ. PLA 5 times, and JUMP to the fail condition.
+	STA $600, X
+	INX
+	CPX #8
+	BNE TEST_AddrMode_Relative	
+	; Some emulators might implement this poorly, such that executing beyond address $FFFF crashes or maybe executes all zeroes? So let's set up the IRQ routine in case a BRK runs.
+	; Let's first test by branching from the zero page. If the PC is somehow moving to a hypothetical Page -1, we could set up address $00 to be a BRK, in case it executes to it.
+	LDA #$00
+	STA <$00
+	STA <$01
+	STA <$02
+	; Address $FFF9 has an RTS, so let's aim for there.
+	LDA #$D0
+	STA <$52
+	LDA #$A5
+	STA <$53
+	JSR $0052	; This will branch to $FFF9, running an RTS. Otherwise, running a BRK.	
+	INC <currentSubTest
+	
+	;;; Test 2 [Relative Addressing]: Branching from page $FF to page $00 ;;;
+	LDA #$E6
+	STA <$50
+	LDA #$55
+	STA <$51
+	LDA #$80
+	STA <$55
+	JSR TEST_FFFF_Branch_Wraparound
+	LDA <$55
+	CMP #$81
+	BNE FAIL_AddrMode_Relative
+	
+	;; END OF TEST ;;
+	LDA #1
+	RTS
+;;;;;;;
+
+FAIL_AddrMode_Relative:
+	JMP TEST_Fail
+;;;;;;;;;;;;;;;;;
+
+TEST_DecimalFlag:
+	;;; Test 1 [The Decimal Flag]: The 6502 "Binary Coded Decimal" flag should not affect the ADC or SBC instructions on the NES ;;;
+	; Despite the Decimal Flag existing, (BRK or PHP instructions will still set bit 3 of the value pushed depending on the state of this flag), it doesn't affect ADC or SBC.
+	; So let's test that!
+	SED
+	; With the Decimal Flag set, we can run math, such as $55 - $16 = $39, despite the fact that that's not how hexadecimal numbers work.
+	LDA #$55
+	SEC
+	SBC #$16
+	; And if the decimal flag works, the result will be $39.
+	; But remember, the decimal does NOT work on the NES. So the result should *actually* be the correct result of subtracting the two hexadecimal numbers, which is $3F.
+	CMP #$3F
+	BNE FAIL_DecimalFlag
+	INC <currentSubTest
+	
+	;;; Test 2 [The Decimal Flag]: Despite this flag not working, it still gets pushed in a PHP/BRK instruction ;;;
+	PHP ; the decimal flag is set.
+	PLA ; pull the processor stuff into the A register.
+	AND #8 ; the Decimal flag is bit 3.
+	BEQ FAIL_DecimalFlag
+	CLD ; clear the decimal flag and do this again.
+	PHP
+	PLA
+	AND #8
+	BNE FAIL_DecimalFlag ; the Decimal flag is no longer set.
+	; And that's pretty much it.
+	
+	;; END OF TEST ;;
+	LDA #1
+	RTS
+;;;;;;;
+
+FAIL_DecimalFlag:
+	CLD
+FAIL_BFlag:
+	LDA #$40
+	STA $4017
+	JMP TEST_Fail
+
+TEST_BFlag: 
+	;;; Test 1 [The B Flag]: The B flag of the 6502 processor flags is set by PHP ;;;
+	PHP
+	PLA
+	STA <$50	; we'll get back to this one.
+	AND #$10
+	BEQ FAIL_BFlag
+	INC <currentSubTest
+	
+	;;; Test 2 [The B Flag]: The B flag of the 6502 processor flags is set by BRK ;;;
+	; Set up the BRK routine
+	LDA #$4C
+	STA $600
+	STA $700	; also set this up now for the NMI test.
+	LDA #LOW(TEST_BFlag_BRK)
+	STA $601
+	LDA #HIGH(TEST_BFlag_BRK)
+	STA $602
+	BRK
+TEST_BFlag_BRK:
+	PLA ; pull off processor flags.
+	STA <$51	; we'll get back to this one.
+	PLA ; pull off the return address
+	PLA ; ^
+	LDA <$51
+	AND #$10
+	BEQ FAIL_BFlag ; the B flag should be set.
+	INC <currentSubTest
+	
+	;;; Test 3 [The B Flag]: This emulator should be capable of running an IRQ before I run an IRQ test. ;;;
+	LDA #LOW(TEST_BFlag_BRK2)
+	STA $601
+	LDA #HIGH(TEST_BFlag_BRK2)
+	STA $602
+	SEI
+	LDA #0
+	STA $4017
+	JSR Clockslide_30000
+	CLI
+	NOP
+	NOP
+	NOP
+	SEI
+	JMP TEST_Fail
+	
+TEST_BFlag_BRK2:
+	LDA #$40
+	STA $4017
+	; this IRQ should set the interrupt flag, but better safe than sorry?
+	SEI
+	INC <currentSubTest
+	
+	;;; Test 4 [The B Flag]: The B Flag should not be set when processor flags get pushed by an IRQ ;;;
+	PLA ; pull off processor flags.
+	STA <$52	; we'll get back to this one.
+	PLA ; pull off the return address
+	PLA ; ^
+	LDA <$52
+	AND #$10
+	BNE FAIL_BFlag ; the B flag should NOT be set.
+	INC <currentSubTest
+	
+	;;; Test 5 [The B Flag]: The B Flag should not be set when processor flags get pushed by an NMI ;;;
+	; we already set up $700 a while back.
+	LDA #LOW(TEST_BFlag_NMI)
+	STA $701
+	LDA #HIGH(TEST_BFlag_NMI)
+	STA $702
+	JSR WaitForVBlank
+	JSR Clockslide_20000
+	JSR EnableNMI
+TEST_BFlag_InfiniteLoop: ; just wait here for the NMI.
+	JMP TEST_BFlag_InfiniteLoop ; if the NMI isn't implemented, then this test never could have even started, so don't worry about it.
+TEST_BFlag_NMI:
+	; this NMI should set the interrupt flag, but better safe than sorry?
+	SEI
+	JSR DisableNMI
+	PLA ; pull off processor flags.
+	STA <$53	; we'll get back to this one.
+	PLA ; pull off the return address
+	PLA ; ^
+	LDA <$53
+	AND #$10
+	BNE FAIL_BFlag2 ; the B flag should NOT be set.
+	INC <currentSubTest
+	
+	;;; Test 6, 7, 8, and 9 [The B Flag]: Bit 5 of the processor status is always set. ;;;
+	LDX #0
+TEST_BFlag_Bit5Loop:
+	LDA <$50, X
+	AND #$20
+	BEQ FAIL_BFlag2
+	INC <currentSubTest
+	INX
+	CPX #4
+	BNE TEST_BFlag_Bit5Loop
+	
+	;; END OF TEST ;;
+	LDA #1
+	RTS
+;;;;;;;
+FAIL_BFlag2:
+	LDA #$40
+	STA $4017
+	JMP TEST_Fail
+;;;;;;;;;;;;;;;;;
+
+FAIL_PPUReadBuffer:
+	JSR ResetScroll
+	JMP TEST_Fail
+	
+TEST_PPUReadBuffer:
+	;;; Test 1 [PPU Read Buffer]: Reading from the PPU register at $2007 should work. ;;;
+	; it is assumed that writing there works.
+	JSR SetPPUADDRFromWord
+	.byte $24, $00
+	LDA #$5A
+	STA $2007
+	STA $2007
+	STA $2007
+	
+	JSR SetPPUADDRFromWord
+	.byte $24, $00
+	LDA #0
+	LDA $2007
+	LDA $2007
+	; this value should be $5A, even if the buffer isn't working.
+	CMP #$5A
+	BNE FAIL_PPUReadBuffer
+	INC <currentSubTest
+	
+	;;; Test 2 [PPU Read Buffer]: Reading address $2007 should increment the "v" register. ;;;
+	JSR ResetScrollAndWaitForVBlank
+	JSR SetPPUADDRFromWord
+	.byte $24, $00
+	LDA #$00	; write 00, 01, 02, and 03 to the nametable.
+	STA $2007	; ^
+	LDA #$01	; ^
+	STA $2007	; ^
+	LDA #$02	; ^
+	STA $2007	; ^
+	LDA #$03	; ^
+	STA $2007	; ^
+	JSR SetPPUADDRFromWord
+	.byte $24, $00
+	LDA $2007	; this should put 0 in the buffer
+	LDA $2007	; this should read 0 from the buffer, and put 1 in the buffer.
+	LDA $2007	; this should read 1 from the buffer, and put 2 in the buffer.
+	BEQ FAIL_PPUReadBuffer
+	INC <currentSubTest
+
+	;;; Test 3 [PPU Read Buffer]: There should be a 1-bute buffer when reading from $2007 ;;;
+	CMP #1
+	BNE FAIL_PPUReadBuffer
+	INC <currentSubTest
+
+	;;; Test 4 [PPU Read Buffer]: Reading from CHR ROM should use the buffer. ;;;
+	JSR ResetScrollAndWaitForVBlank
+	JSR SetPPUADDRFromWord
+	.byte $00, $00
+	LDA $2007 ; prep buffer with 00
+	LDA $2007 ; read $00
+	LDA $2007 ; read $3C from CHR ROM.
+	CMP #$3C
+	BNE FAIL_PPUReadBuffer
+	INC <currentSubTest
+	
+	;;; Test 5 [PPU Read Buffer]: Reading from Palette RAM should NOT use the buffer. ;;;
+	JSR ResetScrollAndWaitForVBlank
+	JSR SetPPUADDRFromWord
+	.byte $3F, $00
+	LDA $2007 ; read $2D
+	LDA $2007 ; read $30
+	CMP #$30
+	BNE FAIL_PPUReadBuffer2
+	INC <currentSubTest
+	
+	;;; Test 6 [PPU Read Buffer]: Writing to $2006 does not modify the buffer value. ;;;
+	JSR ResetScrollAndWaitForVBlank
+	JSR SetPPUADDRFromWord
+	.byte $24, $00
+	LDA $2007 ; Prep buffer with 00
+	LDA $2007 ; Prep buffer with 01
+	LDA #$00
+	STA $2006
+	STA $2006 ; Move v to $0000
+	LDA $2007 ; read the value of $01 from the buffer.
+	CMP #$01
+	BNE FAIL_PPUReadBuffer2
+	INC <currentSubTest
+	
+	;;; Test 7 [PPU Read Buffer]: The value on the nametable at $2700 through $27FF should be put in the buffer when reading from palette RAM at $3F00 through $3FFF. ;;;
+	JSR ResetScrollAndWaitForVBlank
+	JSR SetPPUADDRFromWord
+	.byte $27, $00
+	LDA #$5A
+	STA $2007	; VRAM $2700 = $5A
+	JSR SetPPUADDRFromWord
+	.byte $24, $00
+	LDA $2007 ; Prep buffer with 00
+	LDA $2007 ; Prep buffer with 01
+	LDA $2007 ; Prep buffer with 02
+	LDA #$3F
+	STA $2006
+	LDA #$00
+	STA $2006 ; Move v to $3F00
+	LDA $2007 ; read from palette RAM (buffer is now read from VRAM $2700 = $5A)
+	LDA #$00
+	STA $2006
+	STA $2006 ; Move v to $0000
+	LDA $2007 ; Read $5A from the buffer.	
+	CMP #$5A
+	BNE FAIL_PPUReadBuffer2
+
+	;; END OF TEST ;;
+	JSR ResetScroll
+	LDA #1
+	RTS
+;;;;;;;
+	
+FAIL_PPUReadBuffer2:
+	JSR ResetScroll
+	JMP TEST_Fail
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                ENGINE                   ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -31,22 +31,24 @@ For more information, I recommend reading the fully commented assembly code for 
   1: Reading from a 13-bit mirror of an address in RAM should have the same value as the 11-bit address.  
   2: Writing to a 13-bit mirror of an address in RAM should write to the 11-bit address.  
 
-### $FFFF + X Wraparound
-  1: Reading from address $FFFF + X, (Where X = 1) should loop around to address $0000.  
-  2: Reading from address $FFFF + Y, (Where Y = 1) should loop around to address $0000.  
-  3: Writing to address $FFFF + X (Where X = 1) should loop around to address $0000.  
-  4: You should be able to branch from page $FF to the zero page, and then back.  
-  5. Executing address $FFFF should read address $0000 and $0001 as the operands.  
+### PC Wraparound
+  1: Executing address $FFFF should read address $0000 and $0001 as the operands.  
 
-### PPU Register Mirroring
-  1: PPU Registers should be mirrored through $3FFF.  
+### The Decimal Flag
+  1: The 6502 "Binary Coded Decimal" flag should not affect the ADC or SBC instructions on the NES
+  2: Despite this flag not working, it still gets pushed in a PHP/BRK instruction
 
-### PPU Register Open Bus
-  1: Reading from a write-only register PPU should return the most recently written value to the PPU Data Bus.  
-  2: All PPU Registers should update the PPU Data Bus when written.  
-  3: Bits 0 through 4 when reading from address $2002 should read read the PPU Data Bus.  
-  4: The PPU Data Bus value should decay before 1 second passes.  
-
+### The B Flag
+  1: The B flag of the 6502 processor flags should be set by PHP  
+  2: The B flag of the 6502 processor flags should be set by BRK  
+  3: An IRQ should have occured.  
+  4: The B flag of the 6502 processor flags should not be set by an IRQ  
+  5: The B flag of the 6502 processor flags should not be set by an NMI  
+  6: Bit 5 of the 6502 processor flags should be set by PHP  
+  7: Bit 5 of the 6502 processor flags should be set by BRK  
+  8: Bit 5 of the 6502 processor flags should be set by an IRQ  
+  9: Bit 5 of the 6502 processor flags should be set by an NMI  
+  
 ### Dummy read cycles
   1: A mirror of PPU_STATUS ($2002) should be read twice by LDA $20F2, X (where X = $10).  
   2: The dummy read should not occur if a page boundary is not crossed.  
@@ -99,6 +101,34 @@ For more information, I recommend reading the fully commented assembly code for 
   L: Does DCP Absolute do vaguely what's expected of it?  
   M: Does AXS Immediate do vaguely what's expected of it?  
   L: Does ISC Absolute do vaguely what's expected of it?  
+
+### Absolute Indexed Wraparound
+  1: Absolute Indexed addressing did not read from the correct address.  
+  2: When indexing + X beyond address $FFFF, the instruction should read from the zero page.  
+  3: When indexing + Y beyond address $FFFF, the instruction should read from the zero page.  
+  
+### Zero Page Indexed Wraparound
+  1: Zero Page Indexed addressing did not read from the correct address.  
+  2: When indexing + X beyond address $00FF, the instruction should still read from the zero page.  
+  3: When indexing + Y beyond address $00FF, the instruction should still read from the zero page.  
+  
+### Indirect Addressing Wraparound
+  1: JMP (Indirect) did not move the program counter to the correct address.  
+  2: The Address bus should wrap around the page when reading the low and high bytes with indirect addressing.  
+  
+### Indirect Addressing, X Wraparound
+  1: Indirect, X Addressing addressing did not read from the correct address.  
+  2: The indirect indexing should only occur on the zero page, even if X crosses a page boundary.  
+  3: The Address bus should wrap around the page when reading the low and high bytes with indirect addressing.  
+
+### Indirect Addressing, Y Wraparound
+  1: Indirect, Y Addressing addressing did not read from the correct address.  
+  2: The Y indexing should be able to cross a page boundary, and the high byte should be updated.  
+  3: The Address bus should wrap around the page when reading the low and high bytes with indirect addressing.  
+  
+### Relative Addressing Wraparound
+  1: You should be able to branch from the Zero Page to page $FF.  
+  2: You should be able to branch from page $FF to the Zero Page.  
 
 ### Unofficial Instructions: SLO, RLA, SRE, RRA, SAX, LAX, DCP, ISC, ANC, ASR, ARR, ANE, LXA, AXS, SBC, LAE
   0: This instruction had the wrong number of operand bytes.  
@@ -311,6 +341,24 @@ For more information, I recommend reading the fully commented assembly code for 
 ### PPU Reset Flag
   1: The PPU registers shouldn't be usable before the end of the first VBlank.  
 
+### PPU Register Mirroring
+  1: PPU Registers should be mirrored through $3FFF.  
+
+### PPU Register Open Bus
+  1: Reading from a write-only register PPU should return the most recently written value to the PPU Data Bus.  
+  2: All PPU Registers should update the PPU Data Bus when written.  
+  3: Bits 0 through 4 when reading from address $2002 should read read the PPU Data Bus.  
+  4: The PPU Data Bus value should decay before 1 second passes.  
+
+### PPU Read Buffer
+  1: Reading from the PPU register at $2007 is not working at all.  
+  2: Reading address $2007 should increment the "v" register.  
+  3: There should be a 1-bute buffer when reading from $2007.  
+  4: Reading from CHR ROM should use the buffer.  
+  5: Reading from Palette RAM should NOT use the buffer.  
+  6: Writing to $2006 does not modify the buffer value.  
+  7: The value on the nametable at $2700 through $27FF should be put in the buffer when reading from palette RAM at $3F00 through $3FFF.  
+
 ### VBlank beginning
   1: The PPU Register $2002 VBlank flag was not set at the correct PPU cycle.  
 
@@ -406,9 +454,8 @@ For more information, I recommend reading the fully commented assembly code for 
 
 ### RMW $2007 Extra Write
   1: A Read-Modify-Write instruction to address $2007 should perform an extra write where the low byte of the PPU address written is the result of the Read-Modify-Write instruction.  
-  2: This extra write should not occur when "v" is pointing to Palette RAM.  
+  2: This extra write should not occur when "v" is pointing to Palette RAM. (An extra write still might occur, but that's not the one we're testing for.)  
   3: If "v" is pointing to Palette RAM, this extra write should not get written to the nametable.  
-  4: If "v" is pointing to Palette RAM, this extra write should simply occur at "v" after it was incremented from the read cycle.  
 
 ### Implied Dummy Reads
   1: Your emulator did not pass the SLO Absolute, X test.  
