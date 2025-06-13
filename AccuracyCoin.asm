@@ -685,6 +685,7 @@ AutomaticallyRunEveryTestInROM:   ; This function is used to run every test in t
 	JSR PrintText
 	.word $21E8
 	.byte "Running test 0", $FF
+	JSR ResetScroll
 	LDY #0
 	STY <PostAllTestTally
 AutomaticallyRunEntireROM_Loop:
@@ -1700,11 +1701,11 @@ TEST_PPU_Open_Bus:
 	;;; Test 4 [PPU Open Bus]: The PPU Databus decays. ;;;
 	LDA #$FF
 	STA $2002
-	LDX #60
-TEST_PPU_Open_Bus_60FrameStall:; wait approximately one second.
+	LDX #120
+TEST_PPU_Open_Bus_120FrameStall:; wait approximately two seconds.
 	JSR Clockslide_29780	
 	DEX
-	BNE TEST_PPU_Open_Bus_60FrameStall
+	BNE TEST_PPU_Open_Bus_120FrameStall
 	LDA $2000
 	BNE TEST_FailPPUOpenBus2
 
@@ -6964,6 +6965,7 @@ TEST_IFlagLatency_IRQ:
 	STX <$50
 	LDA #0	
 	STA $4010	; disable the DMA IRQ
+	STA $4015	; This step should NOT be required, since I'm acknowledging the IRQ.
 	RTI
 ;;;;;;;
 
@@ -6973,7 +6975,8 @@ TEST_IFlagLatency_IRQ2:
 	BEQ TEST_IFlagLatency_IRQ2_DontAcknowledgeIRQ
 	STX <$50
 	LDA #0	
-	STX $4010	; disable the DMA IRQ
+	STA $4010	; disable the DMA IRQ
+	STA $4015	; This step should NOT be required, since I'm acknowledging the IRQ.
 TEST_IFlagLatency_IRQ2_DontAcknowledgeIRQ:
 	RTI
 ;;;;;;;
@@ -7017,8 +7020,7 @@ TEST_IFlagLatency_IRQPrep:
 ;;;;;;;
 
 FAIL_IFlagLatency1:
-	SEI
-	JMP TEST_Fail
+	JMP FAIL_IFlagLatency
 
 TEST_IFlagLatency:
 	; How this works.
@@ -7273,6 +7275,8 @@ TEST_IFlagLatency_Branch2:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 FAIL_IFlagLatency:
 	SEI
+	LDA #0
+	STA $4015
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
 

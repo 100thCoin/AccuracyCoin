@@ -3,7 +3,7 @@ A large collection of NES accuracy tests on a single NROM cartridge.
 
 This ROM was designed for the RP2A03G CPU, and the RP2C02G PPU. Some tests might fail on hardware with a different revision.
 
-This ROM currently has 107 tests, each composed of several smaller tests in order to print error codes narrowing down the specific issues your NES emulator might have.
+This ROM currently has 117 tests, each composed of several smaller tests in order to print error codes narrowing down the specific issues your NES emulator might have.
 
 Here's an example of the menu in this ROM, shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been ran yet. (The cursor is currently next to the "RAM Mirroring" test.)
 
@@ -496,10 +496,10 @@ For more information, I recommend reading the fully commented assembly code for 
 Some tests have multiple acceptable behaviors that are tested for in this ROM. The behavior used will either be printed on screen after running the test, or you'll see a "success code" on the all-test table.  
 
 ### Unofficial Instructions: SHA, SHS
-  1: The instruction behaved the way an old RP2A03G CPU or previous revision CPU would run this instruction.
-  2: The instruction behaved the way a new RP2A03G CPU or later revision CPU would run this instruction.
+  1: The instruction behaved the way an old RP2A03G CPU or previous revision CPU would run this instruction.  
+  2: The instruction behaved the way a new RP2A03G CPU or later revision CPU would run this instruction.  
   
 ### DMC DMA Bus Conflicts
-  1: The controller was read how a US released NES should read controllers.
-  2: The controller was read how a Famicom should read controllers.
+  1: The controller was read how a US released NES should read controllers.  
+  2: The controller was read how a Famicom should read controllers.  
   
