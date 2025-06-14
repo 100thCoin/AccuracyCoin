@@ -971,6 +971,8 @@ PressStartToContinue:
 PressStartToContinue_End:
 	RTI
 	
+	.org $9100
+	
 DMASyncWith48:
 	; This fuction very relaibly exits with exactly 50 CPU cycles until the DMA occurs.
 	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
