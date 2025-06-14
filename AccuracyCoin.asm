@@ -988,7 +988,7 @@ DMASyncWith48:
 	NOP
 	NOP
 DMASync48_Loop:
-	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $00 from the DMA.
+	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $48 from the DMA.
 	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
 	CMP #$48
 	BNE DMASync48_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
@@ -1021,7 +1021,7 @@ DMASyncWith60:
 	NOP
 	NOP
 DMASync60_Loop:
-	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $00 from the DMA.
+	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $60 from the DMA.
 	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
 	CMP #$60
 	BNE DMASync60_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
@@ -1054,7 +1054,7 @@ DMASyncWithA5:
 	NOP
 	NOP
 DMASyncA5_Loop:
-	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $00 from the DMA.
+	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $A5 from the DMA.
 	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
 	CMP #$A5
 	BNE DMASyncA5_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
@@ -1087,7 +1087,7 @@ DMASyncWith68:
 	NOP
 	NOP
 DMASync68_Loop:
-	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $00 from the DMA.
+	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $68 from the DMA.
 	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
 	CMP #$68
 	BNE DMASync68_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
@@ -3566,19 +3566,19 @@ TEST_SHA_Behavior1_SkipPrints:
 	JSR TEST_RunTest_AddrInitAXYF
 	.word $1D00	; If someone is testing for this instruction, they would surely have RAM mirroring implemented.
 	.byte $FF
-	.byte $3F, $F5, $00, (flag_i | flag_c | flag_z | flag_v)
+	.byte $3F, $FF, $00, (flag_i | flag_c | flag_z | flag_v)
 	.word $0500
-	.byte $14
-	.byte $3F, $F5, $00, (flag_i | flag_c | flag_z | flag_v)
+	.byte $1E
+	.byte $3F, $FF, $00, (flag_i | flag_c | flag_z | flag_v)
 	
 	; Now to make the high byte go unstable.
 	JSR TEST_RunTest_AddrInitAXYF
 	.word $1F10 ; $1E90 will be the operand.
 	.byte $FF
-	.byte $0D, $15, $80, (flag_i | flag_c | flag_z | flag_v)
+	.byte $0D, $FF, $80, (flag_i | flag_c | flag_z | flag_v)
 	.word $0510
-	.byte $05
-	.byte $0D, $15, $80, (flag_i | flag_c | flag_z | flag_v)
+	.byte $0D
+	.byte $0D, $FF, $80, (flag_i | flag_c | flag_z | flag_v)
 	; Hi = ($1E+1) & A & X;
 	; 	 = $05
 	; $510 = A & X & H
@@ -3588,10 +3588,10 @@ TEST_SHA_Behavior1_SkipPrints:
 	JSR TEST_RunTest_AddrInitAXYF
 	.word $0555 ; $0402 will be the operand.
 	.byte $FF
-	.byte $F0, $09, $FF, (flag_i)
+	.byte $F0, $FF, $FF, (flag_i)
 	.word $0055
 	.byte $00
-	.byte $F0, $09, $FF, (flag_i)
+	.byte $F0, $FF, $FF, (flag_i)
 	; Hi = ($1E+1) & A & X;
 	; 	 = $00
 	; $510 = A & X & H
@@ -6057,6 +6057,7 @@ TEST_Address2004_Behavior_loop:			; Set up page 2 so every value is essentially 
 	BEQ FAIL_Address2004_Behavior1	; It definitely shouldn't be $00.
 	CMP #$FF
 	BEQ FAIL_Address2004_Behavior1	; Since it's inconsistent between CPU/PPU clock alignments, (and probably different on different consolre revisions) we'll simply just check that it isn't FF.
+	INC <currentSubTest
 
 	;;; Test 9 [Address $2004 behavior]: Reads from $2004 during PPU cycle 256 to 320 of a visible scanline (with rendering enabled) reads $FF again. ;;;
 	JSR WaitForVBlank
@@ -6077,6 +6078,32 @@ TEST_Address2004_Behavior_loop:			; Set up page 2 so every value is essentially 
 	LDA $2004
 	CMP #$FF
 	BNE FAIL_Address2004_Behavior2	; This reads $FF. (I'll need to look into why, but I know this is the case.)
+	INC <currentSubTest
+	
+	;;; Test A [Address $2004 behavior]: Writing to $2004 on a visible scanline increments the OAM address by 4, and bitwise AND the OAM Address with $FC ;;;
+	LDA #$8C
+	STA $204
+	JSR WaitForVBlank
+	JSR DisableRendering
+	LDA #0
+	JSR VblSync_Plus_A
+	; Sync to dot 0 of vblank
+	LDA #$02
+	STA $4014
+	JSR EnableRendering
+	JSR Clockslide_1816
+	NOP
+	NOP
+	NOP
+	LDX #5
+	LDA #1
+	STA $2006, X ; PPU OAM is 1.	
+	LDA #0		;+6
+	STA $2004	;+9 before write (+3 after). write with 20 ppu cycles until dot 0. (the CPU write occurs on dot 321 of the pre-render line)
+	STA $2001   ;+9 before write, disable rendering with 8 ppu cycles before dot 0.
+	LDA $2004
+	CMP #$8C
+	BNE FAIL_Address2004_Behavior2	; Despite being between cycle 1 and 64 of a visible scanline, since rendering is disabled, it reads $5A.
 
 	;; END OF TEST ;;
 	JSR ClearOverscanNametable
@@ -9006,7 +9033,7 @@ TEST_DMC_Conflict_CheckFamicom:
 TEST_DMC_Conflict_AnswerLoop_Famicom:
 	LDA $500, X
 	CMP TEST_DMC_Conflicts_AnswerKey_Famicom, X
-	BNE FAIL_DMC_Conflicts
+	BNE TEST_DMC_Conflict_CheckHVCFamicom
 	LDA #$00
 	STA $4017	; Keep the interrupt flag set, but refresh the timer.
 	INX
@@ -9014,6 +9041,20 @@ TEST_DMC_Conflict_AnswerLoop_Famicom:
 	BNE TEST_DMC_Conflict_AnswerLoop_Famicom
 	LDA #9
 	STA <$50	; pass code 2. (famicom)
+	
+TEST_DMC_Conflict_CheckHVCFamicom:
+	LDX #0
+TEST_DMC_Conflict_AnswerLoop_HVCFamicom:
+	LDA $500, X
+	CMP TEST_DMC_Conflicts_AnswerKey_HVC_Famicom, X
+	BNE FAIL_DMC_Conflicts
+	LDA #$00
+	STA $4017	; Keep the interrupt flag set, but refresh the timer.
+	INX
+	CPX #$40
+	BNE TEST_DMC_Conflict_AnswerLoop_HVCFamicom
+	LDA #13
+	STA <$50	; pass code 3. (some other famicom)
 	
 TEST_DMC_Test3:
 	INC <currentSubTest
@@ -10421,6 +10462,14 @@ FAIL_PPUReadBuffer2:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	
 	.bank 3
+	
+	.org $EE00
+TEST_DMC_Conflicts_AnswerKey_HVC_Famicom:
+	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+	.byte $00, $00, $00, $00, $00, $00, $01, $00, $00, $00, $00, $00, $00, $00, $00, $00
+	.byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
+	.byte $FF, $FF, $FF, $FF, $FF, $FF, $FD, $E0, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
+	
 	.org $EE40	
 DPCM_Sample_68:
 	.byte $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68
