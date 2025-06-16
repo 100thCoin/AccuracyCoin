@@ -10693,6 +10693,8 @@ TEST_ExplicitDMAAbort_Loop2:
 	BNE TEST_ExplicitDMAAbort_Loop2
 
 	;; END OF TEST ;;
+	LDA #0
+	STA $4015 ; disable DMC
 	LDA #1
 	RTS
 ;;;;;;;
@@ -10891,6 +10893,15 @@ TEST_ImplicitDMAAbort_KeyLoop3:
 	BNE TEST_ImplicitDMAAbort_KeyLoop3
 
 	;; END OF TEST ;;
+	LDA #0
+	STA $4015
+	JSR WaitForVBlank
+	LDA #0
+	STA <dontSetPointer
+	JSR PrintTextCentered
+	.word $2390
+	.byte "Implicit Abort Behavior 1", $FF
+	JSR ResetScroll
 	LDA #5	; success code 1. (pre-1990 CPU)
 	RTS
 ;;;;;;;
@@ -10935,6 +10946,15 @@ TEST_ImplicitDMAAbort_AltLoop3:
 	BNE TEST_ImplicitDMAAbort_AltLoop3
 
 	;; END OF TEST ;;
+	LDA #0
+	STA $4015
+	JSR WaitForVBlank
+	LDA #0
+	STA <dontSetPointer
+	JSR PrintTextCentered
+	.word $2390
+	.byte "Implicit Abort Behavior 2", $FF
+	JSR ResetScroll
 	LDA #9	; success code 1. (post-1990 CPU)
 	RTS
 ;;;;;;;
