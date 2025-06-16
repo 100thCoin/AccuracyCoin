@@ -88,7 +88,7 @@ DebugMode = $3B
 
 Reserverd_41 = $41 ; Used in the Implied Dummy Reads. It's probably best we never actually use this.
 
-PostDMACyclesUntilTestInstruction = 14
+PostDMACyclesUntilTestInstruction = 13
 
 
 Test_ZeroPageReserved = $50 ; through $5F
@@ -274,6 +274,10 @@ result_DecimalFlag = $474
 result_BFlag = $475
 
 result_PPUReadBuffer = $476
+
+result_DMCDMAPlusOAMDMA = $477
+result_ImplicitDMAAbort = $478
+result_ExplicitDMAAbort = $479
 
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
 result_PowOn_CPUReg = $03FD ; page 3 omits the test from the all-test-result-table.
@@ -602,6 +606,7 @@ Suite_APUTiming:
 	table "Frame Counter 4-step", $FF, result_FrameCounter4Step, TEST_FrameCounter4Step
 	table "Frame Counter 5-step", $FF, result_FrameCounter5Step, TEST_FrameCounter5Step
 	table "Delta Modulation Channel", $FF, result_DeltaModulationChannel, TEST_DeltaModulationChannel
+	table "Controller Strobing", $FF, result_ControllerStrobing, TEST_ControllerStrobing
 	.byte $FF
 	
 	;; DMA Tests ;;
@@ -612,9 +617,12 @@ Suite_DMATests:
 	table "DMA + $2007 Write", $FF, result_DMA_Plus_2007W, TEST_DMA_Plus_2007W
 	table "DMA + $4015 Read", $FF, result_DMA_Plus_4015R, TEST_DMA_Plus_4015R
 	table "DMA + $4016 Read", $FF, result_DMA_Plus_4016R, TEST_DMA_Plus_4016R
-	table "Controller Strobing", $FF, result_ControllerStrobing, TEST_ControllerStrobing
 	table "APU Register Activation", $FF, result_APURegActivation, TEST_APURegActivation
 	table "DMC DMA Bus Conflicts", $FF, result_DMABusConflict, TEST_DMABusConflict
+	table "DMC DMA + OAM DMA", $FF, result_DMCDMAPlusOAMDMA, TEST_DMCDMAPlusOAMDMA
+	table "Explicit DMA Abort", $FF, result_ExplicitDMAAbort, TEST_ExplicitDMAAbort
+	table "Implicit DMA Abort", $FF, result_ImplicitDMAAbort, TEST_ImplicitDMAAbort
+
 	.byte $FF
 
 	;; Power On State ;;
@@ -4451,6 +4459,14 @@ TEST_Fail8:
 	JMP TEST_Fail
 
 Test_ProgramCounter_Wraparound:
+	LDX #0
+Test_ProgramCounter_WraparoundLoop1:
+	LDA TEST_OpenBus_IRQRoutine,X ; Re-use this BRK routine.
+	STA $600, X
+	INX
+	CPX #8
+	BNE Test_ProgramCounter_WraparoundLoop1
+
 	;;; Test 1 [Program Counter Wraparound]: Executing from $FFFF should wrap around to address $0000 ;;;
 	LDA #$00
 	STA <$00
@@ -7345,7 +7361,7 @@ TEST_NmiAndBrk_Prep:
 
 TEST_NmiAndBrk:
 	JSR TEST_NmiAndBrk_Prep
-	;;; Test 1 [NMI and BRK]: What happens when the NMI runs during a BRK instruction? (Error 1 means BRK didn't skip the following byte) ;;;
+	;;; Test 1 [NMI overlap BRK]: What happens when the NMI runs during a BRK instruction? (Error 1 means BRK didn't skip the following byte) ;;;
 	; Also known as Interrupt Hijacking, this test will simply sync the CPU such that the NMI will occur in 8-A cycles. Then it will run this 16 times, incrementing A by 1 for each test.
 	; Here's how it works:
 	; After an NMI or BRK, read the value pushed to the stack, and store at <$50,X or <$60,X respectively.
@@ -7361,12 +7377,11 @@ TEST_NmiAndBrkLoop:
 	JSR EnableNMI ; +31 CPU cycles. (49 cycles until vblank)
 	LDX <Copy_X	  ; +3
 	TXA			  ; +2 (44 cycles)
-	JSR Clockslide36_Plus_A ; + 36 + A
+	JSR Clockslide37_Plus_A ; + 36 + A
 	; 8-A CPU cycles until Vblank.
 	; stall for an extra 6 cycles.
 	LDY #0
-	NOP
-	NOP
+	LDA <$00
 	BRK ; BRK will return *after* this upcoming INY, since it only gets compiled to [$00].
 	INY	; This should get skipped!
 	TYA
@@ -7376,7 +7391,7 @@ TEST_NmiAndBrkLoop:
 	BNE TEST_NmiAndBrkLoop
 	INC <currentSubTest
 	
-	;;; Test 2 [NMI and BRK]: Check the answer key. ;;;
+	;;; Test 2 [NMI overlap BRK]: Check the answer key. ;;;
 	; And now we check with the answer key.
 	JSR DisableNMI
 	LDX #0
@@ -7415,11 +7430,11 @@ FAIL_NmiAndBrk:
 	
 
 TEST_NmiAndBrkAnswerKey:   
-	.byte $27, $37, $37, $36, $37, $26, $27, $26, $27, $26, $27, $24, $25, $24, $25, $24, $25, $24, $25, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
-	.byte $37, $00, $00, $00, $00, $36, $37, $36, $37, $36, $37, $36, $37, $36, $37, $36, $37, $36, $37, $36, $37, $36, $37, $36, $37, $36, $37, $36, $37, $36, $37, $36
+	.byte $35, $35, $34, $35, $34, $25, $24, $25, $26, $27, $24, $25, $24, $25, $24, $25, $24, $25, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
+	.byte $00, $00, $00, $00, $00, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35
 TEST_NmiAndBrkAnswerKey_Alignment2: ; CPU/PPU clock alignment 2 has different results:
-    .byte $37, $37, $37, $36, $27, $26, $27, $26, $27, $26, $25, $24, $25, $24, $25, $24, $25, $24, $25, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
-    .byte $00, $00, $00, $00, $37, $36, $37, $36, $37, $36, $37, $36, $37, $36, $37, $36, $37, $36, $37, $36, $37, $36, $37, $36, $37, $36, $37, $36, $37, $36, $37, $36
+    .byte $35, $35, $34, $35, $24, $25, $24, $27, $26, $25, $24, $25, $24, $25, $24, $25, $24, $25, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
+    .byte $00, $00, $00, $00, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35
 
 TEST_NmiAndIrq_Prep:
 	LDA #$4C
@@ -7478,15 +7493,15 @@ TEST_NmiAndIrqLoop:
 	JSR Clockslide_29700
 	; 80 CPU cycles until Vblank.
 	JSR EnableNMI ; +31 CPU cycles. (49 cycles until vblank)
-	LDX <Copy_X	  ; +3
-	TXA			  ; +2 (44 cycles)
-	JSR Clockslide36_Plus_A ; + 36 + A
+	LDA Copy_X	  ; +3
+	JSR Clockslide37_Plus_A ; + 36 + A
 	; 8-A CPU cycles until Vblank.
 	; stall for an extra 6 cycles.
 	CLI
 	LDA #0	; set the zero flag.
 	; Assuming you passed the Interrupt flag latency test, the IRQ will occur here!
 	NOP
+	LDX <Copy_X	  ; +3
 	INX ; X+=1
 	CPX #16
 	BNE TEST_NmiAndIrqLoop
@@ -7526,12 +7541,12 @@ TEST_NmiAndIrqAnswerLoop2:
 ;;;;;;;
 
 TEST_NmiAndIqrAnswerKey:
-	.byte $A5, $A5, $23, $22, $23, $22, $23, $22, $23, $20, $21, $24, $25, $24, $25, $24
-	.byte $27, $27, $27, $26, $27, $26, $27, $26, $27, $24, $25, $26, $27, $26, $27, $26
+	.byte $A5, $A5, $22, $23, $22, $23, $22, $23, $22, $21, $20, $25, $24, $25, $24, $25
+	.byte $27, $27, $26, $27, $26, $27, $26, $27, $26, $25, $24, $27, $26, $27, $26, $27
 	
 TEST_NmiAndIqrAnswerKey_Alignment2:
-	.byte $A5, $23, $23, $22, $23, $22, $23, $22, $21, $20, $25, $24, $25, $24, $25, $24
-	.byte $27, $27, $27, $26, $27, $26, $27, $26, $25, $24, $27, $26, $27, $26, $27, $26
+	.byte $A5, $23, $22, $23, $22, $23, $22, $23, $20, $21, $24, $25, $24, $25, $24, $25
+	.byte $27, $27, $26, $27, $26, $27, $26, $27, $24, $25, $26, $27, $26, $27, $26, $27
 
 FAIL_NmiAndIqr:
 	JMP TEST_Fail
@@ -8355,10 +8370,6 @@ TEST_FrameCounter4Step_Sync:
 	STA $4017
 	RTS
 ;;;;;;;
-
-FAIL_FrameCounter4Step_:
-	JMP FAIL_AndDisableAudioChannels
-;;;;;;;;;;;;;;;;;
 
 FAIL_FrameCounter5Step:
 	JMP FAIL_AndDisableAudioChannels
@@ -9611,7 +9622,7 @@ TEST_ImpliedDummyRead_Continue2:
 	; [Read opcode from $4015. Hopefully, a JSR.]
 	;
 	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed3, which sets $60 and jumps to TEST_ImpliedDummyRead_PostPHP.
-	.org $D23D	; PHP should push $3C to the stack, so the RTS instruction would return here:
+	.org $D33D	; PHP should push $3C to the stack, so the RTS instruction would return here:
 TEST_ImpliedDummyRead_PostPHP:
 	LDA <$60
 	BEQ FAIL_ImpliedDummyRead4
@@ -10458,6 +10469,488 @@ TEST_PPUReadBuffer:
 FAIL_PPUReadBuffer2:
 	JSR ResetScroll
 	JMP TEST_Fail
+
+CalculateDMADuration:
+	; sync the DMC DMA to occur in 50 cycles.
+	LDY #0
+	JSR Clockslide_45
+CalculateDMADuration_Loop:
+	LDA $4000	;+4
+	BEQ CalculateDMADuration_End ;+2
+	; 2+4+2+3 (+4) = 15.
+	; 576 cycles between each DMA.
+	; 576 - 15 = 561
+	; if I stall for 560 cycles, I can read from open bus 1 cycle earlier in relation to the DMA each loop.
+	JSR Clockslide_500
+	JSR Clockslide_30
+	JSR Clockslide_30
+	INY	; +2
+	JMP CalculateDMADuration_Loop ;+3
+CalculateDMADuration_End:
+	RTS
+;;;;;;;
+
+CheckDMATiming:
+	JSR DMASync_50CyclesRemaining
+	; 50 cycles until the target DMA.	
+	LDA #$4E			; +2 cycles.
+	STA $4010			; +4 cycles. Make this sample loop, and use the SECOND FASTEST DMC rate.
+	JSR Clockslide_44	; [DMC DMA. + 4]
+	; 572 more cycles until the next DMA.
+	JSR Clockslide_500
+	JSR Clockslide_50
+	JSR Clockslide_22
+	; Now we're synced to the DMA.
+	NOP
+	NOP
+	
+	; 572 cycles to go until the next DMA.
+	JSR Clockslide_500
+	; 72 cycles to go. (We need to jump to CalculateDMADuration with 56 cycles remaining)
+	JSR Clockslide_16
+	; 56 cycles to go:
+	JSR CalculateDMADuration
+	RTS
+;;;;;;;
+
+FAIL_DMCDMAPlusOAMDMA:
+	LDA #0
+	STA $4015	; stop the DMC from playing.
+	JMP TEST_Fail
+
+TEST_DMCDMAPlusOAMDMA:
+	;;; Test 1 [DMC DMA + OAM DMA]: This test relies on precise DMA timing in order to calculate how many cycles the DMA took. Let's test for that now. ;;;
+	; Let's confirm this DMA timing subroutine of mine works on this emulator.
+	JSR CheckDMATiming
+	CPY #4 ; 
+	BNE FAIL_DMCDMAPlusOAMDMA
+	
+	; Okay, so what is this test actually testing for?
+	; When the OAM DMA runs, the OAM DMA stalls the CPU.
+	; When the OAM DMA is running and a DMC DMA also occurs:
+	; The DMC DMA takes priority on get cycles, and the OAM DMA takes priority on put cycles. However, the OAM DMA will need to run an alignment cycle after the DMC DMA get.
+	; However, if the DMC DMA is halted, the OAM DMA keeps going. This results in the DMC DMA appearing to only take 2 cycles.
+	; [OAM put]
+	; [OAM get]
+	; [DMC put (Halt), OAM put] Despite the DMC DMA occuring, since it's on a halt cycle, the OAM DMA keeps going.
+	; [DMC get (Halt), OAM get] Despite the DMC DMA occuring, since it's on a halt cycle, the OAM DMA keeps going.
+	; [DMC put, OAM put takes priority]
+	; [DMC get] 
+	; [OAM put, alignment cycle]
+	; [OAM get]
+	;
+	; It's also worth noting, that if the DMC DMA halt cycle occurs on the OAM DMA halt cycle, both halt cycles happen at the same time.
+	; And if both DMAs are halted, it's pretty much the same as a regular halt cycle, where it just reads from the current 6502 address bus,
+	;
+	; see https://www.nesdev.org/wiki/DMA#DMC_DMA_during_OAM_DMA
+	
+	JSR ClearPage2
+	LDX #0
+	
+	; If you fail this test, look around address $50 through $6F to see what your emulator is doing, and compare with the answer key below.
+
+	
+	; for this first loop, we want the DMA to occur at the beginning of the OAM DMA.
+	; We should have a few DMC DMAs start occur before the OAM DMA, but each loop the DMC DMA will occur one cycle later in the loop than before.
+TEST_DMCDMAPlusOAMDMA_Loop1:
+	JSR DMASync_50CyclesRemaining	
+	LDA #$4E			; +2 cycles.
+	STA $4010			; +4 cycles. Make this sample loop, and use the SECOND FASTEST DMC rate.
+	JSR Clockslide_50	; [DMC DMA. + 4]
+	; 566 more cycles until the next DMA.
+	JSR Clockslide_500
+	; 66 more cycles.
+	TXA ; 64 more cycles.
+	JSR Clockslide64_Minus_A ; A cycles until DMA.
+	NOP
+	
+	LDA #2 ; 5+A cycles left.
+	STA $4014
+
+	TXA 
+	JSR Clockslide37_Plus_A ; we ran a clockslide + A earlier, so to sync back up we need to run a clockslide - A.
+	JSR Clockslide_500
+	JSR Clockslide_29
+	LDA <$00
+	;56 cycles to go.
+	JSR CalculateDMADuration
+	STY <$50, X
+	INX
+	CPX #$10
+	BNE TEST_DMCDMAPlusOAMDMA_Loop1
+	; for this second loop, we want the DMC DMA to occur at the end of the OAM DMA.
+	; basically, I removed 512 cycles from the pre STA $4014 code.
+	LDX #0
+TEST_DMCDMAPlusOAMDMA_Loop2:
+	JSR DMASync_50CyclesRemaining	
+	LDA #$4E			; +2 cycles.
+	STA $4010			; +4 cycles. Make this sample loop, and use the SECOND FASTEST DMC rate.
+	JSR Clockslide_40	; [DMC DMA. + 4]
+	; 566 more cycles until the next DMA.
+	; 66 more cycles.
+	TXA ; 64 more cycles.
+	JSR Clockslide64_Minus_A ; A cycles until DMA
+
+	LDA #2 
+	STA $4014
+
+	TXA
+	JSR Clockslide37_Plus_A ; we ran a clockslide + A earlier, so to sync back up we need to run a clockslide - A
+	JSR Clockslide_400
+	JSR Clockslide_50
+	JSR Clockslide_19
+	LDA <$00
+	;56 cycles to go.
+	JSR CalculateDMADuration
+	STY <$60, X
+	INX
+	CPX #$10
+	BNE TEST_DMCDMAPlusOAMDMA_Loop2
+	INC <currentSubTest
+
+	;;; Test 2 [DMC DMA + OAM DMA]: Compare results with answer key ;;;
+	LDX #0
+TEST_DMCDMAPlusOAMDMA_Loop3:
+	LDA <$50, X
+	CMP TEST_DMCDMAPlusOAMDMA_AnswerKey, X
+	BNE FAIL_DMCDMAPlusOAMDMA2
+	INX
+	CPX #$20
+	BNE TEST_DMCDMAPlusOAMDMA_Loop3
+	
+	;; END OF TEST ;;
+	LDA #0
+	STA $4015 ; stop the DMC from playing.
+	LDA #1
+	RTS
+;;;;;;;
+
+FAIL_DMCDMAPlusOAMDMA2:
+	JMP FAIL_DMCDMAPlusOAMDMA
+
+TEST_DMCDMAPlusOAMDMA_AnswerKey:
+	.byte $04, $03, $04, $03, $04, $03, $02, $01, $02, $01, $02, $01, $02, $01, $02, $01
+	.byte $02, $01, $02, $01, $02, $00, $01, $02, $03, $03, $04, $03, $04, $03, $04, $03
+
+FAIL_ExplicitDMAAbort:
+	LDA #0
+	STA $4015	; stop the DMC from playing.
+	JMP TEST_Fail
+
+
+TEST_ExplicitDMAAbort:
+	;;; Test 1 [Explicit DMA Abort]: This test relies on precise DMA timing in order to calculate how many cycles the DMA took. Let's test for that now. ;;;
+	JSR CheckDMATiming
+	CPY #4 ; 
+	BNE FAIL_ExplicitDMAAbort
+
+	JSR ClearPage2
+	LDX #0
+	
+	; The explicit abort test is all about what happens to the DMC DMA if the DMC is disabled while the DMA is ocurring.
+	; If you fail this test, look around address $50 to see what your emulator is doing, and compare with the answer key below.
+
+TEST_ExplicitDMAAbort_Loop1:
+	JSR DMASync_50CyclesRemaining	
+	LDA #$4E			; +2 cycles.
+	STA $4010			; +4 cycles. Make this sample loop, and use the SECOND FASTEST DMC rate.
+	JSR Clockslide_50	; [DMC DMA. + 4]
+	; 566 more cycles until the next DMA.
+	JSR Clockslide_500
+	; 66 more cycles.
+	TXA ; 64 more cycles.
+	JSR Clockslide64_Minus_A ; A cycles until DMA.
+	NOP
+	
+	LDA #0
+	STA $4015	; disable the DMA right as it is occuring.
+
+	TXA
+	JSR Clockslide37_Plus_A ; we ran a clockslide + A earlier, so to sync back up we need to run a clockslide - A.
+	JSR Clockslide_500
+	JSR Clockslide_23
+	LDA <$00
+	LDA #$10
+	STA $4015
+	JSR Clockslide_500
+	JSR Clockslide_15
+	;56 cycles to go.
+	JSR CalculateDMADuration
+	STY <$50, X
+	INX
+	CPX #$10
+	BNE TEST_ExplicitDMAAbort_Loop1
+	INC <currentSubTest
+
+	;;; Test 2 [Explicit DMA Abort]: Compare results with answer key ;;;
+	LDX #0
+TEST_ExplicitDMAAbort_Loop2:
+	LDA <$50, X
+	CMP TEST_ExplicitDMAAbort_AnswerKey, X
+	BNE FAIL_ExplicitDMAAbort
+	INX
+	CPX #$10
+	BNE TEST_ExplicitDMAAbort_Loop2
+
+	;; END OF TEST ;;
+	LDA #1
+	RTS
+;;;;;;;
+
+TEST_ExplicitDMAAbort_AnswerKey:
+	.byte $04, $04, $04, $04, $04, $04, $03, $04, $01, $01, $00, $00, $00, $00, $00, $00
+
+FAIL_ImplicitDMAAbort:
+	LDA #0
+	STA $4015	; stop the DMC from playing.
+	JMP TEST_Fail
+
+TEST_ImplicitDMAAbort:
+	;;; Test 1 [Explicit DMA Abort]: This test relies on precise DMA timing in order to calculate how many cycles the DMA took. Let's test for that now. ;;;
+	JSR CheckDMATiming
+	CPY #4 ; 
+	BNE FAIL_ImplicitDMAAbort
+	INC <currentSubTest
+
+	JSR ClearPage2
+	LDX #0
+	
+	; The implicit abort test is all about what happens if the reload DMA occurs very briefly after a load DMA on a 1-byte sample with looping disabled.
+	; This results in a 1-cycle DMA.
+	; If you fail this test, look around address $500 to see what your emulator is doing, and compare with the answer key below.
+
+TEST_ImplicitDMAAbort_Loop1:
+	JSR DMASync_50CyclesRemaining	
+	LDA #$00
+	STA $4015	; disable the DMA.
+	LDA #$0E			; +2 cycles.
+	STA $4010			; +4 cycles. Make this sample stop looping, and use the SECOND FASTEST DMC rate.
+	JSR Clockslide_44	; [DMC DMA. + 4]
+	; 566 more cycles until the next DMA.
+	TXA ; 64 more cycles.
+	JSR Clockslide64_Minus_A ; A cycles until DMA.
+	JSR Clockslide_500
+	; 66 more cycles.
+
+	NOP
+	
+	LDA #$10
+	STA $4015	; enable the DMA right as it is occuring.
+	NOP
+	NOP
+	NOP
+	TXA
+	JSR Clockslide_500
+	JSR Clockslide37_Plus_A ; we ran a clockslide + A earlier, so to sync back up we need to run a clockslide - A.
+	JSR Clockslide_23
+	LDA <$00
+	LDA #$4E			; +2 cycles.
+	STA $4010			; +4 cycles. Make this sample loop, and use the SECOND FASTEST DMC rate.
+	LDA #$10
+	STA $4015	; enable the DMA 
+	JSR Clockslide_500
+	NOP
+	NOP
+	;56 cycles to go.
+	JSR CalculateDMADuration
+	TYA
+	STA $500, X
+	INX
+	CPX #$10
+	BNE TEST_ImplicitDMAAbort_Loop1
+	
+	LDX #0
+
+	; This loop will run a JSR instruction right after the test. And a DMA cannot happen on write cycles (pushing the PC to the stack)
+	; Since this results in a single cycle with the RDY line low, this DMA will NOT occur when X = $B.
+	; Unlike regular DMAs, that just get delayed by write cycles, this 1-cycle DMA will NOT occur if it would happen on a write cycle.
+	; If you fail this test, look around address $520 to see what your emulator is doing, and compare with the answer key below.
+
+TEST_ImplicitDMAAbort_Loop2:
+	JSR DMASync_50CyclesRemaining	
+	LDA #$00
+	STA $4015	; disable the DMA.
+	LDA #$0E			; +2 cycles.
+	STA $4010			; +4 cycles. Make this sample stop looping, and use the SECOND FASTEST DMC rate.
+	JSR Clockslide_44	; [DMC DMA. + 4]
+	; 566 more cycles until the next DMA.
+	TXA ; 64 more cycles.
+	JSR Clockslide64_Minus_A ; A cycles until DMA.
+	JSR Clockslide_500
+	; 66 more cycles.
+
+	NOP
+	
+	LDA #$10
+	STA $4015	; enable the DMA right as it is occuring.
+
+	TXA
+	JSR Clockslide37_Plus_A ; we ran a clockslide + A earlier, so to sync back up we need to run a clockslide - A.
+	JSR Clockslide_500
+	JSR Clockslide_18
+	LDA <$00
+	LDA #$4E			; +2 cycles.
+	STA $4010			; +4 cycles. Make this sample loop, and use the SECOND FASTEST DMC rate.
+	LDA #$10
+	STA $4015	; enable the DMA 
+	JSR Clockslide_500
+	JSR Clockslide_15
+	;56 cycles to go.
+	JSR CalculateDMADuration
+	TYA
+	STA $520, X
+	INX
+	CPX #$10
+	BNE TEST_ImplicitDMAAbort_Loop2	
+	
+	; This third loop keeps the DMC looping behavior active.
+	; This doesn't result in any implicitly aborted DMAs, but it can be used to highlight some incorrect DMA timing with your emulator.
+	; If you fail this test, look around address $540 to see what your emulator is doing, and compare with the answer key below.
+	
+	LDX #0
+TEST_ImplicitDMAAbort_Loop3:
+	JSR DMASync_50CyclesRemaining	
+	LDA #$4E			; +2 cycles.
+	STA $4010			; +4 cycles. Make this sample keep looping, and use the SECOND FASTEST DMC rate.
+	LDA #$00
+	STA $4015	; disable the DMA.
+	NOP
+	NOP
+	TXA ; 64 more cycles.
+	JSR Clockslide64_Minus_A ; A cycles until DMA.
+	JSR Clockslide_35	; [DMC DMA. + 4]
+	; 566 more cycles until the next DMA.
+	JSR Clockslide_500
+	; 66 more cycles.
+
+	NOP
+	
+	LDA #$10
+	STA $4015	; enable the DMA right as it is occuring.
+
+	TXA
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	JSR Clockslide37_Plus_A ; we ran a clockslide + A earlier, so to sync back up we need to run a clockslide - A.
+	JSR Clockslide_500
+	JSR Clockslide_14
+	LDA <$00
+	LDA #$4E			; +2 cycles.
+	STA $4010			; +4 cycles. Make this sample loop, and use the SECOND FASTEST DMC rate.
+	LDA #$10
+	STA $4015	; enable the DMA 
+	JSR Clockslide_500
+	JSR Clockslide_14
+	;56 cycles to go.
+	JSR CalculateDMADuration
+	TYA
+	STA $540, X
+	INX
+	CPX #$10
+	BNE TEST_ImplicitDMAAbort_Loop3
+	
+	LDA $508
+	CMP #04
+	BEQ TEST_ImplicitDMAAbort_AlternateBehavior
+	
+	LDX #0
+	;;; Test 2 [Implicit DMA Abort]: Compare results with answer key ;;;
+TEST_ImplicitDMAAbort_KeyLoop1:
+	LDA $500, X
+	CMP TEST_ImplicitDMAAbort_Key1, X
+	BNE FAIL_ImplicitDMAAbort2
+	INX
+	CPX #$10
+	BNE TEST_ImplicitDMAAbort_KeyLoop1
+	INC <currentSubTest
+	LDX #0
+
+	;;; Test 3 [Implicit DMA Abort]: Compare results with answer key ;;;
+	; The 1-cycle DMA does not get delayed by a write cycle, instead it just doesn't occur at all.
+TEST_ImplicitDMAAbort_KeyLoop2:
+	LDA $520, X
+	CMP TEST_ImplicitDMAAbort_Key2, X
+	BNE FAIL_ImplicitDMAAbort2
+	INX
+	CPX #$10
+	BNE TEST_ImplicitDMAAbort_KeyLoop2
+	INC <currentSubTest
+	LDX #0
+
+	;;; Test 4 [Implicit DMA Abort]: Compare results with answer key ;;;
+	; This is just another DMA test showing that the DMA cannot occur within 2 cycles of a previous DMC DMA.
+TEST_ImplicitDMAAbort_KeyLoop3:
+	LDA $540, X
+	CMP TEST_ImplicitDMAAbort_Key3, X
+	BNE FAIL_ImplicitDMAAbort2
+	INX
+	CPX #$10
+	BNE TEST_ImplicitDMAAbort_KeyLoop3
+
+	;; END OF TEST ;;
+	LDA #5	; success code 1. (pre-1990 CPU)
+	RTS
+;;;;;;;
+
+FAIL_ImplicitDMAAbort2:
+	JMP FAIL_ImplicitDMAAbort
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+TEST_ImplicitDMAAbort_AlternateBehavior:
+	LDX #0
+
+	;;; Test 2 [Implicit DMA Abort]: Compare results with answer key ;;;
+TEST_ImplicitDMAAbort_AltLoop1:
+	LDA $500, X
+	CMP TEST_ImplicitDMAAbort_AltKey1, X
+	BNE FAIL_ImplicitDMAAbort2
+	INX
+	CPX #$10
+	BNE TEST_ImplicitDMAAbort_AltLoop1
+	INC <currentSubTest
+	LDX #0
+
+	;;; Test 3 [Implicit DMA Abort]: Compare results with answer key ;;;
+	; The 1-cycle DMA does not get delayed by a write cycle, instead it just doesn't occur at all.
+TEST_ImplicitDMAAbort_AltLoop2:
+	LDA $520, X
+	CMP TEST_ImplicitDMAAbort_AltKey2, X
+	BNE FAIL_ImplicitDMAAbort2
+	INX
+	CPX #$10
+	BNE TEST_ImplicitDMAAbort_AltLoop2
+	INC <currentSubTest
+	LDX #0
+
+	;;; Test 4 [Implicit DMA Abort]: Compare results with answer key ;;;
+	; This is just another DMA test showing that the DMA cannot occur within 2 cycles of a previous DMC DMA.
+TEST_ImplicitDMAAbort_AltLoop3:
+	LDA $540, X
+	CMP TEST_ImplicitDMAAbort_Key3, X
+	BNE FAIL_ImplicitDMAAbort2
+	INX
+	CPX #$10
+	BNE TEST_ImplicitDMAAbort_AltLoop3
+
+	;; END OF TEST ;;
+	LDA #9	; success code 1. (post-1990 CPU)
+	RTS
+;;;;;;;
+
+TEST_ImplicitDMAAbort_Key1:
+	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $01, $01, $00, $00, $00, $00
+TEST_ImplicitDMAAbort_Key2:
+	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $01, $00, $00, $00, $00, $00
+TEST_ImplicitDMAAbort_Key3:
+	.byte $01, $01, $01, $01, $01, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
+	
+TEST_ImplicitDMAAbort_AltKey1:
+	.byte $00, $00, $00, $00, $00, $00, $00, $00, $04, $04, $01, $01, $00, $00, $00, $00
+TEST_ImplicitDMAAbort_AltKey2:
+	.byte $00, $00, $00, $00, $00, $00, $00, $00, $04, $04, $01, $00, $00, $00, $00, $00
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                ENGINE                   ;;
@@ -12247,7 +12740,7 @@ DMASync_50MinusACyclesRemaining: ; Sync the CPU and the DMA, such that the DMA r
 	JSR Clockslide_40 ; 156 -> 116
 	JSR Clockslide_21 ; 116 -> 95
 	LDA <Test_UnOp_CycleDelayPostDMA ; 95 -> 92
-	JSR Clockslide36_Plus_A	; 92 -> (56-A)
+	JSR Clockslide37_Plus_A	; 92 -> (56-A)
 	RTS ; (56-A) -> (50-A) cycles after this RTS, a DMA will occur.
 ;;;;;;;
 
@@ -12628,15 +13121,22 @@ Clockslide_3380:
 	RTS
 ;;;;;;;
 
-Clockslide36_Plus_A:;+6
+Clockslide37_Plus_A:;+6
 	STA <$00	; +3
 	LDA #$FF	; +2
 	STA <$01	; +3
-	LDA #37		; +2
+	LDA #36		; +2
 	SEC			; +2
 	SBC <$00	; +3
 	STA <$00	; +3
 	JMP [$0000]	; 5 + A + 6
+;;;;;;;;;;;;;;;;;
+
+Clockslide64_Minus_A:;+6
+	STA <$00	; +3
+	LDA #$FF	; +2
+	STA <$01	; +3
+	JMP [$0000]	; +50 - A
 ;;;;;;;;;;;;;;;;;
 
 VblSync_Plus_A_End: ; Moved here for space. This is the end of the VblSync_Plus_A subroutine.

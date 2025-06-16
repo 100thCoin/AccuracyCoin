@@ -3,7 +3,7 @@ A large collection of NES accuracy tests on a single NROM cartridge.
 
 This ROM was designed for the RP2A03G CPU, and the RP2C02G PPU. Some tests might fail on hardware with a different revision.
 
-This ROM currently has 117 tests, each composed of several smaller tests in order to print error codes narrowing down the specific issues your NES emulator might have.
+This ROM currently has 120 tests, each composed of several smaller tests in order to print error codes narrowing down the specific issues your NES emulator might have.
 
 Here's an example of the menu in this ROM, shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been ran yet. (The cursor is currently next to the "RAM Mirroring" test.)
 
@@ -337,6 +337,20 @@ For more information, I recommend reading the fully commented assembly code for 
   1: The DMA did not occur on the correct CPU cycle.  
   2: The DMC DMA did not correctly emulate the bus conflict with the APU registers.  
   3: The DMC DMA bus conflict should clear the APU Frame Counter Interrupt Flag.  
+
+### DMC DMA + OAM DMA
+  1: The DMC DMA timing in your emulator is off.
+  2: The overlapping DMAs did not spend the correct number of CPU cycles.
+
+### Explicit DMA Abort
+  1: The DMC DMA timing in your emulator is off.
+  2: The aborted DMAs did not spend the correct number of CPU cycles.
+  
+### Implicit DMA Abort
+  1: The DMC DMA timing in your emulator is off.
+  2: The aborted DMAs did not spend the correct number of CPU cycles.
+  3: The 1-cycle DMA should not get delayed by a write cycle, rather it just shouldn't occur in that case.
+  4: If the sample was set to keep looping, the DMC DMA timing in your emulator is off.
 
 ### PPU Reset Flag
   1: The PPU registers shouldn't be usable before the end of the first VBlank.  
