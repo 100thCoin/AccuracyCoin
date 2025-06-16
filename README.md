@@ -518,3 +518,6 @@ Some tests have multiple acceptable behaviors that are tested for in this ROM. T
   1: The controller was read how a US released NES should read controllers.  
   2: The controller was read how a Famicom should read controllers.  
   
+### Implicit DMA Abort
+  1: The abort behaved the way a pre-mid-1990 CPU would behave.  
+  2: The abort behaved the way a mid-1990 or later CPU would behave.  
