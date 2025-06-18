@@ -279,6 +279,8 @@ result_DMCDMAPlusOAMDMA = $477
 result_ImplicitDMAAbort = $478
 result_ExplicitDMAAbort = $479
 
+result_ControllerClocking = $47A
+
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
 result_PowOn_CPUReg = $03FD ; page 3 omits the test from the all-test-result-table.
 result_PowOn_PPURAM = $03FE ; page 3 omits the test from the all-test-result-table.
@@ -597,18 +599,6 @@ Suite_CPUInterrupts:
 	table "NMI Overlap IRQ", $FF, result_NmiAndIrq, TEST_NmiAndIrq
 	.byte $FF
 	
-	;; APU Timing ;;
-Suite_APUTiming:
-	.byte "APU Timing", $FF
-	table "Length Counter", $FF, result_APULengthCounter, TEST_APULengthCounter
-	table "Length Table", $FF, result_APULengthTable, TEST_APULengthTable
-	table "Frame Counter IRQ", $FF, result_FrameCounterIRQ, TEST_FrameCounterIRQ
-	table "Frame Counter 4-step", $FF, result_FrameCounter4Step, TEST_FrameCounter4Step
-	table "Frame Counter 5-step", $FF, result_FrameCounter5Step, TEST_FrameCounter5Step
-	table "Delta Modulation Channel", $FF, result_DeltaModulationChannel, TEST_DeltaModulationChannel
-	table "Controller Strobing", $FF, result_ControllerStrobing, TEST_ControllerStrobing
-	.byte $FF
-	
 	;; DMA Tests ;;
 Suite_DMATests:
 	.byte "APU Registers and DMA tests", $FF	
@@ -622,7 +612,19 @@ Suite_DMATests:
 	table "DMC DMA + OAM DMA", $FF, result_DMCDMAPlusOAMDMA, TEST_DMCDMAPlusOAMDMA
 	table "Explicit DMA Abort", $FF, result_ExplicitDMAAbort, TEST_ExplicitDMAAbort
 	table "Implicit DMA Abort", $FF, result_ImplicitDMAAbort, TEST_ImplicitDMAAbort
-
+	.byte $FF
+	
+	;; APU Timing ;;
+Suite_APUTiming:
+	.byte "APU Timing", $FF
+	table "Length Counter", $FF, result_APULengthCounter, TEST_APULengthCounter
+	table "Length Table", $FF, result_APULengthTable, TEST_APULengthTable
+	table "Frame Counter IRQ", $FF, result_FrameCounterIRQ, TEST_FrameCounterIRQ
+	table "Frame Counter 4-step", $FF, result_FrameCounter4Step, TEST_FrameCounter4Step
+	table "Frame Counter 5-step", $FF, result_FrameCounter5Step, TEST_FrameCounter5Step
+	table "Delta Modulation Channel", $FF, result_DeltaModulationChannel, TEST_DeltaModulationChannel
+	table "Controller Strobing", $FF, result_ControllerStrobing, TEST_ControllerStrobing
+	table "Controller Clocking", $FF, result_ControllerClocking, TEST_ControllerClocking
 	.byte $FF
 
 	;; Power On State ;;
@@ -6629,7 +6631,14 @@ TEST_DMA_Plus_4016R_Loop:
 	BNE DMA_Plus_4016R_TryFamicomControllerBehavior
 
 	;; END OF TEST ;;
-	LDA #1
+	JSR WaitForVBlank
+	LDA #0
+	STA <dontSetPointer
+	JSR PrintTextCentered
+	.word $2370
+	.byte "  $4016 Double-Read like NES  ", $FF
+	JSR ResetScroll
+	LDA #5 ; Success code 1. NES / AV Famicom.
 	RTS
 ;;;;;;;
 DMA_Plus_4016R_TryFamicomControllerBehavior:
@@ -6638,7 +6647,14 @@ DMA_Plus_4016R_TryFamicomControllerBehavior:
 	CMP <$50
 	BNE FAIL_DMA_Plus_4016R
 	;; END OF TEST ;;
-	LDA #1
+	JSR WaitForVBlank
+	LDA #0
+	STA <dontSetPointer
+	JSR PrintTextCentered
+	.word $2370
+	.byte "$4016 Double-Read like Famicom", $FF
+	JSR ResetScroll
+	LDA #9 ; Success code 2. Famicom.
 	RTS
 ;;;;;;;
 
@@ -6682,7 +6698,7 @@ TEST_ControllerStrobing:
 	; This results in a 1-cycle strobe of the controller ports, and if that 1-cycle strobe happens on a get cycle, the controllers actually aren't strobed at all!
 	JSR WaitForVBlank
 	LDA #2
-	STA $4014 ; sync CPU with even cycle.
+	STA $4014 ; sync CPU with put cycle.
 	DEC $4016 ; this should strobe the controller.
 	JSR ReadControllerInto50_and_A
 	AND #$7F
@@ -6693,13 +6709,12 @@ TEST_ControllerStrobing:
 	; This results in a 1-cycle strobe of the controller ports, however they actually aren't strobed at all!
 	JSR WaitForVBlank
 	LDA #2
-	STA $4014 ; sync CPU with even cycle.
-	LDA <$00	; 3 CPU cycles.
-	DEC $4016 ; this should strobe the controller.
+	STA $4014 ; sync CPU with put cycle.
+	LDA <$00  ; 3 CPU cycles.
+	DEC $4016 ; this should not strobe the controller.
 	JSR ReadControllerInto50_and_A
-	AND #$7F
-	CMP #$7F
-	BNE FAIL_ControllerStrobing	; the result should be $00
+	CMP #$FF
+	BNE FAIL_ControllerStrobing	; the result should be $FF
 	
 	;; END OF TEST ;;
 	LDA #1
@@ -7895,7 +7910,7 @@ TEST_FrameCounterIRQ:
 	STA $4017	; 4-step mode, enable IRQ
 	JSR Clockslide_30000 ; wait long enough that the IRQ flag would be set.
 	LDA #02
-	STA $4014 ; align with even cycle.
+	STA $4014 ; align with "put" cycle.
 	LDA #0
 	LDX #0
 	.byte $1F	; SLO Absolute, X
@@ -7931,8 +7946,8 @@ TEST_FrameCounterIRQ:
 	STA $4017	; 4-step mode, enable IRQ
 	JSR Clockslide_30000 ; wait long enough that the IRQ flag would be set.
 	LDA #02
-	STA $4014 ; align with even cycle.
-	LDA <$00  ; align with odd cycle.
+	STA $4014 ; align with "put" cycle.
+	LDA <$00  ; align with "get" cycle.
 	LDA #0
 	LDX #0
 	.byte $1F	; SLO Absolute, X
@@ -7963,11 +7978,11 @@ TEST_FrameCounterIRQ:
 	;;; Test A [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (see if it's set too early) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with even CPU cycle
+	STA $4014 ; sync CPU with "put" cycle
 	LDA #$40
 	STA $4017 ; 4-step mode, clear IRQ flag
 	LDA #$00	
-	STA $4017 ; 4-step mode, enable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
+	STA $4017 ; 4-step mode, enable IRQ (The CPU was on "get" cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	; the flag should be enabled in 29830 CPU cycles.
 	; So let's stall for 29826 cycles, and read $4015 to see if the flag was set. That should be 1 cycle too early.
 	JSR Clockslide_29700
@@ -7987,11 +8002,11 @@ TEST_FrameCounterIRQ_Continue:
 	;;; Test B [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (see if it's set on the right CPU cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with even CPU cycle
+	STA $4014 ; sync CPU with "put" cycle
 	LDA #$40
 	STA $4017 ; 4-step mode, clear IRQ flag
 	LDA #$00	
-	STA $4017 ; 4-step mode, enable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
+	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	; the flag should be enabled in 29830 CPU cycles.
 	; So let's stall for 29827 cycles, and read $4015 to see if the flag was set. That should be 1 cycle too early.
 	JSR Clockslide_29700
@@ -8001,15 +8016,15 @@ TEST_FrameCounterIRQ_Continue:
 	BEQ FAIL_FrameCounterIRQ2
 	INC <currentSubTest
 
-	;;; Test C [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (If the write occurs on an even CPU cycle, the IRQ is delayed by 1 CPU cycle) ;;;
+	;;; Test C [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (If the write occurs on a "put" CPU cycle, the IRQ is delayed by 1 CPU cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with even CPU cycle
-	LDA <$00  ; sync with odd CPU cycle
+	STA $4014 ; sync CPU with "put" cycle
+	LDA <$00  ; sync CPU with "get" cycle
 	LDA #$40
 	STA $4017 ; 4-step mode, clear IRQ flag
 	LDA #$00	
-	STA $4017 ; 4-step mode, enable IRQ (The CPU was on an even cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
 	; So let's stall for 29827 cycles, and read $4015 to see if the flag was set. That should be 1 cycle too early.
 	JSR Clockslide_29700
@@ -8022,12 +8037,12 @@ TEST_FrameCounterIRQ_Continue:
 	;;; Test D [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (see if it's set on the correct cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with even CPU cycle
-	LDA <$00  ; sync with odd CPU cycle
+	STA $4014 ; sync with "put" CPU cycle
+	LDA <$00  ; sync with "get" CPU cycle
 	LDA #$40
 	STA $4017 ; 4-step mode, clear IRQ flag
 	LDA #$00	
-	STA $4017 ; 4-step mode, enable IRQ (The CPU was on an even cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
 	; So let's stall for 29828 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
 	JSR Clockslide_29700
@@ -8040,12 +8055,12 @@ TEST_FrameCounterIRQ_Continue:
 	;;; Test E [APU Frame Counter IRQ]: Reading $4015 on the same cycle the IRQ flag is set, will not clear the IRQ flag (it gets set again on the following 2 CPU cycles) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with even CPU cycle
-	LDA <$00  ; sync with odd CPU cycle
+	STA $4014 ; sync with "put" CPU cycle
+	LDA <$00  ; sync with "get" CPU cycle
 	LDA #$40
 	STA $4017 ; 4-step mode, clear IRQ flag
 	LDA #$00	
-	STA $4017 ; 4-step mode, enable IRQ (The CPU was on an even cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	JSR Clockslide_29700
 	JSR Clockslide_100
 	JSR Clockslide_27
@@ -8057,12 +8072,12 @@ TEST_FrameCounterIRQ_Continue:
 	;;; Test F [APU Frame Counter IRQ]: Reading $4015 on the cycle after the IRQ flag is set, will not clear the IRQ flag (it gets set again on the following CPU cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with even CPU cycle
-	LDA <$00  ; sync with odd CPU cycle
+	STA $4014 ; sync with "put" CPU cycle
+	LDA <$00  ; sync with "get" CPU cycle
 	LDA #$40
 	STA $4017 ; 4-step mode, clear IRQ flag
 	LDA #$00	
-	STA $4017 ; 4-step mode, enable IRQ (The CPU was on an even cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	JSR Clockslide_29700
 	JSR Clockslide_100
 	JSR Clockslide_28
@@ -8074,12 +8089,12 @@ TEST_FrameCounterIRQ_Continue:
 	;;; Test G [APU Frame Counter IRQ]: Reading $4015 2 cycles after the IRQ flag is set, will not clear the IRQ flag (it gets set again on this CPU cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with even CPU cycle
-	LDA <$00  ; sync with odd CPU cycle
+	STA $4014 ; sync with "put" CPU cycle
+	LDA <$00  ; sync with "get" CPU cycle
 	LDA #$40
 	STA $4017 ; 4-step mode, clear IRQ flag
 	LDA #$00	
-	STA $4017 ; 4-step mode, enable IRQ (The CPU was on an even cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	JSR Clockslide_29700
 	JSR Clockslide_100
 	JSR Clockslide_29
@@ -8091,12 +8106,12 @@ TEST_FrameCounterIRQ_Continue:
 	;;; Test H [APU Frame Counter IRQ]: Reading $4015 3 cycles after the IRQ flag is set, will clear the IRQ flag (it does not get set again on this CPU cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with even CPU cycle
-	LDA <$00  ; sync with odd CPU cycle
+	STA $4014 ; sync with "put" CPU cycle
+	LDA <$00  ; sync with "get" CPU cycle
 	LDA #$40
 	STA $4017 ; 4-step mode, clear IRQ flag
 	LDA #$00	
-	STA $4017 ; 4-step mode, enable IRQ (The CPU was on an even cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	JSR Clockslide_29700
 	JSR Clockslide_100
 	JSR Clockslide_30
@@ -8122,10 +8137,10 @@ TEST_FrameCounterIRQ_Continue2:
 	; The following 4 tests will check 29827, 29828, 29829, and 29830 cycles after resetting the frame counter, and the test after that will verify that the IRQ level detector is not pulled low. (An IRQ did not happen)
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with even CPU cycle
-	LDA <$00  ; sync with odd CPU cycle
+	STA $4014 ; sync with "put" CPU cycle
+	LDA <$00  ; sync with "get" CPU cycle
 	LDA #$40
-	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on an even cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
 	; So let's stall for 29827 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
 	JSR Clockslide_29700
@@ -8139,10 +8154,10 @@ TEST_FrameCounterIRQ_Continue2:
 	;;; Test J [APU Frame Counter IRQ]: Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It happens on this cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with even CPU cycle
-	LDA <$00  ; sync with odd CPU cycle
+	STA $4014 ; sync with "put" CPU cycle
+	LDA <$00  ; sync with "get" CPU cycle
 	LDA #$40
-	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on an even cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
 	; So let's stall for 29828 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
 	JSR Clockslide_29700
@@ -8156,10 +8171,10 @@ TEST_FrameCounterIRQ_Continue2:
 	;;; Test K [APU Frame Counter IRQ]: Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It happens on this cycle too) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with even CPU cycle
-	LDA <$00  ; sync with odd CPU cycle
+	STA $4014 ; sync with "put" CPU cycle
+	LDA <$00  ; sync with "get" CPU cycle
 	LDA #$40
-	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on an even cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
 	; So let's stall for 29828 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
 	JSR Clockslide_29700
@@ -8173,10 +8188,10 @@ TEST_FrameCounterIRQ_Continue2:
 	;;; Test L [APU Frame Counter IRQ]:  Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It does not happen on this cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with even CPU cycle
-	LDA <$00  ; sync with odd CPU cycle
+	STA $4014 ; sync with "put" CPU cycle
+	LDA <$00  ; sync with "get" CPU cycle
 	LDA #$40
-	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on an even cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
 	; So let's stall for 29830 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
 	JSR Clockslide_29700
@@ -8193,10 +8208,10 @@ TEST_FrameCounterIRQ_Continue2:
 	JSR WaitForVBlank
 	LDX #$5A
 	LDA #02
-	STA $4014 ; sync with even CPU cycle
-	LDA <$00  ; sync with odd CPU cycle
+	STA $4014 ; sync with "put" CPU cycle
+	LDA <$00  ; sync with "get" CPU cycle
 	LDA #$40
-	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on an even cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
 	; So let's stall for 29828 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
 	JSR Clockslide_29700
@@ -8224,7 +8239,7 @@ TEST_FrameCounter4Step:
 	;;; Test 1 [APU Frame Counter 4-Step Mode]: Verify the timing of the first clock (read 1 cycle early. It's still going) ;;;
 	LDA #2
 	STA $4014
-	;CPU is synced with even CPU cycle
+	;CPU is synced with "put" CPU cycle
 	LDA #0
 	STA $4017 ; Reset the frame counter.
 	LDA #$18
@@ -8247,7 +8262,7 @@ TEST_FrameCounter4Step:
 	;;; Test 2 [APU Frame Counter 4-Step Mode]: Verify the timing of the first clock  (Read the cycle it stops);;;
 	LDA #2
 	STA $4014
-	;CPU is synced with even CPU cycle
+	;CPU is synced with "put" CPU cycle
 	LDA #0
 	STA $4017 ; Reset the frame counter.
 	LDA #$18
@@ -8271,7 +8286,7 @@ TEST_FrameCounter4Step:
 	;;; Test 3 [APU Frame Counter 4-Step Mode]: Verify the timing of the second clock while not inhibiting Frame Counter IRQs (read 1 cycle early. It's still going) ;;;
 	LDA #2
 	STA $4014
-	;CPU is synced with even CPU cycle
+	;CPU is synced with "put" CPU cycle
 	LDA #$18
 	STA $4003	; Set the length to 2. We don't need to manually clock this one, as we're checking the timing of the 2nd clock.
 	LDA #$40
@@ -8307,7 +8322,7 @@ TEST_FrameCounter4Step:
 	;;; Test 5 [APU Frame Counter 4-Step Mode]: Verify the timing of the third clock (read 1 cycle early. It's still going) ;;;
 	LDA #2
 	STA $4014
-	;CPU is synced with even CPU cycle
+	;CPU is synced with "put" CPU cycle
 	LDA #0
 	STA $4017 ; Reset the frame counter.
 	LDA #$28
@@ -8330,7 +8345,7 @@ TEST_FrameCounter4Step:
 	;;; Test 6 [APU Frame Counter 4-Step Mode]: Verify the timing of the third clock  (Read the cycle it stops) ;;;
 	LDA #2
 	STA $4014
-	;CPU is synced with even CPU cycle
+	;CPU is synced with "put" CPU cycle
 	LDA #0
 	STA $4017 ; Reset the frame counter.
 	LDA #$28
@@ -8387,7 +8402,7 @@ TEST_FrameCounter5Step:
 	;;; Test 1 [APU Frame Counter 5-Step Mode]: Verify the timing of the first clock (read 1 cycle early. It's still going) ;;;
 	LDA #2
 	STA $4014
-	;CPU is synced with even CPU cycle
+	;CPU is synced with "put" CPU cycle
 	LDA #0
 	STA $4017 ; Reset the frame counter.
 	LDA #$18
@@ -8408,7 +8423,7 @@ TEST_FrameCounter5Step:
 	;;; Test 2 [APU Frame Counter 5-Step Mode]: Verify the timing of the first clock  (Read the cycle it stops);;;
 	LDA #2
 	STA $4014
-	;CPU is synced with even CPU cycle
+	;CPU is synced with "put" CPU cycle
 	LDA #0
 	STA $4017 ; Reset the frame counter.
 	LDA #$18
@@ -8429,7 +8444,7 @@ TEST_FrameCounter5Step:
 	;;; Test 3 [APU Frame Counter 5-Step Mode]: Verify the timing of the second clock (read 1 cycle early. It's still going) ;;;
 	LDA #2
 	STA $4014
-	;CPU is synced with even CPU cycle
+	;CPU is synced with "put" CPU cycle
 	LDA #0
 	STA $4017 ; Reset the frame counter.
 	LDA #$28
@@ -8450,7 +8465,7 @@ TEST_FrameCounter5Step:
 	;;; Test 4 [APU Frame Counter 5-Step Mode]: Verify the timing of the second clock  (Read the cycle it stops);;;
 	LDA #2
 	STA $4014
-	;CPU is synced with even CPU cycle
+	;CPU is synced with "put" CPU cycle
 	LDA #0
 	STA $4017 ; Reset the frame counter.
 	LDA #$28
@@ -8471,7 +8486,7 @@ TEST_FrameCounter5Step:
 	;;; Test 5 [APU Frame Counter 5-Step Mode]: Verify the timing of the third clock (read 1 cycle early. It's still going) ;;;
 	LDA #2
 	STA $4014
-	;CPU is synced with even CPU cycle
+	;CPU is synced with "put" CPU cycle
 	LDA #0
 	STA $4017 ; Reset the frame counter.
 	LDA #$28
@@ -8492,7 +8507,7 @@ TEST_FrameCounter5Step:
 	;;; Test 6 [APU Frame Counter 5-Step Mode]: Verify the timing of the third clock  (Read the cycle it stops);;;
 	LDA #2
 	STA $4014
-	;CPU is synced with even CPU cycle
+	;CPU is synced with "put" CPU cycle
 	LDA #0
 	STA $4017 ; Reset the frame counter.
 	LDA #$28
@@ -9290,7 +9305,7 @@ TEST_ImpliedDummyRead:
 	STA $4017	; 4-step mode, enable IRQ
 	JSR Clockslide_30000 ; wait long enough that the IRQ flag would be set.
 	LDA #02
-	STA $4014 ; align with even cycle.
+	STA $4014 ; align with "put" cycle.
 	LDA #0
 	LDX #0
 	.byte $1F	; SLO Absolute, X
@@ -10990,6 +11005,185 @@ TEST_ImplicitDMAAbort_AltKey3:
 	.byte $01, $01, $01, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
 	
 
+TEST_ControllerClocking_Strobe:
+	LDA #1
+	STA $4016 ; write 1 to $4016 to strobe the controllers.
+	LSR A
+	STA $4016 ; Write 0 to $4016 to finish strobing the controller.
+	RTS
+;;;;;;;
+
+TEST_ControllerClocking_JMP_Famicom:
+	JMP TEST_ControllerClocking_FamicomBehavior
+
+FAIL_ControllerClocking:
+	JMP TEST_Fail
+
+TEST_ControllerClocking:
+	LDA #0
+	STA $4015	; This shouldn't be running right now anyway, but better safe than sorry.
+	;;; Test 1 [Controller Clocking]: Reading $4016 more than 8 times will always result in bit 0 being set to 1 ;;;
+	; Please don't hold DPad Right during this test.
+	JSR TEST_ControllerClocking_Strobe
+	JSR ReadControllerInto50_and_A
+	; Controller 1 was just read 8 times.
+	LDA $4016 ; Reading it a ninth time (and any futher times) should always have a 1 in bit 0.
+	AND #1
+	BEQ FAIL_ControllerClocking
+	LDA $4016 ; Read it a tenth time just to be sure.
+	AND #1
+	BEQ FAIL_ControllerClocking
+
+	;;; Test 2 [Controller Clocking]: SLO Absolute, X works in this emulator ;;;
+	; This upcoming test requires SLO to be implemented, so let's confirm it works.
+	JSR TEST_SLO_1F
+	LDX #2
+	STX <currentSubTest
+	CMP #1
+	BNE FAIL_ControllerClocking
+	INC <currentSubTest
+
+	;;; Test 3 [Controller Clocking]: What happens on two consecutive read cycles from $4016? ;;;
+	; There are actually 2 outcomes here.
+	; Famicom: The controller gets clocked twice.
+	; NES / AV Famicom: The controller is not clocked on consecutive reads from $4016.
+	JSR TEST_ControllerClocking_Strobe
+	LDX #0
+	LDA $4016 	; We need the make sure the dummy write to $4016 doesn't have bit 1 set. So uh... don't press B during this test either. Thanks.
+	.byte $1F	; SLO Absolute, X
+	.word $4016 ; Double-Read address $4016
+	; Let's see how many times this instruction clocked the controllers
+TEST_ControllerClocking_Loop1:
+	LDA $4016
+	AND #1
+	BNE TEST_ControllerClocking_ExitLoop1
+	INX
+	BNE TEST_ControllerClocking_Loop1
+TEST_ControllerClocking_ExitLoop1:
+	; How many times did this loop before reading a 1 in bit 0?
+	CPX #5
+	BMI FAIL_ControllerClocking ; This should loop a minimum of 6 times.
+	BEQ TEST_ControllerClocking_JMP_Famicom ; If it looped 6 times, it had famicom behavior.
+	; Otherwise, NES / AV Famicom behavior.
+	
+	;;; Test 4 [Controller Clocking]: The double-read will always read the same value as the first read. (on a NES / AV Famicom) ;;;
+	JSR TEST_ControllerClocking_Strobe
+	LDX #7
+TEST_ControllerClocking_Loop2:
+	LDA $4016 ; Read from $4016 7 times.
+	DEX
+	BNE TEST_ControllerClocking_Loop2
+	; X is now zero.
+	.byte $1F	; SLO Absolute, X
+	.word $4016 ; Double-Read address $4016
+	AND #2		; If the double read picked up the ninth value of the shift register, then you fail the test.
+	BNE FAIL_ControllerClocking
+	INC <currentSubTest
+
+	;;; Test 5 [Controller Clocking]: The DMC DMA can clock the controller. ;;;
+	; This is pretty much the exact same thing as the [DMA + $4016] test
+	JSR DMASync_50CyclesRemaining
+	JSR TEST_ControllerClocking_Strobe ; +6 +2 +4 +2 +4 +6 = 24 CPU cycles.
+	JSR Clockslide_23
+	; 3 cycles until the DMA
+	LDA $4016
+	; put : halt cycle. Read $4016.
+	; get : halt cycle. Read $4016. (Consecutive read, so this does not clock the controller.)
+	; put : dummy read. Read $4016. (Consecutive read, so this does not clock the controller.)
+	; get :             Read sample address. (Also bus conflict with $4000, but that won't affect anything since reading that address is all open bus.)
+	; LDA $4016 :       Read $4016. (Non-consecutive, so this clocks again.)
+	
+	; X is zero.
+TEST_ControllerClocking_Loop3:
+	LDA $4016
+	AND #1
+	BNE TEST_ControllerClocking_Exit3
+	INX
+	BNE TEST_ControllerClocking_Loop3
+TEST_ControllerClocking_Exit3:
+	CPX #6
+	BNE FAIL_ControllerClocking2
+	INC <currentSubTest
+
+	;;; Test 6 [Controller Clocking]: The DMC DMA bus conflicting with $4016 counts as a consecutive read, so LDA $4016 would only end up clocking once in that situation. ;;;
+	JSR TEST_ControllerClocking_Strobe
+	JSR DMASync_50CyclesRemaining
+	LDA #4		;+2
+	STA $4013	;+4 sample length = #4 * 16 + 1 = 65 (or $41 in hex)
+	LDA #$BF	;+2
+	STA $4012	;+4 Sample address is $FFC0
+	LDA #$4F	;+2
+	STA $4010	;+4 fastest rate. (also loop, so it refreshes the address and length)
+	LDX #$0	;+2
+	JSR Clockslide_30
+	JSR Clockslide_400
+	JSR Clockslide_26
+	; Next DMA in 4 cycles
+TEST_ControllerClocking_Loop4: ; DMA every 432 CPU cycles.
+	NOP
+	NOP
+	NOP
+	JSR Clockslide_400
+	JSR Clockslide_15
+	INX	; +2   Increment X for the next loop.
+	CPX #$16 ; +2   If X = $40, we exit the loop.
+	BNE TEST_ControllerClocking_Loop4 ; +3 if looping. +2 if not. (total outside the clockslide = 29. 432-29 = 403)
+	; Next DMA in 3 cycles.
+	LDA $4016
+	; put : halt cycle. Read $4016.
+	; get : halt cycle. Read $4016. (Consecutive read, so this does not clock the controller.)
+	; put : dummy read. Read $4016. (Consecutive read, so this does not clock the controller.)
+	; get :             Read sample address. (Also bus conflict with $4016, which is yet another consecutive read.)
+	; LDA $4016 :       Read $4016. (Consecutive read, since the bus conflict also read from $4016, so this does not clock the controller.)
+	LDX #0
+TEST_ControllerClocking_Loop5:
+	LDA $4016
+	AND #1
+	BNE TEST_ControllerClocking_Exit5
+	INX
+	BNE TEST_ControllerClocking_Loop5
+TEST_ControllerClocking_Exit5:
+	CPX #7 ; This will loop 7 times before reaching the end of the shfit register.
+	BNE FAIL_ControllerClocking2	
+	BEQ TEST_ControllerClocking_Continue
+	
+FAIL_ControllerClocking2:
+	JMP TEST_Fail
+
+TEST_ControllerClocking_Continue:
+	
+	;; END OF TEST ;;
+	JSR WaitForVBlank
+	LDA #0
+	STA <dontSetPointer
+	JSR PrintTextCentered
+	.word $2370
+	.byte "  $4016 Double-Read like NES  ", $FF
+	JSR ResetScroll
+	LDA #5 ; success code 1 (NES / AV Famicom)
+	RTS
+;;;;;;;
+
+TEST_ControllerClocking_FamicomBehavior:
+	; If this console or emulator is showing Famicom behavior, there's no need to test further, as the remaining tests are all about consecutive reads not clocking the controller.
+	; But on a famicom, the consecutive reads *do* clock a controller.
+	
+	; If you are not specifically trying to emulate the famicom behavior, consider this a fail.
+
+	;; END OF TEST ;;
+	JSR WaitForVBlank
+	LDA #0
+	STA <dontSetPointer
+	JSR PrintTextCentered
+	.word $2370
+	.byte "$4016 Double-Read like Famicom", $FF
+	JSR ResetScroll
+	LDA #9 ; success code 2. (Famicom)
+	RTS
+;;;;;;;
+
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                ENGINE                   ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -12548,6 +12742,8 @@ RunTest_AllTestSkipDrawing1:
 	LDY #0
 	STA [TestResultPointer],Y     ; store the test results in RAM.
 	STA <Copy_A
+	LDA #0
+	STA $4015					  ; Disable the DMC.
 	LDA <RunningAllTests
 	BNE RunTest_AllTestSkipDrawing2
 	LDA <Copy_A

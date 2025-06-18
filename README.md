@@ -324,6 +324,14 @@ For more information, I recommend reading the fully commented assembly code for 
   2: Any value with bit 0 set written to $4016 should strobe the controllers.  
   3: Controllers should be strobed when the CPU transitions from a "get" cycle to a "put" cycle.  
   4: Controllers should not be strobed when the CPU transitions from a "put" cycle to a "get" cycle.  
+  
+### Controller Clocking
+  1: Reading $4016 more than 8 times should always result in bit 0 being set to 1.  
+  2: Your emulator did not pass the SLO Absolute, X test.  
+  3: (NES / AV Famicom only) Double-Reading address $4016 should only clock the controller once.  
+  4: (NES / AV Famicom only) This Double-Read should be the same value for both reads.  
+  5: (NES / AV Famicom only) The "put"/"Halt" cycles of the DMC DMA should be able to clock the controller if the DMA occurs during a read from $4016. The LDA instruction should clock the controller again after the DMC DMA's "get" cycle.  
+  6: (NES / AV Famicom only) If the DMC DMA "get" cycle has a bus conflict with $4016, the controller will only get clocked once during LDA $4016 even with the DMC DMA occuring.  
 
 ### APU Register Activation
   1: A series of prerequisite tests failed. CPU and PPU open bus, the PPU Read Buffer, DMA + Open Bus, and DMA + $2007 Read.  
@@ -515,6 +523,10 @@ Some tests have multiple acceptable behaviors that are tested for in this ROM. T
   1: The instruction behaved the way an old RP2A03G CPU or previous revision CPU would run this instruction.  
   2: The instruction behaved the way a new RP2A03G CPU or later revision CPU would run this instruction.  
   
+### DMA + $4016 Read
+  1: The controller was read how a US released NES / AV Famicom should read controllers.  
+  2: The controller was read how a Famicom should read controllers.  
+  
 ### DMC DMA Bus Conflicts
   1: The controller was read how a US released NES should read controllers.  
   2: The controller was read how a Famicom should read controllers.  
@@ -522,3 +534,7 @@ Some tests have multiple acceptable behaviors that are tested for in this ROM. T
 ### Implicit DMA Abort
   1: The abort behaved the way a mid-1990 or later CPU would behave.  
   2: The abort behaved the way a pre-mid-1990 CPU would behave.  
+
+### Controller Clocking
+  1: The controller was read how a US released NES / AV Famicom should read controllers.  
+  2: The controller was read how a Famicom should read controllers.  
