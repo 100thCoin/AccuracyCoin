@@ -7797,9 +7797,16 @@ FAIL_APULengthTable:
 ;;;;;;;;;;;;;;;;;
 	
 TEST_APULengthTable:
-	JSR TEST_APU_Prep
 	;;; Test 1 [APU Length Table]: What value was the length counter when we write 'n' to address $4003? ;;;
-	; Just for clarification, this is actually "Test 1" through "Test W". They all use the same routine, but the error code is adjusted accordingly.
+	
+	JSR TEST_APULengthCounter
+	LDX #0
+	STX <currentSubTest
+	CMP #1
+	BNE FAIL_APULengthTable
+	
+	;;; Test 2 [APU Length Table]: What value was the length counter when we write 'n' to address $4003? ;;;
+	; Just for clarification, this is actually "Test 2" through "Test X". They all use the same routine, but the error code is adjusted accordingly.
 	LDX #0
 TEST_APULengthTableLoop:
 	TXA
@@ -10519,6 +10526,9 @@ FAIL_DMCDMAPlusOAMDMA:
 	JMP TEST_Fail
 
 TEST_DMCDMAPlusOAMDMA:
+	LDA <result_DMADMASync_PreTest
+	CMP #1
+	BNE FAIL_DMCDMAPlusOAMDMA	
 	;;; Test 1 [DMC DMA + OAM DMA]: This test relies on precise DMA timing in order to calculate how many cycles the DMA took. Let's test for that now. ;;;
 	; Let's confirm this DMA timing subroutine of mine works on this emulator.
 	JSR CheckDMATiming
@@ -10639,6 +10649,9 @@ FAIL_ExplicitDMAAbort:
 
 
 TEST_ExplicitDMAAbort:
+	LDA <result_DMADMASync_PreTest
+	CMP #1
+	BNE FAIL_ExplicitDMAAbort	
 	;;; Test 1 [Explicit DMA Abort]: This test relies on precise DMA timing in order to calculate how many cycles the DMA took. Let's test for that now. ;;;
 	JSR CheckDMATiming
 	CPY #4 ; 
@@ -10708,6 +10721,9 @@ FAIL_ImplicitDMAAbort:
 	JMP TEST_Fail
 
 TEST_ImplicitDMAAbort:
+	LDA <result_DMADMASync_PreTest
+	CMP #1
+	BNE FAIL_ImplicitDMAAbort	
 	;;; Test 1 [Explicit DMA Abort]: This test relies on precise DMA timing in order to calculate how many cycles the DMA took. Let's test for that now. ;;;
 	JSR CheckDMATiming
 	CPY #4 ; 
@@ -10900,9 +10916,9 @@ TEST_ImplicitDMAAbort_KeyLoop3:
 	STA <dontSetPointer
 	JSR PrintTextCentered
 	.word $2390
-	.byte "Implicit Abort Behavior 1", $FF
+	.byte "Implicit Abort Behavior 2", $FF
 	JSR ResetScroll
-	LDA #5	; success code 1. (pre-1990 CPU)
+	LDA #9	; success code 2. (pre-1990 CPU)
 	RTS
 ;;;;;;;
 
@@ -10939,7 +10955,7 @@ TEST_ImplicitDMAAbort_AltLoop2:
 	; This is just another DMA test showing that the DMA cannot occur within 2 cycles of a previous DMC DMA.
 TEST_ImplicitDMAAbort_AltLoop3:
 	LDA $540, X
-	CMP TEST_ImplicitDMAAbort_Key3, X
+	CMP TEST_ImplicitDMAAbort_AltKey3, X
 	BNE FAIL_ImplicitDMAAbort2
 	INX
 	CPX #$10
@@ -10953,9 +10969,9 @@ TEST_ImplicitDMAAbort_AltLoop3:
 	STA <dontSetPointer
 	JSR PrintTextCentered
 	.word $2390
-	.byte "Implicit Abort Behavior 2", $FF
+	.byte "Implicit Abort Behavior 1", $FF
 	JSR ResetScroll
-	LDA #9	; success code 1. (post-1990 CPU)
+	LDA #5	; success code 1. (post-1990 CPU)
 	RTS
 ;;;;;;;
 
@@ -10970,7 +10986,9 @@ TEST_ImplicitDMAAbort_AltKey1:
 	.byte $00, $00, $00, $00, $00, $00, $00, $00, $04, $04, $01, $01, $00, $00, $00, $00
 TEST_ImplicitDMAAbort_AltKey2:
 	.byte $00, $00, $00, $00, $00, $00, $00, $00, $04, $04, $01, $00, $00, $00, $00, $00
-
+TEST_ImplicitDMAAbort_AltKey3:
+	.byte $01, $01, $01, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
+	
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                ENGINE                   ;;

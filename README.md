@@ -200,38 +200,39 @@ For more information, I recommend reading the fully commented assembly code for 
   8: If the channel is set to play infinitely, the length counter should be left unchanged.  
 
 ### APU Length Table
-  1: When writing %00000--- to address $4003, the pulse 1 length counter should be set to 10  
-  2: When writing %00001--- to address $4003, the pulse 1 length counter should be set to 254  
-  3: When writing %00010--- to address $4003, the pulse 1 length counter should be set to 20  
-  4: When writing %00011--- to address $4003, the pulse 1 length counter should be set to 2  
-  5: When writing %00100--- to address $4003, the pulse 1 length counter should be set to 40  
-  6: When writing %00101--- to address $4003, the pulse 1 length counter should be set to 4  
-  7: When writing %00110--- to address $4003, the pulse 1 length counter should be set to 80  
-  8: When writing %00111--- to address $4003, the pulse 1 length counter should be set to 6  
-  9: When writing %01000--- to address $4003, the pulse 1 length counter should be set to 160  
-  A: When writing %01001--- to address $4003, the pulse 1 length counter should be set to 8  
-  B: When writing %01010--- to address $4003, the pulse 1 length counter should be set to 60  
-  C: When writing %01011--- to address $4003, the pulse 1 length counter should be set to 10  
-  D: When writing %01100--- to address $4003, the pulse 1 length counter should be set to 14  
-  E: When writing %01101--- to address $4003, the pulse 1 length counter should be set to 12  
-  F: When writing %01110--- to address $4003, the pulse 1 length counter should be set to 26  
-  G: When writing %01111--- to address $4003, the pulse 1 length counter should be set to 14  
-  H: When writing %10000--- to address $4003, the pulse 1 length counter should be set to 12  
-  I: When writing %10001--- to address $4003, the pulse 1 length counter should be set to 16  
-  J: When writing %10010--- to address $4003, the pulse 1 length counter should be set to 24  
-  K: When writing %10011--- to address $4003, the pulse 1 length counter should be set to 18  
-  L: When writing %10100--- to address $4003, the pulse 1 length counter should be set to 48  
-  M: When writing %10101--- to address $4003, the pulse 1 length counter should be set to 20  
-  N: When writing %10110--- to address $4003, the pulse 1 length counter should be set to 96  
-  O: When writing %10111--- to address $4003, the pulse 1 length counter should be set to 22  
-  P: When writing %11000--- to address $4003, the pulse 1 length counter should be set to 192  
-  Q: When writing %11001--- to address $4003, the pulse 1 length counter should be set to 24  
-  R: When writing %11010--- to address $4003, the pulse 1 length counter should be set to 72  
-  S: When writing %11011--- to address $4003, the pulse 1 length counter should be set to 26  
-  T: When writing %11100--- to address $4003, the pulse 1 length counter should be set to 16  
-  U: When writing %11101--- to address $4003, the pulse 1 length counter should be set to 28  
-  V: When writing %11110--- to address $4003, the pulse 1 length counter should be set to 32  
-  W: When writing %11111--- to address $4003, the pulse 1 length counter should be set to 30  
+  1: Your emulator did not pass APU Length Counter.
+  2: When writing %00000--- to address $4003, the pulse 1 length counter should be set to 10  
+  3: When writing %00001--- to address $4003, the pulse 1 length counter should be set to 254  
+  4: When writing %00010--- to address $4003, the pulse 1 length counter should be set to 20  
+  5: When writing %00011--- to address $4003, the pulse 1 length counter should be set to 2  
+  6: When writing %00100--- to address $4003, the pulse 1 length counter should be set to 40  
+  7: When writing %00101--- to address $4003, the pulse 1 length counter should be set to 4  
+  8: When writing %00110--- to address $4003, the pulse 1 length counter should be set to 80  
+  9: When writing %00111--- to address $4003, the pulse 1 length counter should be set to 6  
+  A: When writing %01000--- to address $4003, the pulse 1 length counter should be set to 160  
+  B: When writing %01001--- to address $4003, the pulse 1 length counter should be set to 8  
+  C: When writing %01010--- to address $4003, the pulse 1 length counter should be set to 60  
+  D: When writing %01011--- to address $4003, the pulse 1 length counter should be set to 10  
+  E: When writing %01100--- to address $4003, the pulse 1 length counter should be set to 14  
+  F: When writing %01101--- to address $4003, the pulse 1 length counter should be set to 12  
+  G: When writing %01110--- to address $4003, the pulse 1 length counter should be set to 26  
+  H: When writing %01111--- to address $4003, the pulse 1 length counter should be set to 14  
+  I: When writing %10000--- to address $4003, the pulse 1 length counter should be set to 12  
+  J: When writing %10001--- to address $4003, the pulse 1 length counter should be set to 16  
+  K: When writing %10010--- to address $4003, the pulse 1 length counter should be set to 24  
+  L: When writing %10011--- to address $4003, the pulse 1 length counter should be set to 18  
+  M: When writing %10100--- to address $4003, the pulse 1 length counter should be set to 48  
+  N: When writing %10101--- to address $4003, the pulse 1 length counter should be set to 20  
+  O: When writing %10110--- to address $4003, the pulse 1 length counter should be set to 96  
+  P: When writing %10111--- to address $4003, the pulse 1 length counter should be set to 22  
+  Q: When writing %11000--- to address $4003, the pulse 1 length counter should be set to 192  
+  R: When writing %11001--- to address $4003, the pulse 1 length counter should be set to 24  
+  S: When writing %11010--- to address $4003, the pulse 1 length counter should be set to 72  
+  T: When writing %11011--- to address $4003, the pulse 1 length counter should be set to 26  
+  U: When writing %11100--- to address $4003, the pulse 1 length counter should be set to 16  
+  V: When writing %11101--- to address $4003, the pulse 1 length counter should be set to 28  
+  W: When writing %11110--- to address $4003, the pulse 1 length counter should be set to 32  
+  X: When writing %11111--- to address $4003, the pulse 1 length counter should be set to 30  
 
 ### Frame Counter IRQ
   1: The IRQ flag should be set when the APU Frame counter is in the 4-step mode, and the IRQ flag is enabled.  
@@ -519,5 +520,5 @@ Some tests have multiple acceptable behaviors that are tested for in this ROM. T
   2: The controller was read how a Famicom should read controllers.  
   
 ### Implicit DMA Abort
-  1: The abort behaved the way a pre-mid-1990 CPU would behave.  
-  2: The abort behaved the way a mid-1990 or later CPU would behave.  
+  1: The abort behaved the way a mid-1990 or later CPU would behave.  
+  2: The abort behaved the way a pre-mid-1990 CPU would behave.  
