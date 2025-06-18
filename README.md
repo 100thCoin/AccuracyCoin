@@ -3,7 +3,7 @@ A large collection of NES accuracy tests on a single NROM cartridge.
 
 This ROM was designed for the RP2A03G CPU, and the RP2C02G PPU. Some tests might fail on hardware with a different revision.
 
-This ROM currently has 120 tests, each composed of several smaller tests in order to print error codes narrowing down the specific issues your NES emulator might have.
+This ROM currently has 121 tests, each composed of several smaller tests in order to print error codes narrowing down the specific issues your NES emulator might have.
 
 Here's an example of the menu in this ROM, shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been ran yet. (The cursor is currently next to the "RAM Mirroring" test.)
 
@@ -17,9 +17,27 @@ If the cursor is at the top of the page (highlighting the current page index), p
 
 Examples:
 
-![Result_Table](https://github.com/user-attachments/assets/523aca93-0f43-4253-addc-9d23ae776b63)
+![Result_Table](https://github.com/user-attachments/assets/2288e997-fca5-494e-a53d-03cbe7525353)
 
-The top 3 tests on page 9 have two different acceptable results depending on the CPU revision, so the light blue number will indicate which behavior was detected.
+Any test with multiple acceptable passing behaviors will be drawn with a light blue number over it.
+
+# The Debug Menu
+
+After running a test, you can press "Select" to reveal this menu:
+
+![DebugMenu_0](https://github.com/user-attachments/assets/7b79c862-1eca-47f4-863d-dc2b89869188)
+
+This menu will print severl bytes on screen, and can be useful for debugging certain tests in a situation where you don't have a way to view everything in RAM. I suggest simply using some form of memory viewer if possible.
+
+This menu does not apply to every test in the ROM, as many tests don't write anything to RAM, or the values written aren't relavent for what went wrong.
+
+The top-most row will print the values from address $20 to $2F, which are values used in the Unofficial Instruction tests.  
+The second row will print the values from $50 to $6F, which are used in a handful of tests.  
+The remaining 8 rows will print every byte from address $500 to $5FF, which are typically where a test will store any bytes needed for it.
+
+Here's a color-coded version of that image, with boxes around each byte:
+
+![DebugMenu_1](https://github.com/user-attachments/assets/6e6423b3-9f6e-4ccb-88a9-a187a840cdbd)
 
 # Error Codes
 For more information, I recommend reading the fully commented assembly code for the test.
