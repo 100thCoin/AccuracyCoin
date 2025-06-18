@@ -27,7 +27,7 @@ After running a test, you can press "Select" to reveal this menu:
 
 ![DebugMenu_0](https://github.com/user-attachments/assets/7b79c862-1eca-47f4-863d-dc2b89869188)
 
-This menu will print severl bytes on screen, and can be useful for debugging certain tests in a situation where you don't have a way to view everything in RAM. I suggest simply using some form of memory viewer if possible.
+This menu will print several bytes on screen, and can be useful for debugging certain tests in a situation where you don't have a way to view everything in RAM. I suggest simply using some form of memory viewer if possible.
 
 This menu does not apply to every test in the ROM, as many tests don't write anything to RAM, or the values written aren't relavent for what went wrong.
 
