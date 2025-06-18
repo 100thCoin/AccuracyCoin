@@ -6631,6 +6631,8 @@ TEST_DMA_Plus_4016R_Loop:
 	BNE DMA_Plus_4016R_TryFamicomControllerBehavior
 
 	;; END OF TEST ;;
+	LDA <RunningAllTests
+	BNE TEST_DMA_Plus_4016R_SkipText1
 	JSR WaitForVBlank
 	LDA #0
 	STA <dontSetPointer
@@ -6638,6 +6640,7 @@ TEST_DMA_Plus_4016R_Loop:
 	.word $2370
 	.byte "  $4016 Double-Read like NES  ", $FF
 	JSR ResetScroll
+TEST_DMA_Plus_4016R_SkipText1:
 	LDA #5 ; Success code 1. NES / AV Famicom.
 	RTS
 ;;;;;;;
@@ -6647,6 +6650,8 @@ DMA_Plus_4016R_TryFamicomControllerBehavior:
 	CMP <$50
 	BNE FAIL_DMA_Plus_4016R
 	;; END OF TEST ;;
+	LDA <RunningAllTests
+	BNE TEST_DMA_Plus_4016R_SkipText2
 	JSR WaitForVBlank
 	LDA #0
 	STA <dontSetPointer
@@ -6654,6 +6659,7 @@ DMA_Plus_4016R_TryFamicomControllerBehavior:
 	.word $2370
 	.byte "$4016 Double-Read like Famicom", $FF
 	JSR ResetScroll
+TEST_DMA_Plus_4016R_SkipText2:
 	LDA #9 ; Success code 2. Famicom.
 	RTS
 ;;;;;;;
@@ -8610,7 +8616,7 @@ TEST_DeltaModulationChannel:
 	JSR Clockslide_4320 ; as we have established, the DMC is now playing.
 	LDA #0
 	STA $4015	; Write $10 to $4015 again, while the sample is still playing. Nothing changes, don't reload the length or anything.
-	LDA $4015	; the DMC should still be playing.
+	LDA $4015	; the DMC should have stopped
 	AND #$10
 	BNE FAIL_DeltaModulationChannel2
 	INC <currentSubTest
@@ -10926,6 +10932,8 @@ TEST_ImplicitDMAAbort_KeyLoop3:
 	;; END OF TEST ;;
 	LDA #0
 	STA $4015
+	LDA <RunningAllTests
+	BNE TEST_ImplicitDMAAbort_SkipText2
 	JSR WaitForVBlank
 	LDA #0
 	STA <dontSetPointer
@@ -10933,6 +10941,7 @@ TEST_ImplicitDMAAbort_KeyLoop3:
 	.word $2390
 	.byte "Implicit Abort Behavior 2", $FF
 	JSR ResetScroll
+TEST_ImplicitDMAAbort_SkipText2:
 	LDA #9	; success code 2. (pre-1990 CPU)
 	RTS
 ;;;;;;;
@@ -10979,6 +10988,8 @@ TEST_ImplicitDMAAbort_AltLoop3:
 	;; END OF TEST ;;
 	LDA #0
 	STA $4015
+	LDA <RunningAllTests
+	BNE TEST_ImplicitDMAAbort_SkipText
 	JSR WaitForVBlank
 	LDA #0
 	STA <dontSetPointer
@@ -10986,6 +10997,7 @@ TEST_ImplicitDMAAbort_AltLoop3:
 	.word $2390
 	.byte "Implicit Abort Behavior 1", $FF
 	JSR ResetScroll
+TEST_ImplicitDMAAbort_SkipText:
 	LDA #5	; success code 1. (post-1990 CPU)
 	RTS
 ;;;;;;;
@@ -11153,6 +11165,8 @@ FAIL_ControllerClocking2:
 TEST_ControllerClocking_Continue:
 	
 	;; END OF TEST ;;
+	LDA <RunningAllTests
+	BNE TEST_ControllerClocking_SkipText
 	JSR WaitForVBlank
 	LDA #0
 	STA <dontSetPointer
@@ -11160,6 +11174,7 @@ TEST_ControllerClocking_Continue:
 	.word $2370
 	.byte "  $4016 Double-Read like NES  ", $FF
 	JSR ResetScroll
+TEST_ControllerClocking_SkipText:
 	LDA #5 ; success code 1 (NES / AV Famicom)
 	RTS
 ;;;;;;;
@@ -11171,6 +11186,8 @@ TEST_ControllerClocking_FamicomBehavior:
 	; If you are not specifically trying to emulate the famicom behavior, consider this a fail.
 
 	;; END OF TEST ;;
+	LDA <RunningAllTests
+	BNE TEST_ControllerClocking_SkipT2
 	JSR WaitForVBlank
 	LDA #0
 	STA <dontSetPointer
@@ -11178,6 +11195,7 @@ TEST_ControllerClocking_FamicomBehavior:
 	.word $2370
 	.byte "$4016 Double-Read like Famicom", $FF
 	JSR ResetScroll
+TEST_ControllerClocking_SkipT2:
 	LDA #9 ; success code 2. (Famicom)
 	RTS
 ;;;;;;;
