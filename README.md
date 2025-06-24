@@ -89,9 +89,9 @@ For more information, I recommend reading the fully commented assembly code for 
   1: Reading from open bus is not all zeroes.  
   2: Reading from open bus with LDA Absolute should simply return the high byte of the operand.  
   3: Indexed addressing crossing a page boundary should not update the data bus to the new high byte value.  
-  4: The upper 3 bits when reading from the controller should be open bus.  
-  5: Moving the program counter to open bus should read instructions from the floating data bus values.  
-  6: Dummy Reads should update the data bus.  
+  4: Moving the program counter to open bus should read instructions from the floating data bus values.  
+  5: Dummy Reads should update the data bus.  
+  6: The upper 3 bits when reading from the controller should be open bus.  
   7: Reading from $4015 should not update the databus.  
   8: Writing should always update the databus, even writing to $4015.  
 
@@ -493,6 +493,13 @@ For more information, I recommend reading the fully commented assembly code for 
   8: Reads from $2004 during PPU cycle 65 to 256 of a visible scanline (with rendering enabled) should read from the current OAM address.  
   9: Reads from $2004 during PPU cycle 256 to 320 of a visible scanline (with rendering enabled) should always read $FF.  
   A: Writing to $2004 on a visible scanline should increment the OAM address by 4, and then bitwise AND the OAM address with $FC.  
+
+### OAM Corruption
+  1: This emulator failed to sync the CPU to VBlank in a test ran when the ROM boots.  
+  2: OAM Corruption should "corrupt" a row in OAM by copying the 8 values from row 0 to another row.  
+  3: This corruption should not occur immediately after disabling rendering.  
+  4: This corruption should now occur immediately after re-enabling rendering.  
+  5: OAM Corruption should be able to occur from dots 257 to 320.  
 
 ### RMW $2007 Extra Write
   1: A Read-Modify-Write instruction to address $2007 should perform an extra write where the low byte of the PPU address written is the result of the Read-Modify-Write instruction.  

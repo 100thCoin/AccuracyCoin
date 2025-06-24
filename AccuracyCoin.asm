@@ -281,6 +281,8 @@ result_ExplicitDMAAbort = $479
 
 result_ControllerClocking = $47A
 
+result_OAM_Corruption = $47B
+
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
 result_PowOn_CPUReg = $03FD ; page 3 omits the test from the all-test-result-table.
 result_PowOn_PPURAM = $03FE ; page 3 omits the test from the all-test-result-table.
@@ -661,11 +663,13 @@ Suite_PPUTiming:
 	;; Sprite Zero Hits ;;
 Suite_SpriteZeroHits:
 	.byte "Sprite Evaluation", $FF
+	table "Sprite overflow behavior", $FF, result_SprOverflow_Behavior, TEST_SprOverflow_Behavior
 	table "Sprite 0 Hit behavior", $FF, result_Sprite0Hit_Behavior, TEST_Sprite0Hit_Behavior
 	table "Arbitrary Sprite zero", $FF, result_ArbitrarySpriteZero, TEST_ArbitrarySpriteZero
-	table "Sprite overflow behavior", $FF, result_SprOverflow_Behavior, TEST_SprOverflow_Behavior
 	table "Misaligned OAM behavior", $FF, result_MisalignedOAM_Behavior, TEST_MisalignedOAM_Behavior
 	table "Address $2004 behavior", $FF, result_Address2004_Behavior, TEST_Address2004_Behavior
+	table "OAM Corruption", $FF, result_OAM_Corruption, TEST_OAM_Corruption
+
 	.byte $FF
 	
 	;; PPU Misc ;;
@@ -1240,54 +1244,7 @@ TEST_OpenBus:
 	BNE TEST_Fail
 	INC <currentSubTest
 	
-	;;; Test 4 [Open Bus]: The upper 3 bits when reading from the controller are open bus. ;;;
-	; This is just checking to see if the controllers have the open bus bits.
-	LDA $4016
-	AND #$E0
-	CMP #$40 ; When running LDA $4016, bit 6 is likely to be set.
-	BNE TEST_Fail
-	LDA $4017
-	AND #$E0
-	CMP #$40 ; When running LDA $4017, bit 6 is likely to be set.
-	BNE TEST_Fail
-	; This doubles as a test of dummy read cycles, and the PPU Databus.
-	LDA #$F0
-	STA $2002	; Set the PPU databus to $F0
-	LDX #$17
-	LDA $3FFF, X ; dummy read $2006. (The data bus is now $F0) The offset moves the address bus to $4016, reading from controller 1 when the databus was $F0.
-	AND #$E0
-	CMP #$E0 ; However, in this case, the open bus bits are all set.
-	BNE TEST_Fail
-	INX		 ; We're going to run a similar trick with controller 2, but instead of dummy reading a mirror of $2006, it will dummy read a mirror of $2007. Let's set up the ppu read buffer.
-	JSR WaitForVBlank
-	LDA #0
-	STA <dontSetPointer
-	JSR PrintCHR	; The PrintCHR function will read the 2 byte word, and following bytes up until it reads $FF (a terminator) and then fix the return address such that RTS returns to the byte after the terminator.
-	.word $2400
-	.byte $F0, $FF
-	; PrintCHR will return here. The .word $2400 and ,byte $F0, $FF don't get executed.
-	BEQ TEST_OpenBus_ContinueTest4 ; Skip to TEST_OpenBus_ContinueTest4
-	;; If you are reading this for test 4, just ignore these next few lines. ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-TEST_OpenBusA0A0:              ; This is a fail-safe for test 8. It needed to be at address $A0A0.	         ;;
-	SEI						   ; The RTI instruction pulled off some junk and we need to re-set the i flag.  ;;
-	LDX #1                     ; X=1, which is used to tell test 8 that it failed.                           ;;
-	JMP TEST_OpenBus_PostTest8 ; Jump to the end of test 8.                                                  ;;
-TEST_OpenBus_ContinueTest4:    ; Anyway, that was the greatest crime against programming I've ever commited. ;;
-	;; And now, back to your regularly scheduled program. ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	JSR SetPPUADDRFromWord
-	.byte $24, $00
-	; SetPPUADDRFromWord will return here.
-	LDA $2007 ; empty PPU buffer
-	LDA $3FFF, X ; dummy read $2007 (The data bus is now $F0) The offset moves the address bus to $4017, reading from controller 1 when the databus was $F0.
-	PHA
-	JSR ResetScroll	; And reset the scroll, since we just moved "v" to $2400.
-	PLA
-	AND #$E0
-	CMP #$E0 ; However, in this case, the open bus bits are all set.
-	BNE TEST_Fail2
-	INC <currentSubTest
-	
-	;;; Test 5 [Open Bus]: The databus actually exists, and the open bus behavior isn't being faked. ;;;
+	;;; Test 4 [Open Bus]: The databus actually exists, and the open bus behavior isn't being faked. ;;;
 	; This is tested by moving the program counter to open bus, and running a very choreographed function.
 	; Here is what is expected to run in open bus:
 	; LSR <$56, X
@@ -1327,10 +1284,10 @@ TEST_OpenBus_PrepIRQLoop:
 	; if a BRK occured (possibly at $6000), or if we executed into $8000, we failed.
 	LDA <$56
 	CMP #$60
-	BNE TEST_Fail2
+	BNE TEST_Fail
 	INC <currentSubTest 
 	
-	;;; Test 6 [Open Bus]: Dummy Reads update databus, test by reading $4015 ;;;
+	;;; Test 5 [Open Bus]: Dummy Reads update databus, test by reading $4015 ;;;
 	; On second thought... this was already tested by the controller reading test, wasn't it?
 	; Oh well.
 	; This doubles as a test of dummy read cycles, and the PPU Databus. Here's what happens.
@@ -1350,15 +1307,64 @@ TEST_OpenBus_PrepIRQLoop:
 	LDA $3FFF,X 
 	AND #$20 ; Let's only check bit 5, since that's the open bus bit of address $4015
 	CMP #$00 ; bit 5 is a zero, since that was what was read from $3F15
-	BNE TEST_Fail2
+	BNE TEST_Fail
 	; Let's set the PPU Bus to $FF and run it again!
 	LDA #$FF
+	NOP
+	; PrintCHR will return here. The .word $2400 and ,byte $F0, $FF don't get executed.
+	BNE TEST_OpenBus_ContinueTest4 ; Skip to TEST_OpenBus_ContinueTest4
+	;; If you are reading this for test 4, just ignore these next few lines. ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+TEST_OpenBusA0A0:              ; This is a fail-safe for test 8. It needed to be at address $A0A0.	         ;;
+	SEI						   ; The RTI instruction pulled off some junk and we need to re-set the i flag.  ;;
+	LDX #1                     ; X=1, which is used to tell test 8 that it failed.                           ;;
+	JMP TEST_OpenBus_PostTest8 ; Jump to the end of test 8.                                                  ;;
+TEST_OpenBus_ContinueTest4:    ; Anyway, that was the greatest crime against programming I've ever commited. ;;
+	;; And now, back to your regularly scheduled program. ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	
 	STA $2002
 	LDA $3FFF,X
 	AND #$20 ; Again, only check bit 5.
 	CMP #$20 ; Bit 5 was set when reading from the PPU Bus, so bit 5 of $4015 should be set.
-	BNE TEST_Fail2 
+	BNE TEST_Fail
 	INC <currentSubTest 
+	
+	;;; Test 6 [Open Bus]: The upper 3 bits when reading from the controller are open bus. ;;;
+	; This is just checking to see if the controllers have the open bus bits.
+	LDA $4016
+	AND #$E0
+	CMP #$40 ; When running LDA $4016, bit 6 is likely to be set.
+	BNE TEST_Fail2
+	LDA $4017
+	AND #$E0
+	CMP #$40 ; When running LDA $4017, bit 6 is likely to be set.
+	BNE TEST_Fail2
+	; This doubles as a test of dummy read cycles, and the PPU Databus.
+	LDA #$F0
+	STA $2002	; Set the PPU databus to $F0
+	LDX #$17
+	LDA $3FFF, X ; dummy read $2006. (The data bus is now $F0) The offset moves the address bus to $4016, reading from controller 1 when the databus was $F0.
+	AND #$E0
+	CMP #$E0 ; However, in this case, the open bus bits are all set.
+	BNE TEST_Fail2
+	INX		 ; We're going to run a similar trick with controller 2, but instead of dummy reading a mirror of $2006, it will dummy read a mirror of $2007. Let's set up the ppu read buffer.
+	JSR WaitForVBlank
+	LDA #0
+	STA <dontSetPointer
+	JSR PrintCHR	; The PrintCHR function will read the 2 byte word, and following bytes up until it reads $FF (a terminator) and then fix the return address such that RTS returns to the byte after the terminator.
+	.word $2400
+	.byte $F0, $FF
+	JSR SetPPUADDRFromWord
+	.byte $24, $00
+	; SetPPUADDRFromWord will return here.
+	LDA $2007 ; empty PPU buffer
+	LDA $3FFF, X ; dummy read $2007 (The data bus is now $F0) The offset moves the address bus to $4017, reading from controller 1 when the databus was $F0.
+	PHA
+	JSR ResetScroll	; And reset the scroll, since we just moved "v" to $2400.
+	PLA
+	AND #$E0
+	CMP #$E0 ; However, in this case, the open bus bits are all set.
+	BNE TEST_Fail2
+	INC <currentSubTest
 	
 	;;; Test 7 [Open Bus]: Reading from $4015 does not update the databus. ;;;
 	; Address $4015 is special. All the values read here are internal to the 2A03 chip, so the databus isn't used. 
@@ -11201,6 +11207,323 @@ TEST_ControllerClocking_SkipT2:
 ;;;;;;;
 
 
+Sync_ToPreRenderDot324:
+	; Syncing the CPU to dot 1 of Line 0 is not very easy, since there's the even/odd frame skipping dot 0 issue.
+	SEI
+	LDA #$00
+	STA $4017 ; enable the frame counter IRQ. (Used to determine get/put cycle later)
+	JSR WaitForVBlank
+	JSR New_VBL_Sync
+	; (this function syncs to cycle 0 of scanline 241)
+	; However, we do not know if this is an even or an odd frame.
+	; If this is an even frame and rendering is enabled, dot 0 is skipped, which means the next vblank would be 1 dot earlier.
+	; Vblank flag is set on cycle 1 of scanline 241.
+	; Each scanline has 341 cycles, and there are 262 scanlines. 341*262 = 89342
+	; Which means there is either 29780.33 or 29780.66 CPU cycles until next vblank.
+	; So to verify if this is an even or odd frame, we [enable rendering, wait 1 frame, disable rendering, wait 1 frame] 3 times.
+	; At which point, the vblank flag will be set exactly 1 CPU cycle later on odd frames than on an even frame.
+	; This tells us what the alignment is, at which point we can stall for precise amounts of CPU cycles to line things up depending on if this is even or odd.
+	JSR EnableRendering
+	JSR Clockslide_29780
+	JSR DisableRendering
+	JSR Clockslide_29780
+	
+	JSR EnableRendering
+	JSR Clockslide_29780
+	JSR DisableRendering
+	JSR Clockslide_29780
+
+	JSR EnableRendering
+	JSR Clockslide_29780
+	JSR DisableRendering
+	JSR Clockslide_29780
+	; Okay, after all that has occured, we are either on:
+	; Scanline 241, cycle 205 (ODD FRAME)
+	; Scanline 241, cycle 208 (EVEN FRAME)
+	;
+	; Keep rendering disabled.
+	; Wait until a few cycles before vblank, then read from $2002.
+	; There's either:
+	; (89342 - (341+205)) = 88796 PPU Cycles, or 29598.66 CPU cycles (ODD FRAME)
+	; (89342 - (341+208)) = 88793 PPU Cycles, or 29597.66 CPU cycles (EVEN FRAME)
+	; So let's stall for 29595 Cycles and go from there.
+	JSR Clockslide_20000
+	JSR Clockslide_9000
+	JSR Clockslide_500
+	JSR Clockslide_50
+	JSR Clockslide_45
+	; 2.66 or 3.66 cycles to go.
+	LDA $2002
+	PHA
+	JSR Clockslide_1000
+	JSR Clockslide_700
+	JSR Clockslide_50
+	JSR Clockslide_41
+
+	PLA
+	BPL Sync_ToLine0Dot1_Odd
+Sync_ToLine0Dot1_Even:
+	; 13.33 CPU cycles
+	LDA <$00
+	; Current objective: Determine if we are on a "get" or "put" cycle.
+	LDA #0
+	LDX #0
+	.byte $1F
+	.word $4015 ; SLO $4015, X
+	; if this next cycle is a "put", A = $00. If this next cycle is a "get" A = $80.
+	; if the write to $4014 is on a "put" cycle, then there's a 1 cycle delay.
+	PHA
+	LDA #2
+	STA $4014
+	PLA
+	BMI Sync_ToLine0Dot1_Get
+Sync_ToLine0Dot1_Get:
+	JSR EnableRendering
+	RTS
+Sync_ToLine0Dot1_Odd:
+	; 11.33 CPU cycles
+	NOP
+	NOP
+	JSR Clockslide_29780
+	JSR Clockslide_29780
+	; Current objective: Determine if we are on a "get" or "put" cycle.
+	LDA #0
+	LDX #0
+	.byte $1F
+	.word $4015 ; SLO $4015, X
+	; if this next cycle is a "put", A = $00. If this next cycle is a "get" A = $80.
+	; if the write to $4014 is on a "put" cycle, then there's a 1 cycle delay.
+	PHA
+	LDA #2
+	STA $4014
+	PLA
+	BMI Sync_ToLine0Dot1_Get2
+Sync_ToLine0Dot1_Get2:
+	JSR EnableRendering
+	RTS
+;;;;;;;
+
+Sync_ToLine0Dot1:
+	JSR Sync_ToPreRenderDot324
+	RTS
+;;;;;;;
+	
+TEST_OAM_Corruption_Evaluate:
+	; Copy OAM to RAM and see which row was corrupt.
+	LDX #0
+TEST_OAM_Corruption_Loop1:
+	LDA $2004	; Read from OAM
+	STA $500, X	; Store on page 5
+	STA $2004	; Write back to OAM, incrementing the OAM address.
+	INX			; X++, loop until X=0
+	BNE TEST_OAM_Corruption_Loop1
+	; The contents of OAM are now on page 5.
+	LDX #8	; Start X at 8. This will be OAM row 2.
+TEST_OAM_Corruption_Loop2:
+	LDA $500, X	; Read every 8th byte from the data copied from OAM to page 5.
+	BEQ TEST_OAM_Corruption_Exit2
+	TXA		; instead of 8 INX instructions...
+	CLC		; I transfer X to A...
+	ADC #8	; and add 8 to A...
+	TAX		; then transfer A to X.
+	BNE TEST_OAM_Corruption_Loop2 ; Loop until X == 0.
+TEST_OAM_Corruption_Exit2:
+	RTS
+;;;;;;;
+
+FAIL_OAM_Corruption:
+	JMP TEST_Fail
+
+TEST_OAM_Corruption:
+	; Brief synopsis:
+	; If rendering is disabled during a visible scanline, OAM is going to be corrupted on the next visible pixel.
+	; 8 bytes of OAM get replaced with the first 8 bytes of OAM.
+	; The 8 bytes that get replaced correlate to the secondary OAM address at the moment rendering was disabled.
+	; Though to complicate things, the moment rendering is disabled is "CPU/PPU Clock alignment dependant". 
+	; 	- That just means this test will be more complicated for me to make, as I want the results to be consistent regardless of alignment.
+	;
+	; So what's going on?
+	; Rendering was enabled, we're in the middle of a scanline that contains sprite evaluation (pre-render line through line 239), and rendering was disabled (no BG, no sprites).
+	;	- On the first PPU cycle after rendering is enabled on a visible scanline, OAM corruption will occur. 
+	;	- However, at the moment rendering was disabled, we need to know the value of the Secondary OAM Address, as that will determine exactly which bytes get "corrupted".
+	;		- You can think of it as a "seed". The OAM Corruption seed will be whatever the value of the Secondary OAM Address was.
+	;	- Take the current value of the Secondary OAM Address (a value from $00 to $1F) as the seed.
+	;	- Wait for rendering to be enabled, and a PPU cycle to occur from the pre-render line to the end of scanline 239.
+	;	- in a single ppu cycle, copy OAM[0] to OAM[Secondary OAM Address * 8]
+	;	- Copy OAM[1] to OAM[Secondary OAM Address * 8 + 1]
+	;	- Copy OAM[2] to OAM[Secondary OAM Address * 8 + 2] ... and this repeats through OAM[7] being copied to OAM[Secondary OAM Address * 8 + 7]
+	;	- Copy SecondaryOAM[0] to SecondaryOAM[Secondary OAM Address]
+	; To use the terminology, OAM Corruption corrupts a single "row" of Object Attribute Memory, where a "row" is 8 bytes.
+	;	- Row 0 is OAM Address $00 to $07.
+	;	- Row 1 is OAM Address $08 to $0F, and so on.
+	; So if OAM corruption occured when secondary OAM Address was a value of 'n', OAM corruption will replace OAM row 'n' with the values of OAM row 0.
+	; And that's pretty much it for OAM corruption.
+	;
+	; Let's talk about the Secondary OAM Address in detail:
+	; During cycles 1 to 64 of a visible scanline, the secondary OAM address is going to be incremented every other cycle.
+	;	- cycles 1 and 2: Secondary OAM Address = $00
+	;	- cycles 3 and 4: Secondary OAM Address = $01
+	;	- cycles 5 and 6: Secondary OAM Address = $02
+	;	- ...
+	;	- cycles 61 and 62: Secondary OAM Address = $1E
+	;	- cycles 63 and 64: Secondary OAM Address = $1F
+	;
+	; During cycles 65 to 256, sprite evaluation is occuring, and the Secondary OAM Address will be from $00 to $1F depending on how sprite evaluation goes. But to recap:
+	;	- Odd cycles do not modify Secondary OAM Address, so let's focus on even cycles.
+	;	- If an object's Y position is in range of this scanline, write to secondary OAM, and increment Secondary OAM Address.
+	;	- Then the following even cycles will write to secondary OAM, and increment Secondary OAM Address.
+	;	- NOTE: If OAM Corruption occurs between cycles 65 through 256 when the secondary OAM address is not a multiple of 4, it appears to be "ceilinged" to the nearest multiple of 4.
+	;		- In other words, from cycles 65 to 256, OAM Corruption can only corrupt row 0, 4, 8, 16, 20, 24, or 28. (if Secondary OAM is full, Secondary OAM Address is $00.)
+	;
+	; During cycles 257 through 320, Secondary OAM Address is incremented in a pattern during an 8 ppu cycle loop.
+	; On cycle 257, Secondary OAM Address is reset to 0, and then:
+	;	- cycle 0 of this loop will prep the sprite Y postion, and increment Secondary OAM Address
+	;	- cycle 1 of this loop will prep the sprite patten, and increment Secondary OAM Address
+	;	- cycle 2 of this loop will prep the sprite attributes, and increment Secondary OAM Address
+	;	- cycle 3 of this loop will prep the sprite X position, but the Secondary OAM Address is not incremented!
+	;	- cycle 4 of this loop will prep the sprite X position again, but also find the VRAM address of the sprite's low byte bit plane pattern data. The Secondary OAM Address is not incremented!
+	; 	- cycle 5 of this loop will prep the sprite X position again, but also set up the low byte of the pattern bit plane. The Secondary OAM Address is not incremented!
+	;	- cycle 6 of this loop will prep the sprite X position again, but also find the VRAM address of the sprite's high byte bit plane pattern data. The Secondary OAM Address is not incremented!
+	;	- cycle 7 of this loop will prep the sprite X position again, but also set up the high byte of the pattern bit plate. 
+	;		- The Secondary OAM Address IS incremented on cycle 7 of this loop!
+	;	- NOTE: If OAM Corruption occurs between cycles 257 through 320, the value of the secondary OAM address used for the corruption is different between clock alignments. Either the increment happens before / after being used.
+	;	- On Alignments 0 and 3, if the secondary OAM address is 6, and this is cycle 2 of the loop (which will increment the Secondary OAM Address) the OAM Corruption will occur on row 6, not row 7.
+	;	- On Alignments 1 and 2, if the secondary OAM address is 6, and this is cycle 2 of the loop (which will increment the Secondary OAM Address) the OAM Corruption will occur on row 7, not row 6.
+	;
+	;
+	; Additional notes: OAM Corruption corrupting row 0 doesn't affect anything, since row 0 is the one that gets copied to the corrupted row. 
+	;	- This also means that OAM Corruption cannot affect the outcome of a (non-arbitarty) sprite zero hit.
+	; In addition to OAM becomming corrupt, I also believe the OAM address gets incremented in some situations where OAM Corruption occurs, so this test will also attempt to determine the OAM Address after the corruption occurs.
+
+	; Things I need to test for:
+	; OAM Corruption during cycles 1 to 64. (easy to do)
+	; OAM Corruption during cycles 257 to 320. (easy to do as well)
+	; OAM Corruption during cycles 65 to 256, with varying values of the Secondary OAM Address. (Not easy)
+	;
+	; I also need to make sure the results of this test are consistent regardless of the CPU / PPU Clock alignments.
+	;	- So I need some sort of method to calibrate this?
+	
+	; Our first goal should be to calibrate the test so it works regardless of CPU/PPU clock alignments.
+	; Depending on the CPU/PPU Clock alignments, the OAM corruption will occur: (at least on my console. The results are probably different on other consoles. It might be revision specific?)
+	;	- Alignment 0: 2 ppu cycles after writing to $2001
+	;	- Alignment 1: 3 ppu cycles after writing to $2001
+	;	- Alignment 2: 3 ppu cycles after writing to $2001
+	;	- Alignment 3: 2 ppu cycles after writing to $2001
+	; Unfortunately, this doesn't correlate 1 to 1 with disabling rendering preventing a sprite-zero-hit.
+	; That means, hilariously enough, the only way to calibrate this is to just corrupt OAM on a cycle that would either corrupt 1 row or another depending on clock alignment, and check which row it was.
+	; Which of course, means your emulator needs to implement OAM corruption in order to calibrate this.
+	; so that leads us to:
+	
+	;;; Test 1 [OAM Corruption]: This emulator won't infinitely loop when running my sync test ;;;
+	LDA <result_VblankSync_PreTest
+	CMP #1
+	BNE FAIL_OAM_Corruption
+	INC <currentSubTest
+	; Okay, now that we know this emulator won't crash, that *actually* leads us to:
+	
+	;;; Test 2 [OAM Corruption]: Disabling rendering in the middle of a visible scanline can cause OAM Corruption ;;;
+	; This is the simplest form of this test. (Use the pre-render line since dot 0 of line 0 is skipped every other frame)
+	; Run STA $2001, disabling rendering. The write cycle should occur on dot 7 of scanline 0.
+	; If rendering is disabled on dot 7 (no delay was implemented) row 3 will become corrupt.
+	; If rendering is disabled on dot 9 (2 cycle delay) row 4 will become corrupt.
+	; If rendering is disabled on dot 10 (3 cycle delay) row 5 will become corrupt.
+	; If rendering was disabled on any other dot, your emulator's delay is probably wrong. (Or it's emulating some PPU revision I haven't tested)
+	
+	; Let's begin.	
+	JSR ClearPage2	; page 2 is all $FFs.
+	LDA #0		; A = 0
+	STA $200	; This will be our "marker" to determine which OAM row became a copy of row 0.
+	JSR Sync_ToPreRenderDot324 ; This function runs an OAM DMA, enables rendering, and returns such that this next CPU cycle lands on dot 324 of the pre-render line.
+	; (The OAM DMA and enabling rendering happen in the same vblank this returns in.)
+	; (Ignore the fact that of this might be dot 323. Dot 0 of scanline 0 will be skipped in that situation)
+	; There are 341 cycles in a scanline, so if we want to write to $2001 on a specific dot, let's do some counting.
+	; 342 - 324 = 18 PPU cycles, or 6 CPU cycles.
+	; Let's just stall for 5 cycles, then write to $2001.
+	LDA <$00 ; stall for 3 cycles
+	LDA #0	 ; Write #0 to $2001 to disable rendering.
+	STA $2001; Pending OAM Corruption. Once rendering is re-enabled, it will occur.
+	JSR Clockslide_20000	; Stall
+	JSR Clockslide_7000		; Until
+	JSR Clockslide_400		; VBlank
+	; we're in VBlank now.
+	LDA #$10	; 
+	STA $2001	; Enable rendering. (OAM won't actually become corrupt until dot 0 of the pre-render line.)
+	JSR Clockslide_29780	; just stall for an entire frame.
+	JSR DisableRendering	; And disable rendering so we can fully read OAM.
+	JSR TEST_OAM_Corruption_Evaluate ; Transfer OAM to page 5 of RAM and read every 8th byte. X = 8*(the corrupt row of OAM) when returning.
+	CPX #0
+	BEQ FAIL_OAM_Corruption	; If X makes it to zero without detecting a corrupted row of OAM, fail the test.
+	; Okay, we passed test one, but at the same time, we also performed a bit of a "calibration" test of sorts.
+	; Depending on the value of X, we know how many cycles passed between writing to $2001 and the OAM corruption being "seeded".
+	; If X == 8*3, the delay was 0 ppu cycles. (shouldn't occur on real hardware)
+	; If X == 8*4, the delay was 2 ppu cycles.
+	; If X == 8*5, the delay was 3 ppu cycles.
+	STX <$50 ; This could be useful for debugging?
+	INC <currentSubTest
+	
+	;;; Test 3 [OAM Corruption]: OAM Does not get corrupt immediately after disabling rendering ;;;
+	JSR Sync_ToPreRenderDot324 ; Like before, sync the CPU with rendering enabled after an OAM DMA.
+	LDA <$00 ; stall for 3 cycles
+	LDA #0	 ; Write #0 to $2001 to disable rendering.
+	STA $2001; Pending OAM Corruption. Once rendering is re-enabled, it will occur.
+	; So what happens if we read from OAM right now?
+	; Let's make sure it hasn't been corrupt yet.
+	JSR TEST_OAM_Corruption_Evaluate
+	CPX #0
+	BNE FAIL_OAM_Corruption ; If X does not make it to zero (it detected a corrupted row of OAM), fail the test.
+	INC <currentSubTest
+	
+	;;; Test 4 [OAM Corruption]: OAM Does not get corrupt immediately after re-enabling rendering ;;;
+	; You have to wait until the first ppu cycle on a line between the pre-render-line and line 339.
+	JSR Sync_ToPreRenderDot324 ; Like before, sync the CPU with rendering enabled after an OAM DMA.
+	LDA <$00 ; stall for 3 cycles
+	LDA #0	 ; Write #0 to $2001 to disable rendering.
+	STA $2001; Pending OAM Corruption.
+	JSR Clockslide_20000	; Stall
+	JSR Clockslide_7000		; Until
+	JSR Clockslide_400		; VBlank
+	; we're in VBlank now.
+	LDA #$10	; 
+	STA $2001	; Enable rendering. (OAM won't actually become corrupt until dot 0 of the pre-render line.)
+	LDA #0
+	STA $2001	; and disable again for the ability to actually read everything from OAM.
+	JSR TEST_OAM_Corruption_Evaluate
+	CPX #0
+	BNE FAIL_OAM_Corruption ; If X does not make it to zero (it detected a corrupted row of OAM), fail the test.
+	INC <currentSubTest
+
+	;;; Test 5 [OAM Corruption]: OAM Corruption occuring when disabling rendering from ppu cycles 256 to 320 ;;;
+	JSR Sync_ToPreRenderDot324 ; This function runs an OAM DMA, enables rendering, and returns such that this next CPU cycle lands on dot 324 of the pre-render line.
+	JSR Clockslide_50
+	JSR Clockslide_39
+	LDA #0	 ; Write #0 to $2001 to disable rendering.
+	STA $2001; Pending OAM Corruption. Once rendering is re-enabled, it will occur.
+	JSR Clockslide_20000	; Stall
+	JSR Clockslide_7000		; Until
+	JSR Clockslide_400		; VBlank
+	; we're in VBlank now.
+	LDA #$10	; 
+	STA $2001	; Enable rendering. (OAM won't actually become corrupt until dot 0 of the pre-render line.)
+	JSR Clockslide_29780	; just stall for an entire frame.
+	JSR DisableRendering	; And disable rendering so we can fully read OAM.
+	JSR TEST_OAM_Corruption_Evaluate ; Transfer OAM to page 5 of RAM and read every 8th byte. X = 8*(the corrupt row of OAM) when returning.
+	CPX #8*7
+	BEQ FAIL_OAM_Corruption2	; If X makes it to zero without detecting a corrupted row of OAM, fail the test.
+	; Okay, we passed test one, but at the same time, we also performed a bit of a "calibration" test of sorts.
+	; Depending on the value of X, we know how many cycles passed between writing to $2001 and the OAM corruption being "seeded".
+	; If X == 8*3, the delay was 0 ppu cycles. (shouldn't occur on real hardware)
+	; If X == 8*4, the delay was 2 ppu cycles.
+	; If X == 8*5, the delay was 3 ppu cycles.
+	STX <$50 ; This could be useful for debugging?
+	INC <currentSubTest
+
+	;; END OF TEST ;;
+	LDA #1
+	RTS
+;;;;;;;
+
+FAIL_OAM_Corruption2:
+	JMP TEST_Fail
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                ENGINE                   ;;
@@ -13432,6 +13755,25 @@ FAIL_IFlagLatency2:
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
 	; Address $FE0F:
+New_VBL_Sync:
+	JSR DisableRendering
+	LDA $2002
+New_VBL_Sync_Loop1:
+	LDA $2002
+	BMI New_VBL_Sync_Loop1
+	JSR Clockslide_29700
+New_VBL_Sync_Loop2:
+	JSR Clockslide_29750	; +29750
+	JSR Clockslide_24		; +24
+	LDA $2002				; +4
+	BPL New_VBL_Sync_Loop2	; +3 = 29781
+	JSR Clockslide_29766
+	NOP
+	NOP
+	NOP
+	JSR Clockslide_29780
+	RTS
+;;;;;;;
 
 	.org $FE49	
 DMASyncWith40:
