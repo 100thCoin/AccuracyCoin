@@ -710,6 +710,8 @@ AutomaticallyRunEveryTestInROM:   ; This function is used to run every test in t
 	JSR DisableNMI                ; Disable the NMI.
 	JSR DisableRendering
 	JSR ClearNametable
+	LDA #0
+	STA <dontSetPointer
 	JSR PrintText
 	.word $21E8
 	.byte "Running test 0", $FF
@@ -13107,6 +13109,8 @@ RunTest_SkipHighlightResult:
 	JSR EnableNMI			      ; With the test over, re-enable the NMI
 RunTest_AllTestSkipDrawing2:	  ; If we're running all tests, we don't need the NMI to run.
 	JSR EnableRendering_BG	      ; and enable rendering too. This should still occur during Vblank.
+	LDA #0
+	STA <dontSetPointer
 	LDY <Copy_Y2			      ; Restore the Y register
 	LDX <Copy_X2			      ; Restore the X register
 	LDA <Copy_A2			      ; Restore the A register
