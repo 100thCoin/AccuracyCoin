@@ -136,6 +136,8 @@ PowerOn_Y = $372
 PowerOn_SP = $373
 PowerOn_P = $374
 
+PowerOn_MagicNumber = $3F0
+
 result_Unimplemented = $0400
 result_CPUInstr = $0401
 result_UnofficialInstr = $0402
@@ -305,14 +307,21 @@ CannotWriteToROM_01:
 	.byte $01; This value is used in the "Cannot write to ROM" test.
 	
 RESET:	; This ROM, despite the guidance of the NesDev Wiki's "startup code", writes a bunch of uninitialized registers, and reads uninitialized RAM. Intentionally.
+	STA <$00
+	PHP
+	PLA
+	AND #$CF
+	STA <$01
+	LDA PowerOn_MagicNumber
+	CMP #$5A
+	BEQ RESET_SkipPowerOnTests
+	LDA <$00
 	STA PowerOn_A	; For use in TEST_PowerOnState_CPU_Registers
 	STY PowerOn_Y
 	STX PowerOn_X
 	TSX
 	STX PowerOn_SP
-	PHP
-	PLA
-	AND #$CF
+	LDA <$01
 	STA PowerOn_P
 RESET_SkipPowerOnTests:
 
@@ -341,6 +350,10 @@ VblLoop:
 	INX
 	BEQ VblLoop
 	; Now that the PPU is responsive, let's copy the resting values.
+	LDA PowerOn_MagicNumber
+	CMP #$5A
+	BEQ PostResetFlagTest
+
 	JSR Read32NametableBytes
 	JSR ReadPaletteRAM
 	
@@ -360,14 +373,15 @@ VblLoop:
 	LDA #1
 	STA PowerOnTest_PPUReset ; Store a passing result here.
 	;; End of test ;;
-PostResetFlagTest:
-	
+PostResetFlagTest:	
 	JSR DisableRendering
 	
 	; With those values copied for future reference, let's overwrite the nametable.
 	JSR SetUpDefaultPalette
 	JSR ClearNametable
 	JSR ClearRAMExceptPage3
+	LDA #$5A
+	STA PowerOn_MagicNumber ; this is used to indicate that we pressed the reset button, so we should skip overwriting the power on test results.
 ReloadMainMenu:
 	JSR ClearPage2
 	LDA #02
