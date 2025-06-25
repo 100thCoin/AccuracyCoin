@@ -3457,7 +3457,7 @@ TEST_SHA_93:
 	; The big difference here is the "corruption" of the high byte when the Y register indexes beyond a page boundary.
 	; With behavior 1, the high byte of the address bus is bitwise ANDed with A AND X.
 	; With behavior 2, the high byte of the address bus is bitwise ANDed with X. (The A register doesn't have any affect on this high byte corruption with behavior 2.)
-	; It is currently unknown if behavior 1 has a "Magic Number", but it is known that behavior 2 definitely does.
+	; Both behaviors can have a "magic number", though it is much more common with behavior 2.
 	LDA #PostDMACyclesUntilTestInstruction+3
 	STA <Test_UnOp_CycleDelayPostDMA	
 	; Since we need to run this instruction to determine the behavior *before* running a series of tests, let's first confirm this instruction's length in bytes.
@@ -3485,6 +3485,9 @@ TEST_SHA_93_CorrectLength:
 	.byte $93, Test_UnOp_IndirectPointerLo ; SHA (Test_UnOp_IndirectPointerLo), Y ; (Test_UnOp_IndirectPointerLo) = $1EF0
 	; Behavior 1: Hi = ($1E+1) & $55 & $AA = 0	:: write ($1E+1) & $55 & $AA = 0
 	; Behavior 2: Hi = ($1E+1) & $AA = 0A		:: ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
+	; copy to $50 for debugging.
+	JSR CopyLowestPageBytesTo60
+
 	LDA $0A00
 	CMP #$FF
 	BNE TEST_SHA_Behavior2_93_JMP ; if address $0A00 was updated, this is behavior 2.
@@ -3526,6 +3529,7 @@ TEST_SHA_9F_CorrectLength:
 	.byte $9F, $F0, $1E	; SHA $1EF0, Y
 	; Behavior 1: Hi = ($1E+1) & $55 & $AA = 0	:: write ($1E+1) & $55 & $AA = 0
 	; Behavior 2: Hi = ($1E+1) & $AA = 0A		:: ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
+	JSR CopyLowestPageBytesTo60
 	LDA $0A00
 	CMP #$FF
 	BNE TEST_SHA_Behavior2_9F_JMP ; if address $0A00 was updated, this is behavior 2.
@@ -3777,6 +3781,7 @@ TEST_SHS_9B_CorrectLength:
 	.byte $9B, $F0, $1E	; SHS $1EF0, Y
 	; Behavior 1: Hi = ($1E+1) & $55 & $AA = 0	:: write ($1E+1) & $55 & $AA = 0
 	; Behavior 2: Hi = ($1E+1) & $AA = 0A		:: ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
+	JSR CopyLowestPageBytesTo60
 	LDX <Copy_SP
 	TXS
 	LDA $A00
@@ -9096,7 +9101,7 @@ TEST_DMC_Conflict_CheckFamicom:
 TEST_DMC_Conflict_AnswerLoop_Famicom:
 	LDA $500, X
 	CMP TEST_DMC_Conflicts_AnswerKey_Famicom, X
-	BNE TEST_DMC_Conflict_CheckHVCFamicom
+	BNE TEST_DMC_Conflict_CheckEarlyFamicom
 	LDA #$00
 	STA $4017	; Keep the interrupt flag set, but refresh the timer.
 	INX
@@ -9104,20 +9109,21 @@ TEST_DMC_Conflict_AnswerLoop_Famicom:
 	BNE TEST_DMC_Conflict_AnswerLoop_Famicom
 	LDA #9
 	STA <$50	; pass code 2. (famicom)
-	
-TEST_DMC_Conflict_CheckHVCFamicom:
+	BNE TEST_DMC_Test3
+
+TEST_DMC_Conflict_CheckEarlyFamicom:
 	LDX #0
-TEST_DMC_Conflict_AnswerLoop_HVCFamicom:
+TEST_DMC_Conflict_AnswerLoop_EarlyFamicom:
 	LDA $500, X
-	CMP TEST_DMC_Conflicts_AnswerKey_HVC_Famicom, X
+	CMP TEST_DMC_Conflicts_AnswerKey_Early_Famicom, X
 	BNE FAIL_DMC_Conflicts
 	LDA #$00
 	STA $4017	; Keep the interrupt flag set, but refresh the timer.
 	INX
 	CPX #$40
-	BNE TEST_DMC_Conflict_AnswerLoop_HVCFamicom
+	BNE TEST_DMC_Conflict_AnswerLoop_EarlyFamicom
 	LDA #13
-	STA <$50	; pass code 3. (some other famicom)
+	STA <$50	; pass code 3. (early famicom)
 	
 TEST_DMC_Test3:
 	INC <currentSubTest
@@ -11516,6 +11522,27 @@ TEST_OAM_Corruption:
 
 FAIL_OAM_Corruption2:
 	JMP TEST_Fail
+;;;;;;;;;;;;;;;;;
+
+CopyLowestPageBytesTo60:
+	LDA <$00
+	STA <$60
+	LDA $100
+	STA <$61
+	LDA $200
+	STA <$62
+	LDA $300
+	STA <$63
+	LDA $400
+	STA <$64
+	LDA $500
+	STA <$65
+	LDA $600
+	STA <$66
+	LDA $700
+	STA <$67
+	RTS
+;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                ENGINE                   ;;
@@ -11524,7 +11551,7 @@ FAIL_OAM_Corruption2:
 	.bank 3
 	
 	.org $EE00
-TEST_DMC_Conflicts_AnswerKey_HVC_Famicom:
+TEST_DMC_Conflicts_AnswerKey_Early_Famicom:
 	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	.byte $00, $00, $00, $00, $00, $00, $01, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	.byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
