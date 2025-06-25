@@ -3,7 +3,7 @@ A large collection of NES accuracy tests on a single NROM cartridge.
 
 This ROM was designed for the RP2A03G CPU, and the RP2C02G PPU. Some tests might fail on hardware with a different revision.
 
-This ROM currently has 121 tests, each composed of several smaller tests in order to print error codes narrowing down the specific issues your NES emulator might have.
+This ROM currently has 122 tests, each composed of several smaller tests in order to print error codes narrowing down the specific issues your NES emulator might have. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything, rather they simply print information on screen.
 
 Here's an example of the menu in this ROM, shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been ran yet. (The cursor is currently next to the "RAM Mirroring" test.)
 

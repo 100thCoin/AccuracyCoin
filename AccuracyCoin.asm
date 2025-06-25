@@ -12327,6 +12327,13 @@ DrawTEST:	; This will print "TEST", "PASS", "FAIL x" or "...." depending on if t
 	TXA
 	ASL A
 	TAX	
+	LDY #4
+	LDA <suitePointerList+1,X ; check if we're using page 3 or page 4 for these results.
+	CMP #3
+	BNE DrawTEST_NotDRAW
+	LDA #4
+	BNE DrawTEST_PrintDRAW
+DrawTEST_NotDRAW: ; some tests say "DRAW" instead of "TEST". These say "TEST" though.
 	LDA [suitePointerList,X]
 	STA <currentSubTest
 	; 0 = "TEST"
@@ -12335,6 +12342,7 @@ DrawTEST:	; This will print "TEST", "PASS", "FAIL x" or "...." depending on if t
 	; 3 = "...." for a test in progress.
 	;;;;;;;;;;;;
 	AND #$3 ; bits 0 and 1 hold the results. Bits 3+ hold error codes for printing what failed.
+DrawTEST_PrintDRAW:
 	TAX
 	TAY
 	LDA TestPassFailBlend,Y
@@ -12343,19 +12351,19 @@ DrawTEST:	; This will print "TEST", "PASS", "FAIL x" or "...." depending on if t
 	STA $2007
 	TXA
 	TAY
-	LDA TestPassFailBlend+4,Y
+	LDA TestPassFailBlend+5,Y
 	TAY
 	LDA AsciiToCHR,Y
 	STA $2007
 	TXA
 	TAY
-	LDA TestPassFailBlend+8,Y
+	LDA TestPassFailBlend+10,Y
 	TAY
 	LDA AsciiToCHR,Y
 	STA $2007
 	TXA
 	TAY
-	LDA TestPassFailBlend+12,Y
+	LDA TestPassFailBlend+15,Y
 	TAY
 	LDA AsciiToCHR,Y
 	STA $2007
@@ -12386,6 +12394,15 @@ DrawTESTEraseErrorCode:
 UpdateTESTAttributes: ; This will update the attributes for the test results "PASS", or "FAIL x", so they can be colored differently.
 	STY <$FE
 	STX <$FD
+	TXA
+	ASL A
+	TAX
+	LDA <suitePointerList+1,X ; check if we're using page 3 or page 4 for these results.
+	LDX <$FD
+	CMP #3
+	BNE UpdateTESTAttributes_NotDRAW	
+	RTS
+UpdateTESTAttributes_NotDRAW:
 	; convert the x value to the attribute address, and determine top/bottom.
 	LDA #$23
 	STA <byte8
@@ -12624,10 +12641,10 @@ AttributePaletteNybbles:	; Attribute nybbles used in UpdateTESTAttributes
 	.byte $00, $55, $AA, $FF
 	
 TestPassFailBlend:			; These are used in DrawTEST. index 0 of each of these spells "TEST". index 1 spells "PASS" and so on.
-	.byte "TPF."
-	.byte "EAA."
-	.byte "SSI."
-	.byte "TSL."
+	.byte "TPF.D"
+	.byte "EAA.R"
+	.byte "SSI.A"
+	.byte "TSL.W"
 
 AsciiToCHR:					; This table converts the ascii values stored in the ROM to the indexes into the pattern table I made.
 	.byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
