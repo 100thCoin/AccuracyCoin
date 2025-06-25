@@ -11490,32 +11490,8 @@ TEST_OAM_Corruption:
 	JSR TEST_OAM_Corruption_Evaluate
 	CPX #0
 	BNE FAIL_OAM_Corruption ; If X does not make it to zero (it detected a corrupted row of OAM), fail the test.
-	INC <currentSubTest
 
-	;;; Test 5 [OAM Corruption]: OAM Corruption occuring when disabling rendering from ppu cycles 256 to 320 ;;;
-	JSR Sync_ToPreRenderDot324 ; This function runs an OAM DMA, enables rendering, and returns such that this next CPU cycle lands on dot 324 of the pre-render line.
-	JSR Clockslide_50
-	JSR Clockslide_39
-	LDA #0	 ; Write #0 to $2001 to disable rendering.
-	STA $2001; Pending OAM Corruption. Once rendering is re-enabled, it will occur.
-	JSR Clockslide_20000	; Stall
-	JSR Clockslide_7000		; Until
-	JSR Clockslide_400		; VBlank
-	; we're in VBlank now.
-	LDA #$10	; 
-	STA $2001	; Enable rendering. (OAM won't actually become corrupt until dot 0 of the pre-render line.)
-	JSR Clockslide_29780	; just stall for an entire frame.
-	JSR DisableRendering	; And disable rendering so we can fully read OAM.
-	JSR TEST_OAM_Corruption_Evaluate ; Transfer OAM to page 5 of RAM and read every 8th byte. X = 8*(the corrupt row of OAM) when returning.
-	CPX #8*7
-	BEQ FAIL_OAM_Corruption2	; If X makes it to zero without detecting a corrupted row of OAM, fail the test.
-	; Okay, we passed test one, but at the same time, we also performed a bit of a "calibration" test of sorts.
-	; Depending on the value of X, we know how many cycles passed between writing to $2001 and the OAM corruption being "seeded".
-	; If X == 8*3, the delay was 0 ppu cycles. (shouldn't occur on real hardware)
-	; If X == 8*4, the delay was 2 ppu cycles.
-	; If X == 8*5, the delay was 3 ppu cycles.
-	STX <$50 ; This could be useful for debugging?
-	INC <currentSubTest
+
 
 	;; END OF TEST ;;
 	LDA #1

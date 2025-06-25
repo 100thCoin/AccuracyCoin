@@ -499,8 +499,7 @@ For more information, I recommend reading the fully commented assembly code for 
   2: OAM Corruption should "corrupt" a row in OAM by copying the 8 values from row 0 to another row.  
   3: This corruption should not occur immediately after disabling rendering.  
   4: This corruption should now occur immediately after re-enabling rendering.  
-  5: OAM Corruption should be able to occur from dots 257 to 320.  
-
+  
 ### RMW $2007 Extra Write
   1: A Read-Modify-Write instruction to address $2007 should perform an extra write where the low byte of the PPU address written is the result of the Read-Modify-Write instruction.  
   2: This extra write should not occur when "v" is pointing to Palette RAM. (An extra write still might occur, but that's not the one we're testing for.)  
