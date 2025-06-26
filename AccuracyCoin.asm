@@ -671,7 +671,6 @@ Suite_PPUTiming:
 	table "NMI Suppression", $FF, result_NMI_Suppression, TEST_NMI_Suppression
 	table "NMI at VBlank end", $FF, result_NMI_VBL_End, TEST_NMI_VBL_End
 	table "NMI disabled at VBlank", $FF, result_NMI_Disabled_VBL_Start, TEST_NMI_Disabled_VBL_Start
-	table "Instruction Timing", 	 $FF, result_InstructionTiming, TEST_InstructionTiming
 	.byte $FF
 	
 	;; Sprite Zero Hits ;;
@@ -695,6 +694,7 @@ Suite_PPUMisc:
 	
 Suite_CPUBehavior2:
 	.byte "CPU Behavior 2", $FF
+	table "Instruction Timing", 	 $FF, result_InstructionTiming, TEST_InstructionTiming
 	table "Implied Dummy Reads",	 $FF, result_ImpliedDummyRead, TEST_ImpliedDummyRead
 	.byte $FF
 
@@ -5316,6 +5316,11 @@ TEST_ArbitrarySpriteZeroLoop:
 	LDA $2002					; Read PPUSTATUS
 	AND #$40					; mask away every bit except the Sprite Zero Hit flag.
 	BEQ FAIL_ArbitrarySpriteZero; If bit 6 was zero, the sprite zero hit did not occur, thus failing the test.
+	JSR Clockslide_29780		; Let's wait an entire frame and check again to weed out potential false positives.
+	LDA $2002					; Read PPUSTATUS
+	AND #$40					; mask away every bit except the Sprite Zero Hit flag.
+	BNE FAIL_ArbitrarySpriteZero; If bit 6 was non-zero, the sprite zero hit did occur, thus failing the test.
+	
 	INC <currentSubTest			; And if we passed this, increment the subtest so the error code is adjusted for this next test.
 	
 	;;; Test 3 [Arbitrary Sprite Zero]: Misaligned OAM can properly draw a sprite, and yes, it can even trigger a sprite zero hit. ;;;
@@ -6759,300 +6764,603 @@ TEST_ControllerStrobing:
 FAIL_InstructionTiming:
 	JMP TEST_Fail
 
-TEST_InstructionTiming_EvenOverhead:
-	LDA <$64	; Copy the high byte of the results
-	STA <$62	; Paste to the high byte of the odd overhead
-	LDA <$65	; Copy the low byte of the results
-	STA <$63	; Paste to the low byte of the odd overhead.
-	RTS
-;;;;;;;
-TEST_InstructionTiming_OddOverhead:
-	LDA <$66	; Copy the high byte of the results
-	STA <$62	; Paste to the high byte of the odd overhead
-	LDA <$67	; Copy the low byte of the results
-	STA <$63	; Paste to the low byte of the odd overhead.
-	RTS
-;;;;;;;
-
 TEST_InstructionTiming:
-	;;; Test 1 [Instruction Timing]: Is the NMI Timing Reliable enough for this test? ;;;
-	; How this test works:
-	; The test will begin exactly 1000 CPU cycles before the NMI occurs.
-	; The results can be found in a 16-bit value (little endian) at address $0060
-	; The result there is the total number of CPU cycles the test spent before jumping to JSR $500
-	;
-	; The actual way this works is:
-	; Address $500 through $6FE are filled with NOP instructions.
-	; The NMI will occur somewhere while executing all of those NOPs, and it will push the return address to the stack.
-	; By waiting one more frame, we can determine if we were on cycle 1 or 2 of a NOP instruction when the NMI occured, giving us precisely the number of CPU cycles that occured in this test.
-	; Then some math happens, storing the result in $60
-	;
-	; Now, we would really like to run this test even if your NMI timing is bad.
-	; So let's run a "callibration test"
-	JSR SyncTo1000CyclesUntilNMI
-	JSR $500	; wait for NMI, which records the return address, then jumps to ConvertReturnAddressIntoCPUCycles
-	; The results stored in $60 and $61 *should* be zero, but some emulators might fail this, due to incorrect NMI timing. (Or perhaps, due to CPU/PPU alignment, the timing could be off)
-	; Basically, we take this value (which should be zero) and use that as the "overhead" in future tests.
-	; So if the value was 04, indicating that the NMI happened 4 cycles later than expected, we subtract 4 from all of the future tests.
-	LDA <$60	; Copy the high byte of the results
-	STA <$64	; Paste to the high byte of the even overhead
-	LDA <$61	; Copy the low byte of the results
-	STA <$65	; Paste to the low byte of the even overhead.
-	; Let's also calibrate for an odd number of cycles. In this case, 3.
-	; Set the overhead to 3.
-	LDA #3
-	STA <$63
-	JSR SyncTo1000CyclesUntilNMI
-	LDA <$00	; take 3 cycles
-	JSR $500	; wait for NMI, which records the return address, then jumps to ConvertReturnAddressIntoCPUCycles
-	; and store the overhead.
-	LDA <$60	; Copy the high byte of the results
-	STA <$66	; Paste to the high byte of the odd overhead
-	LDA <$61	; Copy the low byte of the results
-	STA <$67	; Paste to the low byte of the odd overhead.
-	; Now that we have calculated the overheads, let's run a real test.
-	JSR TEST_InstructionTiming_EvenOverhead
-	
-	JSR SyncTo1000CyclesUntilNMI
-	JSR $500	
-	LDA <$60
-	BNE FAIL_InstructionTiming ; this should be zero.
-	LDA <$61
-	BNE FAIL_InstructionTiming ; this should also be zero.
-	; Test 1 continued:
-	JSR SyncTo1000CyclesUntilNMI
-	JSR Clockslide_500	; wait exactly 500 CPU cycles.
-	JSR $500	; wait for NMI, which records the return address, then jumps to ConvertReturnAddressIntoCPUCycles
-	; Decimal 500 = $1F4
-	LDA <$60
-	CMP #$01
-	BNE FAIL_InstructionTiming ; this should be $01.
-	LDA <$61
-	CMP #$F4
-	BNE FAIL_InstructionTiming ; this should be $F4.
-	; Alright, I think this emulator has reliable enough NMI timing for this.
-	; Granted, if any of the instructions needed to sync this up perfectly was failing, then this likely wouldn't even get this far.
-	; Oh well? Let's check how long some instructions take!
+	;;; Test 1 [Instruction Timing]: Can we use the open bus method of sycing the DMA?? ;;;
+	LDA <result_DMADMASync_PreTest
+	CMP #1
+	BNE FAIL_InstructionTiming
 	INC <currentSubTest
 	
-	;;; Test 2 [Instruction Timing]: Does LDA #Immediate take 2 cycles? ;;;
-	JSR TEST_InstructionTiming_EvenOverhead
-	JSR SyncTo1000CyclesUntilNMI
-	LDA #$5A ; this takes 2 cycles.
-	JSR $500 ; run timing test.
-	LDA #02 
-	CMP <$61
-	BNE FAIL_InstructionTiming ; this should be $02.
+	;;; Test 2 [Instruction Timing]: Is the DMA Timing Reliable enough for this test? ;;;
+	JSR CheckDMATiming
+	CPY #4 ; 
+	BNE FAIL_InstructionTiming
+	; To be honest, in order to make it this far, you're going to need some very accurate DMA timing, and I guess also "NOP" needs to be 2 cycles, for that matter.
+	
+	; Now we can see how long various instructions take.
+	LDA #$60 ; RTS
+	STA <$50
+	STA <$51
+	STA <$52 
+	STA <$53 
+
+	JSR CycleClockBegin
+	JSR $0050 ; this takes 12 cycles
+	JSR CycleClockEnd
+	CPY #12
+	BNE FAIL_InstructionTiming
+	; If JSR + RTS does not equal 12 cycles, then we have a problem.
+	; otherwise...
 	INC <currentSubTest
 
-	;;; Test 3 [Instruction Timing]: Does LDA <ZeroPage take 3 cycles? ;;;
-	JSR TEST_InstructionTiming_OddOverhead
-	JSR SyncTo1000CyclesUntilNMI
-	LDA <$00 ; this takes 3 cycles.
-	JSR $500 ; run timing test.
-	LDA #03 
-	CMP <$61
-	BNE FAIL_InstructionTiming1 ; this should be $03.
-	INC <currentSubTest
+	;;; Test 3 [Instruction Timing]: The immediate addressing mode takes 2 cycles ;;;
+	; If you fail this test, press select to view the debug menu.
+	; The value at address $50 (the bottom left of the upper block) will be the opcode tested which failed.
 	
-	;;; Test 4 [Instruction Timing]: Does LDA Absolute take 4 cycles? ;;;
-	JSR TEST_InstructionTiming_EvenOverhead
-	JSR SyncTo1000CyclesUntilNMI
-	LDA $0000 ; this takes 4 cycles.
-	JSR $500 ; run timing test.
-	LDA #04 
-	CMP <$61
-	BNE FAIL_InstructionTiming1 ; this should be $04.
-	INC <currentSubTest
-	
-	;;; Test 5 [Instruction Timing]: Does LDA Absolute, X take 4 cycles if a page boundary is NOT crossed? ;;;
-	JSR SyncTo1000CyclesUntilNMI
-	LDX #02	  ; This take 2 cycles
-	LDA $0000, X ; this takes 4 cycles.
-	JSR $500 ; run timing test.
-	LDA #06 
-	CMP <$61
-	BNE FAIL_InstructionTiming1 ; this should be $06.(I also had to set X)
-	INC <currentSubTest
-	
-	;;; Test 6 [Instruction Timing]: Does LDA Absolute, X take 5 cycles if a page boundary IS crossed? ;;;
-	JSR TEST_InstructionTiming_OddOverhead
-	JSR SyncTo1000CyclesUntilNMI
-	LDX #02	  ; This take 2 cycles
-	LDA $00FF, X ; this takes 5 cycles.
-	JSR $500 ; run timing test.
-	LDA #07 
-	CMP <$61
-	BNE FAIL_InstructionTiming1 ; this should be $06.(I also had to set X)
-	INC <currentSubTest
-	
-	;;; Test 7 [Instruction Timing]: Does LDA (indirect),Y take 5 cycles if a page boundary is NOT crossed? ;;;
-	LDA #0
-	STA <Test_UnOp_IndirectPointerLo
-	STA <Test_UnOp_IndirectPointerHi
-	JSR SyncTo1000CyclesUntilNMI
-	LDY #02	  ; This take 2 cycles
-	LDA [Test_UnOp_IndirectPointerLo],Y ; this takes 5 cycles.
-	JSR $500 ; run timing test.
-	LDA #07 
-	CMP <$61
-	BNE FAIL_InstructionTiming1 ; this should be $07.(I also had to set Y)
-	INC <currentSubTest
-
-	;;; Test 8 [Instruction Timing]: Does LDA (indirect),Y take 6 cycles if a page boundary IS crossed? ;;;
-	JSR TEST_InstructionTiming_EvenOverhead
-	LDA #$FF
-	STA <Test_UnOp_IndirectPointerLo
-	STA <Test_UnOp_IndirectPointerHi
-	JSR SyncTo1000CyclesUntilNMI
-	LDY #02	  ; This take 2 cycles
-	LDA [Test_UnOp_IndirectPointerLo],Y ; this takes 6 cycles.
-	JSR $500 ; run timing test.
-	LDA #08
-	CMP <$61
-	BNE FAIL_InstructionTiming1 ; this should be $08.(I also had to set Y)
-	INC <currentSubTest
-	
-	;;; Test 9 [Instruction Timing]: Does JMP take 3 cycles? ;;;
-	JSR TEST_InstructionTiming_OddOverhead
-	JSR SyncTo1000CyclesUntilNMI
-	JMP TEST_InstructionTimingContinue
-	; I thought it was clever to jump around the fail condition while testing how long a JMP instruction takes.
-	
-FAIL_InstructionTiming1:
-	JMP TEST_Fail
-
-TEST_InstructionTimingContinue:
-	JSR $500 ; run timing test.
-	LDA #03 
-	CMP <$61
-	BNE FAIL_InstructionTiming1 ; this should be $03.(I also had to set X)
-	INC <currentSubTest
-
-	;;; Test A [Instruction Timing]: Does LDA (indirect,X) take 6 cycles? ;;;
-	JSR TEST_InstructionTiming_EvenOverhead
-	LDA #$FF
-	JSR SyncTo1000CyclesUntilNMI
-	LDX #$FF	  ; This take 2 cycles
-	LDA [Test_UnOp_IndirectPointerLo,X] ; this takes 6 cycles.
-	JSR $500 ; run timing test.
-	LDA #08
-	CMP <$61
-	BNE FAIL_InstructionTiming1 ; this should be $08.(I also had to set X)
-	INC <currentSubTest
-
-	;;; Test B [Instruction Timing]: Do these implied/accumulator instructions each take 2 cycles?  ;;;
-	; I guess in theory, you could have an emulator that for some reason makes one of these take 3 cycles, and another take 1 and it would all add up, but that would be dumb.
-	; In any case, if you are failing this one, apologies for not narrowing down exactly which one is failing.
-	; This test takes a long time to run due to all the syncing with vblank, and I'd like to keep the run duration down.
-	JSR SyncTo1000CyclesUntilNMI
-	ASL A
-	ROL A
-	LSR A
-	ROR A
-	TSX
-	TXS
-	TAX
+	LDX #0	
+TEST_InstructionTiming_Loop_Imm:
+	LDA TEST_InstructionTiming_Immediates, X
+	STA <$50
 	TXA
-	TAY
-	TYA
-	DEX
+	PHA
+	JSR CycleClockBegin
+	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
+	JSR CycleClockEnd
+	PLA ; PLA before branching to a fail condition.
+	TAX 
+	STY $500  ; for easy debugging.
+	CPY #12+2 ; So let's see if this took 2 cycles.
+	BNE FAIL_InstructionTiming
 	INX
-	DEY
-	INY
-	NOP
-	JSR $500 ; run timing test.
-	LDA #30 
-	CMP <$61
-	BNE FAIL_InstructionTiming1 ; this should be 30.
+	CPX #11
+	BNE TEST_InstructionTiming_Loop_Imm
 	INC <currentSubTest
 	
-	;;; Test C [Instruction Timing]: Does JSR take 6 cycles?  ;;;
-	JSR SyncTo1000CyclesUntilNMI
-	JSR TEST_InstructionTimingJSR
-TEST_InstructionTimingJSR:
-	JSR $500 ; run timing test.
-	PLA	; fix the stack
-	PLA	; fix the stack
-	LDA #$06 
-	CMP <$61
-	BNE FAIL_InstructionTiming1 ; this should be $06.
+	;;; Test 4 [Instruction Timing]: The Zero Page addressing mode for non-Read-Modify-Write instructions take 3 cycles ;;;
+	LDX #0
+TEST_InstructionTiming_Loop_ZP:
+	LDA TEST_InstructionTiming_ZPs, X
+	STA <$50
+	TXA
+	PHA
+	JSR CycleClockBegin
+	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
+	JSR CycleClockEnd
+	PLA ; PLA before branching to a fail condition.
+	TAX
+	STY $500  ; for easy debugging.
+	CPY #12+3 ; So let's see if this took 3 cycles.
+	BNE FAIL_InstructionTiming2
+	INX
+	CPX #10
+	BNE TEST_InstructionTiming_Loop_ZP
 	INC <currentSubTest
 	
-	;;; Test D [Instruction Timing]: Does RTS take 6 cycles?  ;;;
-	LDA #LOW(TEST_InstructionTimingRTS)
-	SEC
-	SBC #1
-	LDA #HIGH(TEST_InstructionTimingRTS)
-	SBC #0
+	;;; Test 5 [Instruction Timing]: The Zero Page addressing mode for Read-Modify-Write instructions take 5 cycles ;;;
+	LDX #0
+TEST_InstructionTiming_Loop_ZP2:
+	LDA TEST_InstructionTiming_ZP2s, X
+	STA <$50
+	TXA
 	PHA
-	LDA #LOW(TEST_InstructionTimingRTS)
-	SEC
-	SBC #1
-	PHA
-	JSR SyncTo1000CyclesUntilNMI
-	RTS
-TEST_InstructionTimingRTS:
-	JSR $500 ; run timing test.
-	PLA	; fix the stack
-	PLA	; fix the stack
-	LDA #$06 
-	CMP <$61
-	BNE FAIL_InstructionTiming1 ; this should be $06.
+	JSR CycleClockBegin
+	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
+	JSR CycleClockEnd
+	PLA ; PLA before branching to a fail condition.
+	TAX
+	STY $500  ; for easy debugging.
+	CPY #12+5 ; So let's see if this took 5 cycles.
+	BNE FAIL_InstructionTiming2
+	INX
+	CPX #6
+	BNE TEST_InstructionTiming_Loop_ZP2
 	INC <currentSubTest
 
-	;;; Test E [Instruction Timing]: Does PHA take 3 cycles? ;;;
-	JSR TEST_InstructionTiming_OddOverhead
-	JSR SyncTo1000CyclesUntilNMI
+	;;; Test 6 [Instruction Timing]: The Indexed Zero Page addressing mode for non-Read-Modify-Write instructions take 4 cycles ;;;
+	LDX #0
+TEST_InstructionTiming_Loop_iZP:
+	LDA TEST_InstructionTiming_iZPs, X
+	STA <$50
+	TXA
 	PHA
-	JSR $500 ; run timing test.
-	PLA
-	LDA #03 
-	CMP <$61
-	BNE FAIL_InstructionTiming2 ; this should be $03.
-	INC <currentSubTest
-	
-	;;; Test F [Instruction Timing]: Does PLA take 4 cycles? ;;;
-	JSR TEST_InstructionTiming_EvenOverhead
-	PHA
-	JSR SyncTo1000CyclesUntilNMI
-	PLA
-	JSR $500 ; run timing test.
-	LDA #04 
-	CMP <$61
-	BNE FAIL_InstructionTiming2 ; this should be $04.
+	LDX #0
+	LDY #0
+	JSR CycleClockBegin
+	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
+	JSR CycleClockEnd
+	PLA ; PLA before branching to a fail condition.
+	TAX
+	STY $500  ; for easy debugging.
+	CPY #12+4 ; So let's see if this took 4 cycles.
+	BNE FAIL_InstructionTiming2
+	INX
+	CPX #10
+	BNE TEST_InstructionTiming_Loop_iZP
 	INC <currentSubTest
 
-	;;; Test G [Instruction Timing]: Does PHP take 3 cycles? ;;;
-	JSR TEST_InstructionTiming_OddOverhead
-	JSR SyncTo1000CyclesUntilNMI
-	PHP
-	JSR $500 ; run timing test.
-	PLA
-	LDA #03 
-	CMP <$61
-	BNE FAIL_InstructionTiming2 ; this should be $03.
+	;;; Test 7 [Instruction Timing]: The Indexed Zero Page addressing mode for Read-Modify-Write instructions take 6 cycles ;;;
+	LDX #0
+TEST_InstructionTiming_Loop_i2ZP:
+	LDA TEST_InstructionTiming_iZP2s, X
+	STA <$50
+	TXA
+	PHA
+	LDX #0
+	LDY #0
+	JSR CycleClockBegin
+	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
+	JSR CycleClockEnd
+	PLA ; PLA before branching to a fail condition.
+	TAX
+	STY $500  ; for easy debugging.
+	CPY #12+6 ; So let's see if this took 6 cycles.
+	BNE FAIL_InstructionTiming2
+	INX
+	CPX #6
+	BNE TEST_InstructionTiming_Loop_i2ZP
+	INC <currentSubTest
+		BNE FAIL_InstructionTiming_Continue
+FAIL_InstructionTiming2:
+	JMP TEST_Fail
+;;;;;;;;;;;;;;;;;
+FAIL_InstructionTiming_Continue:
+	;;; Test 8 [Instruction Timing]: The Absolute addressing mode for non-Read-Modify-Write instructions take 4 cycles ;;;
+	LDX #0
+TEST_InstructionTiming_Loop_A:
+	LDA TEST_InstructionTiming_As, X
+	STA <$50
+	TXA
+	PHA
+	LDX #0
+	LDY #0
+	JSR CycleClockBegin
+	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
+	JSR CycleClockEnd
+	PLA ; PLA before branching to a fail condition.
+	TAX
+	STY $500  ; for easy debugging.
+	CPY #12+4 ; So let's see if this took 4 cycles.
+	BNE FAIL_InstructionTiming2
+	INX
+	CPX #15
+	BNE TEST_InstructionTiming_Loop_A
+	INC <currentSubTest
+
+	;;; Test 9 [Instruction Timing]: The Absolute addressing mode for Read-Modify-Write instructions take 6 cycles ;;;
+	LDX #0
+TEST_InstructionTiming_Loop_A2:
+	LDA TEST_InstructionTiming_A2s, X
+	STA <$50
+	TXA
+	PHA
+	LDX #0
+	LDY #0
+	JSR CycleClockBegin
+	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
+	JSR CycleClockEnd
+	PLA ; PLA before branching to a fail condition.
+	TAX
+	STY $500  ; for easy debugging.
+	CPY #12+6 ; So let's see if this took 4 cycles.
+	BNE FAIL_InstructionTiming2
+	INX
+	CPX #6
+	BNE TEST_InstructionTiming_Loop_A2
 	INC <currentSubTest
 	
-	;;; Test H [Instruction Timing]: Does PLP take 4 cycles? ;;;
-	JSR TEST_InstructionTiming_EvenOverhead
+	;;; Test A [Instruction Timing]: The indexed Absolute addressing mode for STA instructions always take 5 cycles ;;;
+	LDX #0
+TEST_InstructionTiming_Loop_iA:
+	LDA TEST_InstructionTiming_iAs, X
+	STA <$50
+	TXA
+	PHA
+	LDX #0
+	LDY #0
+	JSR CycleClockBegin
+	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
+	JSR CycleClockEnd
+	PLA ; PLA before branching to a fail condition.
+	TAX
+	STY $500  ; for easy debugging.
+	CPY #12+5 ; So let's see if this took 5 cycles.
+	BNE FAIL_InstructionTiming2
+	INX
+	CPX #2
+	BNE TEST_InstructionTiming_Loop_iA
+	
+	LDX #0
+TEST_InstructionTiming_Loop_iA_2:
+	LDA TEST_InstructionTiming_iAs, X
+	STA <$50
+	TXA
+	PHA
+	LDX #$FF
+	LDY #$FF
+	JSR CycleClockBegin
+	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
+	JSR CycleClockEnd
+	PLA ; PLA before branching to a fail condition.
+	TAX
+	STY $500  ; for easy debugging.
+	CPY #12+5 ; So let's see if this took 5 cycles.
+	BNE FAIL_InstructionTiming3
+	INX
+	CPX #2
+	BNE TEST_InstructionTiming_Loop_iA_2
+	INC <currentSubTest
+	
+	;;; Test B [Instruction Timing]: The indexed Absolute addressing mode for many instructions take an extra cycle if the page boundary was crossed. ;;;
+	LDX #0
+TEST_InstructionTiming_Loop_iAp:
+	LDA TEST_InstructionTiming_iAs_plus, X
+	STA <$50
+	TXA
+	PHA
+	LDX #0
+	LDY #0
+	JSR CycleClockBegin
+	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
+	JSR CycleClockEnd
+	PLA ; PLA before branching to a fail condition.
+	TAX
+	STY $500  ; for easy debugging.
+	CPY #12+4 ; So let's see if this took 4 cycles.
+	BNE FAIL_InstructionTiming3
+	INX
+	CPX #16
+	BNE TEST_InstructionTiming_Loop_iAp
+	
+	LDX #0
+TEST_InstructionTiming_Loop_i2Ap:
+	LDA TEST_InstructionTiming_iAs_plus, X
+	STA <$50
+	TXA
+	PHA
+	LDX #$FF
+	LDY #$FF
+	JSR CycleClockBegin
+	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
+	JSR CycleClockEnd
+	PLA ; PLA before branching to a fail condition.
+	TAX
+	STY $500  ; for easy debugging.
+	CPY #12+5 ; So let's see if this took 5 cycles.
+	BNE FAIL_InstructionTiming3
+	INX
+	CPX #16
+	BNE TEST_InstructionTiming_Loop_i2Ap
+	INC <currentSubTest
+	BNE TEST_InstructionTiming_Cont2
+FAIL_InstructionTiming3:
+	JMP TEST_Fail
+TEST_InstructionTiming_Cont2:
+
+	;;; Test C [Instruction Timing]: The indexed Absolute addressing mode for Read-Modify-Write instructions always take 7 cycles ;;;
+	LDX #0
+TEST_InstructionTiming_Loop_RMWiA:
+	LDA TEST_InstructionTiming_iA2s, X
+	STA <$50
+	TXA
+	PHA
+	LDX #0
+	LDY #0
+	JSR CycleClockBegin
+	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
+	JSR CycleClockEnd
+	PLA ; PLA before branching to a fail condition.
+	TAX
+	STY $500  ; for easy debugging.
+	CPY #12+7 ; So let's see if this took 7 cycles.
+	BNE FAIL_InstructionTiming3
+	INX
+	CPX #6
+	BNE TEST_InstructionTiming_Loop_RMWiA
+	
+	LDX #0
+TEST_InstructionTiming_Loop_2RMWiA:
+	LDA TEST_InstructionTiming_iA2s, X
+	STA <$50
+	TXA
+	PHA
+	LDX #$FF
+	LDY #$FF
+	JSR CycleClockBegin
+	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
+	JSR CycleClockEnd
+	PLA ; PLA before branching to a fail condition.
+	TAX
+	STY $500  ; for easy debugging.
+	CPY #12+7 ; So let's see if this took 7 cycles.
+	BNE FAIL_InstructionTiming3
+	INX
+	CPX #6
+	BNE TEST_InstructionTiming_Loop_2RMWiA
+	INC <currentSubTest
+
+	;;; Test D [Instruction Timing]: The Indirect, X instructions always take 6 cycles (well, except for the unofficial ones) ;;;
+	LDA #05
+	STA <$61
+	STA <$60
+	LDX #0
+TEST_InstructionTiming_Loop_indX:
+	LDA TEST_InstructionTiming_inX, X
+	STA <$50
+	TXA
+	PHA
+	LDX #$00
+	LDY #$00
+	JSR CycleClockBegin
+	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
+	JSR CycleClockEnd
+	PLA ; PLA before branching to a fail condition.
+	TAX
+	STY $500  ; for easy debugging.
+	CPY #12+6 ; So let's see if this took 5 cycles.
+	BNE FAIL_InstructionTiming3
+	INX
+	CPX #8
+	BNE TEST_InstructionTiming_Loop_indX
+	INC <currentSubTest
+	
+	;;; Test E [Instruction Timing]: The Indirect, Y instructions take an extra cycle if a page boundary is crossed.;;;
+	LDX #0
+TEST_InstructionTiming_Loop_Yind:
+	LDA TEST_InstructionTiming_inY, X
+	STA <$50
+	TXA
+	PHA
+	LDX #$00
+	LDY #$00
+	JSR CycleClockBegin
+	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
+	JSR CycleClockEnd
+	PLA ; PLA before branching to a fail condition.
+	TAX
+	STY $500  ; for easy debugging.
+	CPY #12+5 ; So let's see if this took 5 cycles.
+	BNE FAIL_InstructionTiming4
+	INX
+	CPX #7
+	BNE TEST_InstructionTiming_Loop_Yind
+	LDX #0
+TEST_InstructionTiming_Loop_Y2ind:
+	LDA TEST_InstructionTiming_inY, X
+	STA <$50
+	TXA
+	PHA
+	LDX #$00
+	LDY #$FF
+	JSR CycleClockBegin
+	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
+	JSR CycleClockEnd
+	PLA ; PLA before branching to a fail condition.
+	TAX
+	STY $500  ; for easy debugging.
+	CPY #12+6 ; So let's see if this took 6 cycles.
+	BNE FAIL_InstructionTiming4
+	INX
+	CPX #7
+	BNE TEST_InstructionTiming_Loop_Y2ind
+	INC <currentSubTest
+
+	;;; Test F [Instruction Timing]: The Implied instructions take 2 cycles.;;;
+	LDX #0
+TEST_InstructionTiming_Loop_Implied:
+	LDA TEST_InstructionTiming_Implied, X
+	STA <$50
+	TXA
+	PHA
+	TSX ; Transfer stack pointer to X, so when TXS runs, we don't break anything.
+	DEX ; Oh wait- we'll need to account for the stack pointer moving from the JSR.
+	DEX ; Okay, now we're all set.
+	LDY #$FF
+	JSR CycleClockBegin
+	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
+	JSR CycleClockEnd
+	PLA ; PLA before branching to a fail condition.
+	TAX
+	STY $500  ; for easy debugging.
+	CPY #12+2 ; So let's see if this took 6 cycles.
+	BNE FAIL_InstructionTiming4
+	INX
+	CPX #22
+	BNE TEST_InstructionTiming_Loop_Implied
+	CLD
+	INC <currentSubTest
+	BNE TEST_InstructionTiming_Cont3
+FAIL_InstructionTiming4:
+	JMP TEST_Fail
+TEST_InstructionTiming_Cont3:
+	; The rest of the tests are not in loops.
+	;;; Test G [Instruction Timing]: PHP takes 3 cycles ;;;
+	JSR CycleClockBegin
 	PHP
-	JSR SyncTo1000CyclesUntilNMI
+	JSR CycleClockEnd
+	PLA
+	STY $500  ; for easy debugging.
+	CPY #3
+	BNE FAIL_InstructionTiming4
+	INC <currentSubTest
+	
+	;;; Test H [Instruction Timing]: PHA takes 3 cycles ;;;
+	JSR CycleClockBegin
+	PHA
+	JSR CycleClockEnd
+	PLA
+	STY $500  ; for easy debugging.
+	CPY #3
+	BNE FAIL_InstructionTiming4
+	INC <currentSubTest
+	
+	;;; Test I [Instruction Timing]: PLP takes 4 cycles ;;;
+	PHA
+	JSR CycleClockBegin
 	PLP
-	JSR $500 ; run timing test.
-	LDA #04 
-	CMP <$61
-	BNE FAIL_InstructionTiming2 ; this should be $04.
-	;TODO Add more instructions?
+	JSR CycleClockEnd
+	STY $500  ; for easy debugging.
+	CPY #4
+	BNE FAIL_InstructionTiming4
+	INC <currentSubTest
+
+	;;; Test J [Instruction Timing]: PLA takes 4 cycles ;;;
+	PHA
+	JSR CycleClockBegin
+	PLA
+	JSR CycleClockEnd
+	STY $500  ; for easy debugging.
+	CPY #4
+	BNE FAIL_InstructionTiming4
+	INC <currentSubTest
+	
+	;;; Test K [Instruction Timing]: JMP takes 3 cycles ;;;
+	JSR CycleClockBegin
+	JMP TEST_InstructionTiming_JMP
+TEST_InstructionTiming_JMP:
+	JSR CycleClockEnd
+	STY $500  ; for easy debugging.
+	CPY #3
+	BNE FAIL_InstructionTiming4
+	INC <currentSubTest
+	
+	;;; Test L [Instruction Timing]: JSR takes 6 cycles ;;;
+	JSR CycleClockBegin
+	JSR TEST_InstructionTiming_JSR
+TEST_InstructionTiming_JSR:
+	JSR CycleClockEnd
+	PLA
+	PLA
+	STY $500  ; for easy debugging.
+	CPY #6
+	BNE FAIL_InstructionTiming4
+	INC <currentSubTest
+
+	;;; Test M [Instruction Timing]: RTS takes 6 cycles ;;;
+	LDA #HIGH(TEST_InstructionTiming_RTS-1)
+	PHA
+	LDA #LOW(TEST_InstructionTiming_RTS-1)
+	PHA
+	JSR CycleClockBegin
+	RTS
+TEST_InstructionTiming_RTS:
+	JSR CycleClockEnd
+	STY $500  ; for easy debugging.
+	CPY #6
+	BNE FAIL_InstructionTiming5
+	INC <currentSubTest
+	
+	;;; Test N [Instruction Timing]: RTI takes 6 cycles ;;;
+	LDA #HIGH(TEST_InstructionTiming_RTI)
+	PHA
+	LDA #LOW(TEST_InstructionTiming_RTI)
+	PHA
+	PHA
+	JSR CycleClockBegin
+	RTI
+TEST_InstructionTiming_RTI:
+	JSR CycleClockEnd
+	STY $500  ; for easy debugging.
+	CPY #6
+	BNE FAIL_InstructionTiming5
+	INC <currentSubTest
+	
+	;;; Test O [Instruction Timing]: BRK takes 7 cycles ;;;
+	LDA #$40
+	STA $600
+	JSR CycleClockBegin
+	BRK
+	.byte $00 ; BRK is compiled as 1 byte for some reason.
+	JSR CycleClockEnd
+	STY $500  ; for easy debugging.
+	CPY #6+7
+	BNE FAIL_InstructionTiming5
+	INC <currentSubTest
+	
+	;;; Test P [Instruction Timing]: JMP (indirect) takes 5 cycles ;;;
+	LDA #LOW(TEST_InstructionTiming_JMPIndirect)
+	STA <$00
+	LDA #HIGH(TEST_InstructionTiming_JMPIndirect)
+	STA <$01
+	JSR CycleClockBegin
+	JMP [$0000]
+TEST_InstructionTiming_JMPIndirect:
+	JSR CycleClockEnd
+	STY $500  ; for easy debugging.
+	CPY #5
+	BNE FAIL_InstructionTiming5
 
 	;; END OF TEST ;;
 	LDA #1
 	RTS
 ;;;;;;;
-
-FAIL_InstructionTiming2:
+FAIL_InstructionTiming5:
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
+
+TEST_InstructionTiming_Immediates:
+	.byte $09, $29, $49, $69, $A0, $A2, $A9, $C0, $C9, $E0, $E9
+
+TEST_InstructionTiming_ZPs:
+	.byte $05, $25, $45, $65, $85, $86, $A5, $A6, $C5, $E5
+	
+TEST_InstructionTiming_ZP2s:
+	.byte $06, $26, $46, $66, $C6, $E6
+
+TEST_InstructionTiming_iZPs:
+	.byte $15, $35, $55, $75, $95, $96, $B5, $B6, $D5, $F5
+	
+TEST_InstructionTiming_iZP2s:
+	.byte $16, $36, $56, $76, $D6, $F6
+
+TEST_InstructionTiming_As:
+	.byte $0D, $2C, $2D, $4D, $6D, $8C, $8D, $8E, $AC, $AD, $AE, $CC, $CD, $EC, $ED
+
+TEST_InstructionTiming_A2s:
+	.byte $0E, $2E, $4E, $6E, $CE, $EE
+
+TEST_InstructionTiming_iAs:
+	.byte $99, $9D
+	
+TEST_InstructionTiming_iAs_plus:
+	.byte $19, $1D, $39, $3D, $59, $5D, $79, $7D, $B9, $BC, $BD, $BE, $D9, $DD, $F9, $FD
+
+TEST_InstructionTiming_iA2s:
+	.byte $1E, $3E, $5E, $7E, $DE, $FE
+
+TEST_InstructionTiming_inX:
+	.byte $01, $21, $41, $61, $81, $A1, $C1, $E1
+
+TEST_InstructionTiming_inY:
+	.byte $11, $31, $51, $71, $B1, $D1, $F1
+
+TEST_InstructionTiming_inY_STA:
+	.byte $91
+
+TEST_InstructionTiming_Implied:
+	CLC
+	ASL A
+	SEC
+	LSR A
+	CLI
+	ROL A
+	SEI
+	ROR A
+	DEY
+	TXA
+	TYA
+	TXS
+	TAY
+	TAX
+	CLV
+	TSX
+	INY
+	DEX
+	CLD
+	INX
+	NOP
+	SED
+
+
 
 TEST_IFlagLatency_IRQ:
 	STX <$50
@@ -9354,7 +9662,6 @@ FAIL_ImpliedDummyRead1:
 	JMP FAIL_ImpliedDummyRead
 ;;;;;;;;;;;;;;;;;
 TEST_ImpliedDummyReadPreReqContinue:
-	; This test will require Addreass $00A5 to be the opcode we want to test, but address $A5 is currently used to store some information about the page of tests for the main menu.
 	;;; Test 3 [Implied Dummy Reads]: Prerequisite check. Does a modified version of DMA + Open Bus pass? ;;;
 	LDA <result_DMADMASync_PreTest	; If this emulator fails the pre-test for the DMA sync routine, then don't even bother trying.
 	CMP #1
@@ -9554,8 +9861,8 @@ TEST_ImpliedDummyRead_Continue:
 	; now we test for the instructions that have bit 5 set.
 	; instead of BRK for pass, and RTI for fail, we're looking at JSR for pass, and RTS for fail!
 	
-	; Due to the upper 3 bits of a controller (or 5 bits on famicom) being open bus, (and $4015 doesn't upodate the databus) the low byte operand of the JSR instruction could have anything in those bits.
-	
+	; Due to the upper 3 bits of a controller (or 5 bits on famicom) being open bus, (and $4015 doesn't update the databus) the low byte operand of the JSR instruction could have anything in those bits.
+
 	LDA #$00	; We need a series of bytes to be BRKs
 	STA <$01	; This byte isn't being used in this test, so we're good to overwrite it.
 	STA <$09	; This byte isn't being used in this test, so we're good to overwrite it.
@@ -9678,7 +9985,7 @@ TEST_ImpliedDummyRead_Continue2:
 	; [Read opcode from $4015. Hopefully, a JSR.]
 	;
 	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed3, which sets $60 and jumps to TEST_ImpliedDummyRead_PostPHP.
-	.org $D33D	; PHP should push $3C to the stack, so the RTS instruction would return here:
+	.org $D53D	; PHP should push $3C to the stack, so the RTS instruction would return here:
 TEST_ImpliedDummyRead_PostPHP:
 	LDA <$60
 	BEQ FAIL_ImpliedDummyRead4
@@ -10546,7 +10853,7 @@ CalculateDMADuration_End:
 	RTS
 ;;;;;;;
 
-CheckDMATiming:
+CycleClockBegin:
 	JSR DMASync_50CyclesRemaining
 	; 50 cycles until the target DMA.	
 	LDA #$4E			; +2 cycles.
@@ -10555,17 +10862,28 @@ CheckDMATiming:
 	; 572 more cycles until the next DMA.
 	JSR Clockslide_500
 	JSR Clockslide_50
-	JSR Clockslide_22
-	; Now we're synced to the DMA.
-	NOP
-	NOP
-	
-	; 572 cycles to go until the next DMA.
-	JSR Clockslide_500
-	; 72 cycles to go. (We need to jump to CalculateDMADuration with 56 cycles remaining)
 	JSR Clockslide_16
+	RTS
+	
+CycleClockEnd:
+	; 572-6 cycles to go until the next DMA.
+	JSR Clockslide_500
+	; 72-6 cycles to go. (We need to jump to CalculateDMADuration with 56 cycles remaining)
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
 	; 56 cycles to go:
 	JSR CalculateDMADuration
+	RTS
+;;;;;;;
+
+CheckDMATiming:
+	JSR CycleClockBegin
+	NOP
+	NOP
+	JSR CycleClockEnd
 	RTS
 ;;;;;;;
 
@@ -11440,6 +11758,16 @@ TEST_OAM_Corruption:
 	LDA <result_VblankSync_PreTest
 	CMP #1
 	BNE FAIL_OAM_Corruption
+	; also you can read from OAM. that's important.
+	LDX #0
+	STX $2003
+	LDA #$5A
+	STA $2004
+	LDA #0
+	STX $2003
+	LDA $2004
+	CMP #$5A
+	BNE FAIL_OAM_Corruption	
 	INC <currentSubTest
 	; Okay, now that we know this emulator won't crash, that *actually* leads us to:
 	
@@ -11511,7 +11839,7 @@ TEST_OAM_Corruption:
 	STA $2001	; and disable again for the ability to actually read everything from OAM.
 	JSR TEST_OAM_Corruption_Evaluate
 	CPX #0
-	BNE FAIL_OAM_Corruption ; If X does not make it to zero (it detected a corrupted row of OAM), fail the test.
+	BNE FAIL_OAM_Corruption2 ; If X does not make it to zero (it detected a corrupted row of OAM), fail the test.
 
 
 
@@ -14068,6 +14396,8 @@ TEST_DoesTheDMA_Loop:
 TEST_DoesTheDMA_LoopPostDec:
 	LDA $4000
 	BNE TEST_DoesTheDMA_Loop
+	LDA $4000
+	BEQ TEST_DoesTheDMA_Fail
 	LDA #01
 	STA <result_DMADMASync_PreTest
 	JMP DMASync
