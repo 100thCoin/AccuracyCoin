@@ -428,25 +428,6 @@ For more information, I recommend reading the fully commented assembly code for 
 ### NMI disabled at VBlank
   1: The NMI could occur too late, or was disabled too early.  
 
-### Instruction Timing
-  1: The NMI timing was not relaible enough.  
-  2: LDA Immediate should take 2 cycles.  
-  3: LDA Zero Page should take 3 cycles.  
-  4: LDA Absolute should take 4 cycles.  
-  5: LDA Absolute, X should take 4 cycles if a page boundary is not crossed.  
-  6: LDA Absolute, X should take 5 cycles if a page boundary is crossed.  
-  7: LDA (Indirect, Y) should take 5 cycles in a page boundary is not crossed.  
-  8: LDA (Indirect, Y) should take 6 cycles in a page boundary is crossed.  
-  9: JMP Absolute should take 3 cycles  
-  A: LDA (Indirect, X) should take 6 cycles  
-  B: ASL A, ROL A, LSR A, ROR A, TSX, TXS, TAX, TXA, TAY, TYA, DEX, INX, DEY, INY, and NOP all should take 2 cycles.  
-  C: JSR should take 6 cycles  
-  D: RTS should take 6 cycles  
-  E: PHA should take 3 cycles  
-  F: PLA should take 4 cycles  
-  G: PHP should take 3 cycles  
-  H: PLP should take 4 cycles  
-
 ### Sprite 0 Hit behavior
   1: A Sprite Zero Hit did not occur.  
   2: Sprite zero hits should not happen if Background Rendering is disabled.  
@@ -504,6 +485,33 @@ For more information, I recommend reading the fully commented assembly code for 
   1: A Read-Modify-Write instruction to address $2007 should perform an extra write where the low byte of the PPU address written is the result of the Read-Modify-Write instruction.  
   2: This extra write should not occur when "v" is pointing to Palette RAM. (An extra write still might occur, but that's not the one we're testing for.)  
   3: If "v" is pointing to Palette RAM, this extra write should not get written to the nametable.  
+
+### Instruction Timing
+  1: The DMA should update the data bus.  
+  2: The DMA Timing is not accurate enough to test this.  
+  3: The immediate addressed instructions should take 2 CPU cycles.  
+  4: The Zero Page addressing mode for non-Read-Modify-Write instructions should take 3 cycles.  
+  5: The Zero Page addressing mode for Read-Modify-Write instructions take 5 should cycles.  
+  6: The Indexed Zero Page addressing mode for non-Read-Modify-Write instructions should take 4 cycles.  
+  7: The Indexed Zero Page addressing mode for Read-Modify-Write instructions should take 6 cycles.  
+  8: The Absolute addressing mode for non-Read-Modify-Write instructions should take 4 cycles.  
+  9: The Absolute addressing mode for Read-Modify-Write instructions should take 6 cycles.  
+  A: The indexed Absolute addressing mode for STA instructions should always take 5 cycles. 
+  B: The indexed Absolute addressing mode for many instructions should take an extra cycle if the page boundary was crossed.  
+  C: The indexed Absolute addressing mode for Read-Modify-Write instructions should always take 7 cycles.  
+  D: The Indirect, X instructions should always take 6 cycles (well, except for the unofficial ones).  
+  E: The Indirect, Y instructions should take an extra cycle if a page boundary is crossed.
+  F: The Implied instructions should take 2 cycles.  
+  G: PHP should take 3 cycles.  
+  H: PHA should take 3 cycles.  
+  I: PLP should take 4 cycles.  
+  J: PLA should take 4 cycles.  
+  K: JMP should take 3 cycles.  
+  L: JSR should take 6 cycles.  
+  M: RTS should take 6 cycles.  
+  N: RTI should take 6 cycles.  
+  O: BRK should take 7 cycles.  
+  P: JMP (Indirect) should take 5 cycles.  
 
 ### Implied Dummy Reads
   1: Your emulator did not pass the SLO Absolute, X test.  
