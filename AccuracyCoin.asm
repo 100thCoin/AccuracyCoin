@@ -7144,6 +7144,10 @@ TEST_InstructionTiming_Loop_Y2ind:
 	BNE TEST_InstructionTiming_Loop_Y2ind
 	INC <currentSubTest
 
+	LDA $4015
+	LDA #$40
+	STA $4017
+
 	;;; Test F [Instruction Timing]: The Implied instructions take 2 cycles.;;;
 	LDX #0
 TEST_InstructionTiming_Loop_Implied:
