@@ -85,6 +85,7 @@ PostAllPassTally = $38
 PrintDecimalTensCheck = $39
 result_VblankSync_PreTest = $3A
 DebugMode = $3B
+IncorrectReturnAddressOffset = $3C
 
 Reserverd_41 = $41 ; Used in the Implied Dummy Reads. It's probably best we never actually use this.
 
@@ -110,6 +111,7 @@ Reserved_C8 = $C8; For my "unofficial opcodes are correct length" tests, I use [
 
 Reserverd_E1 = $E1 ; Used in the Implied Dummy Reads. It's probably best we never actually use this.
 
+Debug_EC = $EC 	; This is used to see how far an emulator gets before hanging when loading the main menu.
 
 Copy_X2 = $ED	; These are exclusively used to keep registers from before RunTest from being modified during a test, so they can be restored after the test.
 Copy_Y2 = $EE	; ^
@@ -383,15 +385,26 @@ PostResetFlagTest:
 	LDA #$5A
 	STA PowerOn_MagicNumber ; this is used to indicate that we pressed the reset button, so we should skip overwriting the power on test results.
 ReloadMainMenu:
+	INC <Debug_EC ; 00 -> 01
 	JSR ClearPage2
 	LDA #02
 	STA $4014 ; Set up OAM
 	
 	LDA #0
 	STA <dontSetPointer
+	INC <Debug_EC ; 01 -> 02
 	; set up the NMI routine.
 	JSR SetUpNMIRoutineForMainMenu
-	
+	LDA #$20
+	STA <$00
+	LDA #Low(VerifyReturnAddressesAreCorrect)
+	STA <$01
+	LDA #High(VerifyReturnAddressesAreCorrect)
+	STA <$02
+	LDA #$60
+	STA <$03
+	INC <Debug_EC ; 02 -> 03
+	JSR $0000 ; Verify return addresses pushed by JSR are correct.	
 	LDA #$20
 	STA <JSRFromRAM
 	LDA #$60
@@ -410,8 +423,11 @@ ReloadMainMenu:
 	STA $6001 ; Though I would prefer if this was a NES 2.0 cartridge without any PRG RAM, so writing here might do nothing anyway.
 	STA $6002 ; There's still a good chance an emulator doesn't support NES 2.0 and just puts PRG RAM here anyway.
 	
+	INC <Debug_EC ; 03 -> 04
 	JSR WaitForVBlank
+	INC <Debug_EC ; 04 -> 05
 	JSR TEST_VblankSync_PreTest; ; Initialize result_VblankSync_PreTest
+	INC <Debug_EC ; 05 -> 06
 	JSR DMASync ; Initialize result_DMADMASync_PreTest
 	
 	
@@ -422,18 +438,24 @@ ReloadMainMenu:
 	STA <suitePointer
 	LDA #High(Suite_CPUBehavior)
 	STA <suitePointer+1
+	INC <Debug_EC ; 06 -> 07
 	JSR LoadSuiteMenu
+	INC <Debug_EC ; 07 -> 08
 	JSR DrawPageNumber
+	INC <Debug_EC ; 08 -> 09
 	JSR WaitForVBlank
+	INC <Debug_EC ; 09 -> 0A
 	JSR ResetScroll
+	INC <Debug_EC ; 0A -> 0B
 	JSR EnableRendering_BG
+	INC <Debug_EC ; 0B -> 0C
 	JSR EnableNMI
-		
+	INC <Debug_EC ; 0C -> 0D
 InfiniteLoop:
 	JMP InfiniteLoop	; This is the spinning loop while I wait for the NMI to occur.
 ;;;;;;;;;;;;;;;;;;;;
 	
-	.org $8100
+	.org $8200
 	; Menu Data
 
 	; Here is how the pages of tests are organized.
@@ -1001,7 +1023,7 @@ PressStartToContinue:
 PressStartToContinue_End:
 	RTI
 	
-	.org $9100
+	.org $9200
 	
 DMASyncWith48:
 	; This fuction very relaibly exits with exactly 50 CPU cycles until the DMA occurs.
@@ -1135,6 +1157,16 @@ DMASync68_Loop:
 	CMP <$C9
 	RTS 
 	
+VerifyReturnAddressesAreCorrect:
+	TSX
+	INX
+	LDA $100, X
+	; $02 is the correct value to read here. A value of $03 is wrong. $04 is right out.
+	; Anyway, subtrack by 1.
+	SEC
+	SBC #02
+	STA <IncorrectReturnAddressOffset
+	RTS	
 	
 	.bank 1
 	.org $A000
@@ -1460,7 +1492,7 @@ TEST_Fail2:
 TEST_ROMnotWritable:
 	;;; Test 1 [ROM is not Writable]: Writing to ROM does nothing. ;;;
 	; This is an NROM cartridge, so there aren't banks to swap or anything
-	LDA #$02 ; 02 = FAIL
+	LDA #$06 ; 06 = FAIL
 	STA CannotWriteToROM_01 ; This address holds a $01
 	LDA CannotWriteToROM_01 ; If ROM was updated, you read a 2, which fails the test.
 	;; END OF TEST ;;
@@ -6182,26 +6214,31 @@ FAIL_APURegActivation0:
 
 TEST_APURegActivation:
 	;;; Test 1 [APU Register Activation]: Pre-requisite test suite: Does DMA affect the data bus? Is DMC DMA timing accurate? Is open bus accurate enough for this test? How about PPU Open Bus? What about the PPU Read buffer? ;;;
+	; For the purposes of debugging, you can press select to show the debug menu. Address $50 will be labeled 00 to 04 based on which pre-requisite it fails.
 	LDA <result_DMADMASync_PreTest	; This is written before the main menu loads when resetting the ROM. If you aren't passing this test (and using savestates), you'll need to reboot the ROM to update this value.
 	CMP #1
 	BNE FAIL_APURegActivation_Pre ; Fail if the DMC DMA doesn't update the data bus.
+	INC <$50 ; for debugging.
 	
 	JSR TEST_DMA_Plus_2007R
 	CMP #1
 	BNE FAIL_APURegActivation_Pre ; Fail if DMC DMA timing is off.
-	
+	INC <$50 ; for debugging.
+
 	JSR ResetScrollAndWaitForVBlank
 	LDY #$10	 ; A copy of Open Bus test 3. If this fails, then open bus isn't reliable enough for this test.
 	LDA $50F8, Y ; This offset changes the high byte of the value read, but not the data bus.
 	CMP #$50
 	BNE FAIL_APURegActivation_Pre ; Fail if open bus is faked.
-	
+	INC <$50 ; for debugging.
+
 	LDA #$5A
 	STA $2002
 	LDA #0
 	LDA $3000 ; use a mirror to test for mirrors too.
 	CMP #$5A
 	BNE FAIL_APURegActivation_Pre ; Fail if PPU open bus doesn't exist.
+	INC <$50 ; for debugging.
 
 	JSR WriteToPPUADDRWithByte
 	.byte $24, $00
@@ -8263,7 +8300,7 @@ TEST_FrameCounterIRQ:
 	BNE FAIL_FrameCounterIRQ ; If SLO is properly emulated, you might see bit 7 set here (failing the test). The flag is actually cleared before the second read, so it bit 7 should be 0.
 	INC <currentSubTest
 	
-	;;; Test 7 [APU Frame Counter IRQ]: The IRQ flag should not be cleared yet the APU transitions from a "get" cycle to a "put" cycle. ;;;
+	;;; Test 7 [APU Frame Counter IRQ]: The IRQ flag should not be cleared when the APU transitions from a "get" cycle to a "put" cycle. ;;;
 	; If you are reading this, then you probably passed test 6 and failed test 7.
 	; This was a brand new discovery as of writing this ROM, so I expect most emulators to fail this.
 	;
@@ -12470,6 +12507,7 @@ CopyReturnAddressToByte0: ; Several helper functions have a series of bytes foll
 	; This function just takes the return address from the previous JSR instruction, adds 1 to it, and stores both bytes in a word at address $0000
 	; That way, you can easily run LDA [$0000], Y to read the bytes that followed the JSR instruction.
 	; NOTE: This will corrupt the stack. see FixRTS below.
+	; NOTE: If your emulator pushes the wrong retur naddress from RTS,this function will still work, as it was detected and stored in IncorrectReturnAddressOffset.
 	PLA
 	STA <$02
 	PLA
@@ -12478,6 +12516,10 @@ CopyReturnAddressToByte0: ; Several helper functions have a series of bytes foll
 	STA <$00
 	PLA
 	STA <$01
+	LDA <$00
+	SEC
+	SBC <IncorrectReturnAddressOffset
+	STA <$00
 	INC <$00 ; INC the low byte
 	BNE CPYRTS0
 	INC <$01 ; If needed, INC the high byte
@@ -12509,6 +12551,8 @@ FixRTS:	; Correct the return address so any stack modifications for other functi
 	LDA <$01 ; add byte0 to the return stack
 	PHA
 	LDA <$00
+	CLC
+	ADC <IncorrectReturnAddressOffset
 	PHA
 	LDA <$03 ; add back the return address from this function
 	PHA
