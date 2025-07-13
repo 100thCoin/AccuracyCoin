@@ -287,6 +287,8 @@ result_ControllerClocking = $47A
 
 result_OAM_Corruption = $47B
 
+result_JSREdgeCases = $47C
+
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
 result_PowOn_CPUReg = $03FD ; page 3 omits the test from the all-test-result-table.
 result_PowOn_PPURAM = $03FE ; page 3 omits the test from the all-test-result-table.
@@ -718,6 +720,8 @@ Suite_CPUBehavior2:
 	.byte "CPU Behavior 2", $FF
 	table "Instruction Timing", 	 $FF, result_InstructionTiming, TEST_InstructionTiming
 	table "Implied Dummy Reads",	 $FF, result_ImpliedDummyRead, TEST_ImpliedDummyRead
+	table "JSR Edge Cases",			 $FF, result_JSREdgeCases,	TEST_JSREdgeCases
+	;table "All NOP instructions",	 $FF, result_JSREdgeCases,	TEST_JSREdgeCases
 	.byte $FF
 
 
@@ -11881,8 +11885,6 @@ TEST_OAM_Corruption:
 	CPX #0
 	BNE FAIL_OAM_Corruption2 ; If X does not make it to zero (it detected a corrupted row of OAM), fail the test.
 
-
-
 	;; END OF TEST ;;
 	LDA #1
 	RTS
@@ -11911,13 +11913,93 @@ CopyLowestPageBytesTo60:
 	STA <$67
 	RTS
 ;;;;;;;
+	.bank 3
+	.org $E000
+FAIL_JSREdgeCases:
+	JMP TEST_Fail
+
+TEST_JSREdgeCases:
+	;;; Test 1 [JSR Edge Cases]: Does JSR push the correct values to the stack for the return address? ;;;
+	; This test is actually ran briefly after power on, since the results are used in "CopyReturnAddressToByte0" and "FixRTS"
+	; If the opcode is at address $1234, the return address pushed to the stack is $1236.
+	; An RTS instruction would then return to $1236, and increment the PC to $1237.
+	LDA IncorrectReturnAddressOffset
+	CMP #0
+	BNE FAIL_JSREdgeCases
+	INC <currentSubTest
+	
+	;;; Test 2 [JSR Edge Cases]: Open bus pre-requisite ;;;
+	LDA $4000
+	CMP #$40
+	BNE FAIL_JSREdgeCases
+	LDA #$5A
+	STA $2002
+	LDX #$10
+	LDA $3FF0, X
+	CMP #$5A
+	BNE FAIL_JSREdgeCases
+	INC <currentSubTest
+
+	;;; Test 3 [JSR Edge Cases]: What value is on the data bus after JSR? ;;;
+	; Here are all the cycles of JSR. (Simplified. JSR is actually a super odd instruction. I recommend looking at it in visual 6502 some time.)
+	; 1: Read the opcode.
+	; 2: Read the first operand.
+	; 3: Dummy read from stack.
+	; 4: Push PC High to the stack.
+	; 5: Push PC Low to the stack.
+	; 6: Read the second operand, and update the program counter.
+	
+	; This test will do the following at address $005E. JSR $4000
+	; If pass, it will run RTI.
+	; If fail, it will likely run RTS. (But no guarantee, since who knows how inaccurate emulation will run)	
+	
+	; RTI will pull off 3 bytes, [flags] [pcl] [pch]. 
+	; therefore, I should push the desired high byte to the stack before the JSR.
+	
+	LDA #$60
+	STA $0505
+	LDA #$68
+	STA $600
+	LDA #$A9
+	STA $601
+	LDA #$FF
+	STA $602
+	LDA #$48
+	STA $603
+	LDA #$40
+	STA $604
+	
+	LDX #0
+TEST_JSREdgeCases_RAMCodeLoop:
+	LDA TEST_JSREdgeCases_RAMCode, X
+	STA $55B,X
+	INX
+	CPX #10
+	BNE TEST_JSREdgeCases_RAMCodeLoop
+	LDX #0
+	JSR $055B ; run the code copied from TEST_JSREdgeCases_RAMCode
+	CPX #1
+	BEQ FAIL_JSREdgeCases
+
+	;; END OF TEST ;;
+	LDA #1
+	RTS
+;;;;;;;
+	
+	
+TEST_JSREdgeCases_RAMCode:
+	LDA #$05
+	PHA
+	JSR $4000
+	PLA
+	LDX #1
+	RTS
+;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                ENGINE                   ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	
-	.bank 3
-	
+		
 	.org $EE00
 TEST_DMC_Conflicts_AnswerKey_Early_Famicom:
 	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
