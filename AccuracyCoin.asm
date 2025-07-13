@@ -12036,7 +12036,7 @@ TEST_AllNops_EvaluateAbsolute:
 	.byte $F0, $03 ; BEQ +3 bytes
 	JMP TEST_AllNops_Evaluate_Flags
 	LDA #$5A
-	CMP <$CA
+	CMP $05CA
 	.byte $F0, $03 ; BEQ +3 bytes
 	JMP TEST_AllNops_Evaluate_Memory
 	LDA <Copy_A
@@ -12177,7 +12177,7 @@ TEST_AllNOPs:
 	; run some thorough tests on all unofficial NOP instructions.
 	LDA #$5A
 	STA <$CA ; #$5A at address $CA
-	
+	STA $05CA
 	TSX
 	STX <Copy_SP
 	
@@ -12197,6 +12197,7 @@ TEST_AllNOPs:
 	
 	;;; Test 2 [All NOP Instructions]: opcode $0C ;;;
 	.byte $0C, $CA, $3A ; NOP $3ACA (A mirror of $2002)
+	.byte $0C, $CA, $1A ; NOP $1ACA (A mirror of $05CA)
 	JSR TEST_AllNops_EvaluateAbsolute
 	
 	;;; Test 3 [All NOP Instructions]: opcode $14 ;;;
@@ -12209,6 +12210,7 @@ TEST_AllNOPs:
 	
 	;;; Test 5 [All NOP Instructions]: opcode $1C ;;;
 	.byte $1C, $CA, $3A ; NOP $3ACA, X (A mirror of $2002)
+	.byte $1C, $CA, $1A ; NOP $1ACA, X (A mirror of $05CA)
 	JSR TEST_AllNops_EvaluateAbsolute
 	
 	;;; Test 6 [All NOP Instructions]: opcode $34 ;;;
@@ -12221,6 +12223,7 @@ TEST_AllNOPs:
 	
 	;;; Test 8 [All NOP Instructions]: opcode $3C ;;;
 	.byte $3C, $CA, $3A ; NOP $3ACA, X (A mirror of $2002)
+	.byte $3C, $CA, $1A ; NOP $1ACA, X (A mirror of $05CA)
 	JSR TEST_AllNops_EvaluateAbsolute
 	
 	;;; Test 9 [All NOP Instructions]: opcode $44 ;;;
@@ -12237,6 +12240,7 @@ TEST_AllNOPs:
 	
 	;;; Test C [All NOP Instructions]: opcode $5C ;;;
 	.byte $5C, $CA, $3A ; NOP $3ACA, X (A mirror of $2002)
+	.byte $5C, $CA, $1A ; NOP $1ACA, X (A mirror of $05CA)
 	JSR TEST_AllNops_EvaluateAbsolute
 	
 	;;; Test D [All NOP Instructions]: opcode $64 ;;;
@@ -12253,6 +12257,7 @@ TEST_AllNOPs:
 	
 	;;; Test G [All NOP Instructions]: opcode $7C ;;;
 	.byte $7C, $CA, $3A ; NOP $3ACA, X (A mirror of $2002)
+	.byte $7C, $CA, $1A ; NOP $1ACA, X (A mirror of $05CA)
 	JSR TEST_AllNops_EvaluateAbsolute
 	
 	;;; Test H [All NOP Instructions]: opcode $80 ;;;
@@ -12281,6 +12286,7 @@ TEST_AllNOPs:
 	
 	;;; Test N [All NOP Instructions]: opcode $DC ;;;
 	.byte $DC, $CA, $3A ; NOP $3ACA, X (A mirror of $2002)
+	.byte $DC, $CA, $1A ; NOP $1ACA, X (A mirror of $05CA)
 	JSR TEST_AllNops_EvaluateAbsolute
 	
 	;;; Test O [All NOP Instructions]: opcode $E2 ;;;
@@ -12301,6 +12307,7 @@ TEST_AllNOPs:
 	
 	;;; Test S [All NOP Instructions]: opcode $FC ;;;
 	.byte $FC, $CA, $3A ; NOP $3ACA, X (A mirror of $2002)
+	.byte $FC, $CA, $1A ; NOP $1ACA, X (A mirror of $05CA)
 	JSR TEST_AllNops_EvaluateAbsolute
 	
 	;; END OF TEST ;;
