@@ -12235,8 +12235,8 @@ TEST_AllNOPs:
 	LDY #$41
 	LDA #$40
 	.byte $04, $CA ; NOP <$CA
-	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test 2 [All NOP Instructions]: opcode $0C ;;;
@@ -12253,17 +12253,17 @@ TEST_AllNOPs:
 	LDY #$41
 	LDA #$40
 	.byte $14, $CA ; NOP <$CA, X
-	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test 4 [All NOP Instructions]: opcode $1A ;;;
 	LDY #$42
 	LDA #$40
 	.byte $1A ; NOP (implied)
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
-	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
-	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test 5 [All NOP Instructions]: opcode $1C ;;;
@@ -12280,17 +12280,17 @@ TEST_AllNOPs:
 	LDY #$41
 	LDA #$40
 	.byte $34, $CA ; NOP <$CA, X
-	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test 7 [All NOP Instructions]: opcode $3A ;;;
 	LDY #$42
 	LDA #$40
 	.byte $3A ; NOP (implied)
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
-	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
-	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test 8 [All NOP Instructions]: opcode $3C ;;;
@@ -12307,16 +12307,16 @@ TEST_AllNOPs:
 	LDY #$41
 	LDA #$40
 	.byte $44, $CA ; NOP <$CA
-	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_Evaluate
 
 	;;; Test A [All NOP Instructions]: opcode $54 ;;;
 	LDY #$41
 	LDA #$40
 	.byte $54, $CA ; NOP <$CA, X
-	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test B [All NOP Instructions]: opcode $5A ;;;
@@ -12342,25 +12342,25 @@ TEST_AllNOPs:
 	LDY #$41
 	LDA #$40
 	.byte $64, $CA ; NOP <$CA
-	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test E [All NOP Instructions]: opcode $74 ;;;
 	LDY #$41
 	LDA #$40
 	.byte $74, $CA ; NOP <$CA, X
-	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test F [All NOP Instructions]: opcode $7A ;;;
 	LDY #$42
 	LDA #$40
 	.byte $7A ; NOP (implied)
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
-	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
-	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test G [All NOP Instructions]: opcode $7C ;;;
@@ -12377,49 +12377,49 @@ TEST_AllNOPs:
 	LDY #$41
 	LDA #$40
 	.byte $80, $CA ; NOP #CA
-	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test I [All NOP Instructions]: opcode $82 ;;;
 	LDY #$41
 	LDA #$40
 	.byte $82, $CA ; NOP #CA
-	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test J [All NOP Instructions]: opcode $89 ;;;
 	LDY #$41
 	LDA #$40
 	.byte $89, $CA ; NOP #CA
-	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test K [All NOP Instructions]: opcode $C2 ;;;
 	LDY #$41
 	LDA #$40
 	.byte $C2, $CA ; NOP #CA
-	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test L [All NOP Instructions]: opcode $D4 ;;;
 	LDY #$41
 	LDA #$40
 	.byte $D4, $CA ; NOP <$CA, X
-	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test M [All NOP Instructions]: opcode $DA ;;;
 	LDY #$42
 	LDA #$40
 	.byte $DA ; NOP (implied)
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
-	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
-	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test N [All NOP Instructions]: opcode $DC ;;;
@@ -12436,34 +12436,34 @@ TEST_AllNOPs:
 	LDY #$41
 	LDA #$40
 	.byte $E2, $CA ; NOP #CA
-	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test P [All NOP Instructions]: opcode $EA ;;;
 	LDY #$42
 	LDA #$40
 	.byte $EA ; NOP (implied)
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
-	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
-	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test Q [All NOP Instructions]: opcode $F4 ;;;
 	LDY #$41
 	LDA #$40
 	.byte $F4, $CA ; NOP <$CA, X
-	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test R [All NOP Instructions]: opcode $FA ;;;
 	LDY #$42
 	LDA #$40
 	.byte $FA ; NOP (implied)
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
-	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
-	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test S [All NOP Instructions]: opcode $FC ;;;
