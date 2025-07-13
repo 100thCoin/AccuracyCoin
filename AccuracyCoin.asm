@@ -12019,6 +12019,8 @@ TEST_AllNops_Evaluate:
 	.byte $F0, $03 ; BEQ +3 bytes
 	JMP TEST_AllNops_Evaluate_Y
 	TSX
+	INX
+	INX
 	CPX <Copy_SP
 	.byte $F0, $03 ; BEQ +3 bytes
 	JMP TEST_AllNops_Evaluate_SP
@@ -12048,6 +12050,8 @@ TEST_AllNops_EvaluateAbsolute:
 	.byte $F0, $03 ; BEQ +3 bytes
 	JMP TEST_AllNops_Evaluate_Y
 	TSX
+	INX
+	INX
 	CPX <Copy_SP
 	.byte $F0, $03 ; BEQ +3 bytes
 	JMP TEST_AllNops_Evaluate_SP
@@ -12057,6 +12061,7 @@ TEST_AllNops_EvaluateAbsolute:
 	INC <currentSubTest
 	JSR WaitForVBlank
 	LDA #0
+	TAX
 	RTS
 	
 TEST_AllNops_Evaluate_Flags:
