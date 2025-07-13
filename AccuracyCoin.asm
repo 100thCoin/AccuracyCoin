@@ -288,6 +288,7 @@ result_ControllerClocking = $47A
 result_OAM_Corruption = $47B
 
 result_JSREdgeCases = $47C
+result_AllNOPs = $47D
 
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
 result_PowOn_CPUReg = $03FD ; page 3 omits the test from the all-test-result-table.
@@ -507,6 +508,7 @@ Suite_CPUBehavior:
 	table "Dummy write cycles", 	 $FF, result_DummyWrites, TEST_DummyWrites
 	table "Open Bus", 				 $FF, result_OpenBus, TEST_OpenBus
 	table "Unofficial Instructions", $FF, result_UnofficialInstr, TEST_UnofficialInstructionsExist
+	table "All NOP instructions",	 $FF, result_AllNOPs, TEST_AllNOPs
 	.byte $FF
 	
 Suite_CPUInstructions:
@@ -721,7 +723,6 @@ Suite_CPUBehavior2:
 	table "Instruction Timing", 	 $FF, result_InstructionTiming, TEST_InstructionTiming
 	table "Implied Dummy Reads",	 $FF, result_ImpliedDummyRead, TEST_ImpliedDummyRead
 	table "JSR Edge Cases",			 $FF, result_JSREdgeCases,	TEST_JSREdgeCases
-	;table "All NOP instructions",	 $FF, result_JSREdgeCases,	TEST_JSREdgeCases
 	.byte $FF
 
 
@@ -11993,6 +11994,312 @@ TEST_JSREdgeCases_RAMCode:
 	JSR $4000
 	PLA
 	LDX #1
+	RTS
+;;;;;;;
+
+TEST_AllNops_Evaluate:
+	PHP
+	STA <Copy_A
+	PLA
+	CMP <$51
+	.byte $F0, $03 ; BEQ +3 bytes
+	JMP TEST_AllNops_Evaluate_Flags
+	LDA #$5A
+	CMP <$CA
+	.byte $F0, $03 ; BEQ +3 bytes
+	JMP TEST_AllNops_Evaluate_Memory
+	LDA <Copy_A
+	CMP #0
+	.byte $F0, $03 ; BEQ +3 bytes
+	JMP TEST_AllNops_Evaluate_A
+	CPX #0
+	.byte $F0, $03 ; BEQ +3 bytes
+	JMP TEST_AllNops_Evaluate_X
+	CPY #0
+	.byte $F0, $03 ; BEQ +3 bytes
+	JMP TEST_AllNops_Evaluate_Y
+	TSX
+	CPX <Copy_SP
+	.byte $F0, $03 ; BEQ +3 bytes
+	JMP TEST_AllNops_Evaluate_SP
+	INC <currentSubTest
+	LDX #0
+	RTS
+	
+TEST_AllNops_EvaluateAbsolute:
+	PHP
+	STA <Copy_A
+	PLA
+	CMP <$51
+	.byte $F0, $03 ; BEQ +3 bytes
+	JMP TEST_AllNops_Evaluate_Flags
+	LDA #$5A
+	CMP <$CA
+	.byte $F0, $03 ; BEQ +3 bytes
+	JMP TEST_AllNops_Evaluate_Memory
+	LDA <Copy_A
+	CMP #0
+	.byte $F0, $03 ; BEQ +3 bytes
+	JMP TEST_AllNops_Evaluate_A
+	CPX #0
+	.byte $F0, $03 ; BEQ +3 bytes
+	JMP TEST_AllNops_Evaluate_X
+	CPY #0
+	.byte $F0, $03 ; BEQ +3 bytes
+	JMP TEST_AllNops_Evaluate_Y
+	TSX
+	CPX <Copy_SP
+	.byte $F0, $03 ; BEQ +3 bytes
+	JMP TEST_AllNops_Evaluate_SP
+	LDA $2002
+	.byte $10, $03 ; BPL +3 bytes
+	JMP TEST_AllNops_Evaluate_Dummy
+	INC <currentSubTest
+	JSR WaitForVBlank
+	LDA #0
+	RTS
+	
+TEST_AllNops_Evaluate_Flags:
+	LDA <RunningAllTests
+	BNE TEST_AllNops_Evaluate_Flags_Skip
+	LDA #0
+	STA <dontSetPointer
+	JSR WaitForVBlank
+	JSR PrintTextCentered
+	.word $2370
+	.byte "NOP modified flags.", $FF
+	JSR ResetScroll
+TEST_AllNops_Evaluate_Flags_Skip:
+	JMP TEST_AllNops_Evaluate_Fail
+	
+TEST_AllNops_Evaluate_Memory:
+	LDA <RunningAllTests
+	BNE TEST_AllNops_Evaluate_Mem_Skip
+	LDA #0
+	STA <dontSetPointer
+	JSR WaitForVBlank
+	JSR PrintTextCentered
+	.word $2370
+	.byte "NOP wrote to RAM.", $FF
+	JSR ResetScroll
+TEST_AllNops_Evaluate_Mem_Skip:
+	JMP TEST_AllNops_Evaluate_Fail
+	
+TEST_AllNops_Evaluate_A:
+	LDA <RunningAllTests
+	BNE TEST_AllNops_Evaluate_A_Skip
+	LDA #0
+	STA <dontSetPointer
+	JSR WaitForVBlank
+	JSR PrintTextCentered
+	.word $2370
+	.byte "NOP updated A.", $FF
+	JSR ResetScroll
+TEST_AllNops_Evaluate_A_Skip:
+	JMP TEST_AllNops_Evaluate_Fail
+	
+TEST_AllNops_Evaluate_X:
+	LDA <RunningAllTests
+	BNE TEST_AllNops_Evaluate_X_Skip
+	LDA #0
+	STA <dontSetPointer
+	JSR WaitForVBlank
+	CPX #$FF
+	BEQ TEST_AllNops_Evaluate_WrongOperands
+	JSR PrintTextCentered
+	.word $2370
+	.byte "NOP updated X.", $FF
+	JSR ResetScroll
+TEST_AllNops_Evaluate_X_Skip:
+	JMP TEST_AllNops_Evaluate_Fail
+
+TEST_AllNops_Evaluate_WrongOperands:
+	JSR PrintTextCentered
+	.word $2370
+	.byte "NOP was wrong size.", $FF ; This NOP did not have the correct amount of operand bytes
+	JSR ResetScroll
+	JMP TEST_AllNops_Evaluate_Fail
+
+TEST_AllNops_Evaluate_Y:
+	LDA <RunningAllTests
+	BNE TEST_AllNops_Evaluate_Y_Skip
+	LDA #0
+	STA <dontSetPointer
+	JSR WaitForVBlank
+	JSR PrintTextCentered
+	.word $2370
+	.byte "NOP updated Y.", $FF
+	JSR ResetScroll
+TEST_AllNops_Evaluate_Y_Skip:
+	JMP TEST_AllNops_Evaluate_Fail
+	
+TEST_AllNops_Evaluate_SP:
+	LDA <RunningAllTests
+	BNE TEST_AllNops_Evaluate_SP_Skip
+	LDA #0
+	STA <dontSetPointer
+	JSR WaitForVBlank
+	JSR PrintTextCentered
+	.word $2370
+	.byte "NOP updated Stack P.", $FF
+	JSR ResetScroll
+TEST_AllNops_Evaluate_SP_Skip:
+	LDX <Copy_SP
+	DEX
+	DEX
+	TXS
+	JMP TEST_AllNops_Evaluate_Fail
+	
+TEST_AllNops_Evaluate_Dummy:
+	LDA <RunningAllTests
+	BNE TEST_AllNops_Evaluate_Dum_Skip
+	LDA #0
+	STA <dontSetPointer
+	JSR WaitForVBlank
+	JSR PrintTextCentered
+	.word $2370
+	.byte "NOP must dummy read.", $FF
+	JSR ResetScroll
+TEST_AllNops_Evaluate_Dum_Skip:
+	JMP TEST_AllNops_Evaluate_Fail
+	
+TEST_AllNops_Evaluate_Fail
+	PLA
+	PLA
+	JMP TEST_Fail	
+
+TEST_AllNOPs:
+	; run some thorough tests on all unofficial NOP instructions.
+	LDA #$5A
+	STA <$CA ; #$5A at address $CA
+	
+	TSX
+	STX <Copy_SP
+	
+	LDA #0
+	TAX
+	TAY
+	
+	PHP
+	PLA
+	STA <$51 ; flags at address $51
+	
+	LDA #0
+	
+	;;; Test 1 [All NOP Instructions]: opcode $04 ;;;
+	.byte $04, $CA ; NOP <$CA
+	JSR TEST_AllNops_Evaluate
+	
+	;;; Test 2 [All NOP Instructions]: opcode $0C ;;;
+	.byte $0C, $CA, $3A ; NOP $3ACA (A mirror of $2002)
+	JSR TEST_AllNops_EvaluateAbsolute
+	
+	;;; Test 3 [All NOP Instructions]: opcode $14 ;;;
+	.byte $14, $CA ; NOP <$CA, X
+	JSR TEST_AllNops_Evaluate
+	
+	;;; Test 4 [All NOP Instructions]: opcode $1A ;;;
+	.byte $1A ; NOP (implied)
+	JSR TEST_AllNops_Evaluate
+	
+	;;; Test 5 [All NOP Instructions]: opcode $1C ;;;
+	.byte $1C, $CA, $3A ; NOP $3ACA, X (A mirror of $2002)
+	JSR TEST_AllNops_EvaluateAbsolute
+	
+	;;; Test 6 [All NOP Instructions]: opcode $34 ;;;
+	.byte $34, $CA ; NOP <$CA, X
+	JSR TEST_AllNops_Evaluate
+	
+	;;; Test 7 [All NOP Instructions]: opcode $3A ;;;
+	.byte $3A ; NOP (implied)
+	JSR TEST_AllNops_Evaluate
+	
+	;;; Test 8 [All NOP Instructions]: opcode $3C ;;;
+	.byte $3C, $CA, $3A ; NOP $3ACA, X (A mirror of $2002)
+	JSR TEST_AllNops_EvaluateAbsolute
+	
+	;;; Test 9 [All NOP Instructions]: opcode $44 ;;;
+	.byte $44, $CA ; NOP <$CA
+	JSR TEST_AllNops_Evaluate
+
+	;;; Test A [All NOP Instructions]: opcode $54 ;;;
+	.byte $54, $CA ; NOP <$CA, X
+	JSR TEST_AllNops_Evaluate
+	
+	;;; Test B [All NOP Instructions]: opcode $5A ;;;
+	.byte $5A ; NOP (implied)
+	JSR TEST_AllNops_Evaluate
+	
+	;;; Test C [All NOP Instructions]: opcode $5C ;;;
+	.byte $5C, $CA, $3A ; NOP $3ACA, X (A mirror of $2002)
+	JSR TEST_AllNops_EvaluateAbsolute
+	
+	;;; Test D [All NOP Instructions]: opcode $64 ;;;
+	.byte $64, $CA ; NOP <$CA
+	JSR TEST_AllNops_Evaluate
+	
+	;;; Test E [All NOP Instructions]: opcode $74 ;;;
+	.byte $74, $CA ; NOP <$CA, X
+	JSR TEST_AllNops_Evaluate
+	
+	;;; Test F [All NOP Instructions]: opcode $7A ;;;
+	.byte $7A ; NOP (implied)
+	JSR TEST_AllNops_Evaluate
+	
+	;;; Test G [All NOP Instructions]: opcode $7C ;;;
+	.byte $7C, $CA, $3A ; NOP $3ACA, X (A mirror of $2002)
+	JSR TEST_AllNops_EvaluateAbsolute
+	
+	;;; Test H [All NOP Instructions]: opcode $80 ;;;
+	.byte $80, $CA ; NOP #CA
+	JSR TEST_AllNops_Evaluate
+	
+	;;; Test I [All NOP Instructions]: opcode $82 ;;;
+	.byte $82, $CA ; NOP #CA
+	JSR TEST_AllNops_Evaluate
+	
+	;;; Test J [All NOP Instructions]: opcode $89 ;;;
+	.byte $89, $CA ; NOP #CA
+	JSR TEST_AllNops_Evaluate
+	
+	;;; Test K [All NOP Instructions]: opcode $C2 ;;;
+	.byte $C2, $CA ; NOP #CA
+	JSR TEST_AllNops_Evaluate
+	
+	;;; Test L [All NOP Instructions]: opcode $D4 ;;;
+	.byte $D4, $CA ; NOP <$CA, X
+	JSR TEST_AllNops_Evaluate
+	
+	;;; Test M [All NOP Instructions]: opcode $DA ;;;
+	.byte $DA ; NOP (implied)
+	JSR TEST_AllNops_Evaluate
+	
+	;;; Test N [All NOP Instructions]: opcode $DC ;;;
+	.byte $DC, $CA, $3A ; NOP $3ACA, X (A mirror of $2002)
+	JSR TEST_AllNops_EvaluateAbsolute
+	
+	;;; Test O [All NOP Instructions]: opcode $E2 ;;;
+	.byte $E2, $CA ; NOP #CA
+	JSR TEST_AllNops_Evaluate
+	
+	;;; Test P [All NOP Instructions]: opcode $EA ;;;
+	.byte $EA ; NOP (implied)
+	JSR TEST_AllNops_Evaluate
+	
+	;;; Test Q [All NOP Instructions]: opcode $F4 ;;;
+	.byte $F4, $CA ; NOP <$CA, X
+	JSR TEST_AllNops_Evaluate
+	
+	;;; Test R [All NOP Instructions]: opcode $FA ;;;
+	.byte $FA ; NOP (implied)
+	JSR TEST_AllNops_Evaluate
+	
+	;;; Test S [All NOP Instructions]: opcode $FC ;;;
+	.byte $FC, $CA, $3A ; NOP $3ACA, X (A mirror of $2002)
+	JSR TEST_AllNops_EvaluateAbsolute
+	
+	;; END OF TEST ;;
+	LDA #1
 	RTS
 ;;;;;;;
 

@@ -119,6 +119,37 @@ For more information, I recommend reading the fully commented assembly code for 
   L: Does DCP Absolute do vaguely what's expected of it?  
   M: Does AXS Immediate do vaguely what's expected of it?  
   L: Does ISC Absolute do vaguely what's expected of it?  
+  
+### All NOP Instructions
+  (See message printed on screen for more details)
+  1: Opcode $04 (NOP Zero Page) malfunctioned.  
+  2: Opcode $0C (NOP Absolute) malfunctioned.  
+  3: Opcode $14 (NOP Zero Page, X) malfunctioned.  
+  4: Opcode $1A (NOP Implied) malfunctioned.  
+  5: Opcode $1C (NOP Absolute, X) malfunctioned.  
+  6: Opcode $34 (NOP Zero Page, X) malfunctioned.  
+  7: Opcode $3A (NOP Implied) malfunctioned.  
+  8: Opcode $3C (NOP Absolute, X) malfunctioned.  
+  9: Opcode $44 (NOP Zero Page) malfunctioned.  
+  A: Opcode $54 (NOP Zero Page, X) malfunctioned.  
+  B: Opcode $5A (NOP Implied) malfunctioned.  
+  C: Opcode $5C (NOP Absolute, X) malfunctioned.  
+  D: Opcode $64 (NOP Zero Page) malfunctioned.  
+  E: Opcode $74 (NOP Zero Page, X) malfunctioned.  
+  F: Opcode $7A (NOP Implied) malfunctioned.  
+  G: Opcode $7C (NOP Absolute, X) malfunctioned. 
+  H: Opcode $80 (NOP Immediate) malfunctioned.  
+  I: Opcode $82 (NOP Immediate) malfunctioned.  
+  J: Opcode $89 (NOP Immediate) malfunctioned.  
+  K: Opcode $C2 (NOP Immediate) malfunctioned.  
+  L: Opcode $D4 (NOP Zero Page, X) malfunctioned.  
+  M: Opcode $DA (NOP Implied) malfunctioned.  
+  N: Opcode $DC (NOP Absolute, X) malfunctioned.  
+  O: Opcode $E2 (NOP Immediate) malfunctioned.  
+  P: Opcode $EA (NOP Implied) malfunctioned.  
+  Q: Opcode $F4 (NOP Zero Page, X) malfunctioned.  
+  R: Opcode $FA (NOP Implied) malfunctioned.  
+  S: Opcode $FC (NOP Absolute, X) malfunctioned.  
 
 ### Absolute Indexed Wraparound
   1: Absolute Indexed addressing did not read from the correct address.  
@@ -547,6 +578,11 @@ For more information, I recommend reading the fully commented assembly code for 
   V: BRK should perform a dummy read on cycle 2.  
   W: RTI should perform a dummy read on cycle 2.  
   X: RTS should perform a dummy read on cycle 2.  
+
+### JSR Edge Cases
+  1: Your emulator pushed the wrong value for the return address.  
+  2: Your emulator has incorrect open bus emulation.  
+  3: JSR should leave the value of the second operand on the data bus.
 
 # Success Codes
 Some tests have multiple acceptable behaviors that are tested for in this ROM. The behavior used will either be printed on screen after running the test, or you'll see a "success code" on the all-test table.  
