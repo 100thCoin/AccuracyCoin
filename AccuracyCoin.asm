@@ -11987,8 +11987,7 @@ TEST_JSREdgeCases_RAMCodeLoop:
 	RTS
 ;;;;;;;
 	
-	
-TEST_JSREdgeCases_RAMCode:
+TEST_JSREdgeCases_RAMCode: ; The following code gets copied to RAM.
 	LDA #$05
 	PHA
 	JSR $4000
@@ -11997,11 +11996,9 @@ TEST_JSREdgeCases_RAMCode:
 	RTS
 ;;;;;;;
 
-TEST_AllNops_Evaluate:
-	PHP
-	STA <Copy_A
-	PLA
-	CMP <$51
+TEST_AllNops_Evaluate:	; This just checks a bunch of variables to make sure the NOP instruction didn't modify any of them.
+	LDA <$52 ; Read the copy of the flags
+	CMP <$51 ; and compare with the expected results.
 	.byte $F0, $03 ; BEQ +3 bytes
 	JMP TEST_AllNops_Evaluate_Flags
 	LDA <$CA
@@ -12010,13 +12007,13 @@ TEST_AllNops_Evaluate:
 	.byte $F0, $03 ; BEQ +3 bytes
 	JMP TEST_AllNops_Evaluate_Memory
 	LDA <Copy_A
-	CMP #0
+	CMP #$40
 	.byte $F0, $03 ; BEQ +3 bytes
 	JMP TEST_AllNops_Evaluate_A
-	CPX #0
+	CPX #$40
 	.byte $F0, $03 ; BEQ +3 bytes
 	JMP TEST_AllNops_Evaluate_X
-	CPY #0
+	CPY #$40
 	.byte $F0, $03 ; BEQ +3 bytes
 	JMP TEST_AllNops_Evaluate_Y
 	TSX
@@ -12026,14 +12023,13 @@ TEST_AllNops_Evaluate:
 	.byte $F0, $03 ; BEQ +3 bytes
 	JMP TEST_AllNops_Evaluate_SP
 	INC <currentSubTest
-	LDX #0
+	LDX #$40
 	RTS
-	
-TEST_AllNops_EvaluateAbsolute:
-	PHP
-	STA <Copy_A
-	PLA
-	CMP <$51
+;;;;;;;
+
+TEST_AllNops_EvaluateAbsolute: ; This does the same thing as TEST_AllNops_Evaluate, but it checks a different address and confirms PPU VBlank flag was modified.
+	LDA <$52 ; Read the copy of the flags
+	CMP <$51 ; and compare with the expected results.
 	.byte $F0, $03 ; BEQ +3 bytes
 	JMP TEST_AllNops_Evaluate_Flags
 	LDA $02EA
@@ -12042,13 +12038,13 @@ TEST_AllNops_EvaluateAbsolute:
 	.byte $F0, $03 ; BEQ +3 bytes
 	JMP TEST_AllNops_Evaluate_Memory
 	LDA <Copy_A
-	CMP #0
+	CMP #$40
 	.byte $F0, $03 ; BEQ +3 bytes
 	JMP TEST_AllNops_Evaluate_A
-	CPX #0
+	CPX #$40
 	.byte $F0, $03 ; BEQ +3 bytes
 	JMP TEST_AllNops_Evaluate_X
-	CPY #0
+	CPY #$40
 	.byte $F0, $03 ; BEQ +3 bytes
 	JMP TEST_AllNops_Evaluate_Y
 	TSX
@@ -12061,265 +12057,423 @@ TEST_AllNops_EvaluateAbsolute:
 	.byte $10, $03 ; BPL +3 bytes
 	JMP TEST_AllNops_Evaluate_Dummy
 	INC <currentSubTest
-	JSR WaitForVBlank
-	LDA #0
+	LDA #$40
 	TAX
 	RTS
-	
-TEST_AllNops_Evaluate_Flags:
+;;;;;;;
+
+TEST_AllNops_Evaluate_Flags: 				; If this is executed, NOP updated the CPU status flags.
 	LDA <RunningAllTests
-	BNE TEST_AllNops_Evaluate_Flags_Skip
+	BNE TEST_AllNops_Evaluate_Flags_Skip 	; Skip drawing to the screen if this is running for the all-test-menu.
 	LDA #0
-	STA <dontSetPointer
-	JSR WaitForVBlank
-	JSR PrintTextCentered
+	STA <dontSetPointer						; make sure the PrintTextCentered uses 2 bytes to the value of the v register.
+	JSR WaitForVBlank						; Wait for vblank so we're not updating the nametable out of vblank.
+	JSR PrintTextCentered 					; And write the following message to address $2370.
 	.word $2370
 	.byte "NOP modified flags.", $FF
-	JSR ResetScroll
+	JSR ResetScroll							; Reset scroll so the next frame doesn't look wrong.
 TEST_AllNops_Evaluate_Flags_Skip:
-	JMP TEST_AllNops_Evaluate_Fail
-	
-TEST_AllNops_Evaluate_Memory:
+	JMP TEST_AllNops_Evaluate_Fail			; and fail the test, removing two bytes from the stack, then getting the proper error code.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+TEST_AllNops_Evaluate_Memory: 				; If this is executed, NOP updated a value in RAM.
 	LDA <RunningAllTests
-	BNE TEST_AllNops_Evaluate_Mem_Skip
+	BNE TEST_AllNops_Evaluate_Mem_Skip 		; Skip drawing to the screen if this is running for the all-test-menu.
 	LDA #0
-	STA <dontSetPointer
-	JSR WaitForVBlank
-	JSR PrintTextCentered
+	STA <dontSetPointer						; make sure the PrintTextCentered uses 2 bytes to the value of the v register.
+	JSR WaitForVBlank						; Wait for vblank so we're not updating the nametable out of vblank.
+	JSR PrintTextCentered 					; And write the following message to address $2370.
 	.word $2370
 	.byte "NOP wrote to RAM.", $FF
-	JSR ResetScroll
+	JSR ResetScroll							; Reset scroll so the next frame doesn't look wrong.
 TEST_AllNops_Evaluate_Mem_Skip:
-	JMP TEST_AllNops_Evaluate_Fail
-	
-TEST_AllNops_Evaluate_A:
+	JMP TEST_AllNops_Evaluate_Fail			; and fail the test, removing two bytes from the stack, then getting the proper error code.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+TEST_AllNops_Evaluate_A: 					; If this is executed, NOP updated the A register.
 	LDA <RunningAllTests
-	BNE TEST_AllNops_Evaluate_A_Skip
+	BNE TEST_AllNops_Evaluate_A_Skip 		; Skip drawing to the screen if this is running for the all-test-menu.
 	LDA #0
-	STA <dontSetPointer
-	JSR WaitForVBlank
-	JSR PrintTextCentered
+	STA <dontSetPointer						; make sure the PrintTextCentered uses 2 bytes to the value of the v register.
+	JSR WaitForVBlank						; Wait for vblank so we're not updating the nametable out of vblank.
+	JSR PrintTextCentered 					; And write the following message to address $2370.
 	.word $2370
 	.byte "NOP updated A.", $FF
-	JSR ResetScroll
+	JSR ResetScroll							; Reset scroll so the next frame doesn't look wrong.
 TEST_AllNops_Evaluate_A_Skip:
-	JMP TEST_AllNops_Evaluate_Fail
-	
-TEST_AllNops_Evaluate_X:
+	JMP TEST_AllNops_Evaluate_Fail			; and fail the test, removing two bytes from the stack, then getting the proper error code.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+TEST_AllNops_Evaluate_X: 					; If this is executed, NOP updated the X register.
 	LDA <RunningAllTests
-	BNE TEST_AllNops_Evaluate_X_Skip
+	BNE TEST_AllNops_Evaluate_X_Skip 		; Skip drawing to the screen if this is running for the all-test-menu.
 	LDA #0
-	STA <dontSetPointer
-	JSR WaitForVBlank
-	CPX #$FF
-	BEQ TEST_AllNops_Evaluate_WrongOperands
-	CPX #$FE
-	BEQ TEST_AllNops_Evaluate_WrongOperands
-	JSR PrintTextCentered
+	STA <dontSetPointer						; make sure the PrintTextCentered uses 2 bytes to the value of the v register.
+	JSR WaitForVBlank						; Wait for vblank so we're not updating the nametable out of vblank.
+	CPX #$3F
+	BEQ TEST_AllNops_Evaluate_WrongOperands ; If X == FF, this instruction had the wrong number of operands.
+	CPX #$3E
+	BEQ TEST_AllNops_Evaluate_WrongOperands ; If X == FE, this instruction had the wrong number of operands.
+	JSR PrintTextCentered 					; And write the following message to address $2370.
 	.word $2370
 	.byte "NOP updated X.", $FF
-	JSR ResetScroll
+	JSR ResetScroll							; Reset scroll so the next frame doesn't look wrong.
 TEST_AllNops_Evaluate_X_Skip:
-	JMP TEST_AllNops_Evaluate_Fail
+	JMP TEST_AllNops_Evaluate_Fail			; and fail the test, removing two bytes from the stack, then getting the proper error code.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-TEST_AllNops_Evaluate_WrongOperands:
-	JSR PrintTextCentered
+TEST_AllNops_Evaluate_WrongOperands: 		; If this is executed, NOP had the wrong number of operands.
+	JSR PrintTextCentered 					; And write the following message to address $2370.
 	.word $2370
-	.byte "NOP was wrong size.", $FF ; This NOP did not have the correct amount of operand bytes
-	JSR ResetScroll
-	JMP TEST_AllNops_Evaluate_Fail
+	.byte "NOP was wrong size.", $FF 		; This NOP did not have the correct amount of operand bytes
+	JSR ResetScroll							; Reset scroll so the next frame doesn't look wrong.
+	JMP TEST_AllNops_Evaluate_Fail			; and fail the test, removing two bytes from the stack, then getting the proper error code.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-TEST_AllNops_Evaluate_Y:
+TEST_AllNops_Evaluate_Y: 					; If this is executed, NOP updated the Y register.
 	LDA <RunningAllTests
-	BNE TEST_AllNops_Evaluate_Y_Skip
+	BNE TEST_AllNops_Evaluate_Y_Skip 		; Skip drawing to the screen if this is running for the all-test-menu.
 	LDA #0
-	STA <dontSetPointer
-	JSR WaitForVBlank
-	JSR PrintTextCentered
+	STA <dontSetPointer						; make sure the PrintTextCentered uses 2 bytes to the value of the v register.
+	JSR WaitForVBlank						; Wait for vblank so we're not updating the nametable out of vblank.
+	CPY #$41
+	BEQ TEST_AllNops_Evaluate_WrongOperands	; If Y == 1, this instruction had the wrong number of operands.
+	CPY #$42
+	BEQ TEST_AllNops_Evaluate_WrongOperands	; If Y == 2, this instruction had the wrong number of operands.
+	JSR PrintTextCentered 					; And write the following message to address $2370.
 	.word $2370
 	.byte "NOP updated Y.", $FF
-	JSR ResetScroll
+	JSR ResetScroll							; Reset scroll so the next frame doesn't look wrong.
 TEST_AllNops_Evaluate_Y_Skip:
-	JMP TEST_AllNops_Evaluate_Fail
-	
-TEST_AllNops_Evaluate_SP:
+	JMP TEST_AllNops_Evaluate_Fail			; and fail the test, removing two bytes from the stack, then getting the proper error code.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+TEST_AllNops_Evaluate_SP: 					; If this is executed, NOP updated the Stack Pointer.
 	LDA <RunningAllTests
-	BNE TEST_AllNops_Evaluate_SP_Skip
+	BNE TEST_AllNops_Evaluate_SP_Skip 		; Skip drawing to the screen if this is running for the all-test-menu.
 	LDA #0
-	STA <dontSetPointer
-	JSR WaitForVBlank
-	JSR PrintTextCentered
+	STA <dontSetPointer						; make sure the PrintTextCentered uses 2 bytes to the value of the v register.
+	JSR WaitForVBlank						; Wait for vblank so we're not updating the nametable out of vblank.
+	JSR PrintTextCentered 					; And write the following message to address $2370.
 	.word $2370
 	.byte "NOP updated Stack P.", $FF
-	JSR ResetScroll
+	JSR ResetScroll							; Reset scroll so the next frame doesn't look wrong.
 TEST_AllNops_Evaluate_SP_Skip:
 	LDX <Copy_SP
 	DEX
 	DEX
 	TXS
-	JMP TEST_AllNops_Evaluate_Fail
-	
-TEST_AllNops_Evaluate_Dummy:
+	JMP TEST_AllNops_Evaluate_Fail			; and fail the test, removing two bytes from the stack, then getting the proper error code.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+TEST_AllNops_Evaluate_Dummy: 				; If this is executed, NOP did not dummy read $2002.
 	LDA <RunningAllTests
-	BNE TEST_AllNops_Evaluate_Dum_Skip
+	BNE TEST_AllNops_Evaluate_Dum_Skip 		; Skip drawing to the screen if this is running for the all-test-menu.
 	LDA #0
-	STA <dontSetPointer
-	JSR WaitForVBlank
-	JSR PrintTextCentered
+	STA <dontSetPointer						; make sure the PrintTextCentered uses 2 bytes to the value of the v register.
+	JSR WaitForVBlank						; Wait for vblank so we're not updating the nametable out of vblank.
+	JSR PrintTextCentered 					; And write the following message to address $2370.
 	.word $2370
 	.byte "NOP must dummy read.", $FF
-	JSR ResetScroll
+	JSR ResetScroll							; Reset scroll so the next frame doesn't look wrong.
 TEST_AllNops_Evaluate_Dum_Skip:
-	JMP TEST_AllNops_Evaluate_Fail
-	
+	JMP TEST_AllNops_Evaluate_Fail			; and fail the test, removing two bytes from the stack, then getting the proper error code.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+TEST_AllNops_FixFlags:
+	LDA <$51
+	PHA
+	PLP
+	LDA #$40
+	RTS
+;;;;;;;
+
+TEST_AllNops_StoreFlags:
+	STA <Copy_A
+	PHP
+	PLA
+	STA <$52
+	RTS
+;;;;;;;
+
 TEST_AllNops_Evaluate_Fail
 	PLA
 	PLA
 	JMP TEST_Fail	
+;;;;;;;;;;;;;;;;;
 
 TEST_AllNOPs:
 	; run some thorough tests on all unofficial NOP instructions.
-	LDA #$5A
-	STA <$CA ; #$5A at address $CA
-	STA $02EA
-	TSX
-	STX <Copy_SP
+	; This test will verify that:
+	; NOP instructions have the correct number of operands.
+	; NOP does not update the CPU Status flags.
+	; NOP does not update the value in memory at the target address.
+	; NOP does not update the A register.
+	; NOP does not update the X register.
+	; NOP does not update the Y register.
+	; NOP does not update the Stack Pointer.
+	; NOP does perform a dummy read, which can update the PPU VBlank Flag.	
 	
-	LDA #0
+	LDA #$5A ; Magic number to be compared with after each test.
+	STA <$CA ; #$5A at address $CA
+	STA $02EA; #$5A at address $02EA
+	TSX
+	STX <Copy_SP ; Make a copy of the stack pointer to be checked after each NOP as well.
+	; Though I can't imagine anybody would unknowingly make a NOP instruction update the stack pointer, ha!
+	
+	LDA #$40 ; Set A, X, and Y to zero
 	TAX
 	TAY
 	
-	PHP
+	PHP ; And store a copy of the status flags at address $51
 	PLA
 	STA <$51 ; flags at address $51
 	
-	LDA #0
+	LDA #$40	; Initialize A to zero for the test.
 	
 	;;; Test 1 [All NOP Instructions]: opcode $04 ;;;
+	LDY #$41
+	LDA #$40
 	.byte $04, $CA ; NOP <$CA
-	NOP
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test 2 [All NOP Instructions]: opcode $0C ;;;
+	JSR WaitForVBlank	; This test checks if NOP $2002 will update the PPU Vblank Flag.
+	JSR Clockslide_29780; So we need to wait an additional frame.
+	JSR TEST_AllNops_FixFlags ; Fix flags that were changed by WaitForVBlank and Clockslide_29780.
 	.byte $0C, $EA, $3A ; NOP $3ACA (A mirror of $2002)
 	.byte $0C, $EA, $1A ; NOP $1ACA (A mirror of $02CA)
-	.byte $0C, $CA, $CA ; NOP $CACA
+	.byte $0C, $CA, $CA ; NOP $CACA (This is to veify the correct number of operands. $CA is the DEX instruction.)
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_EvaluateAbsolute
 	
 	;;; Test 3 [All NOP Instructions]: opcode $14 ;;;
+	LDY #$41
+	LDA #$40
 	.byte $14, $CA ; NOP <$CA, X
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test 4 [All NOP Instructions]: opcode $1A ;;;
+	LDY #$42
+	LDA #$40
 	.byte $1A ; NOP (implied)
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test 5 [All NOP Instructions]: opcode $1C ;;;
+	JSR WaitForVBlank	; This test checks if NOP $2002 will update the PPU Vblank Flag.
+	JSR Clockslide_29780; So we need to wait an additional frame.
+	JSR TEST_AllNops_FixFlags ; Fix flags that were changed by WaitForVBlank and Clockslide_29780.
 	.byte $1C, $EA, $3A ; NOP $3ACA, X (A mirror of $2002)
 	.byte $1C, $EA, $1A ; NOP $1ACA, X (A mirror of $02CA)
-	.byte $1C, $CA, $CA ; NOP $CACA, X
+	.byte $1C, $CA, $CA ; NOP $CACA, X (This is to veify the correct number of operands. $CA is the DEX instruction.)
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_EvaluateAbsolute
 	
 	;;; Test 6 [All NOP Instructions]: opcode $34 ;;;
+	LDY #$41
+	LDA #$40
 	.byte $34, $CA ; NOP <$CA, X
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test 7 [All NOP Instructions]: opcode $3A ;;;
+	LDY #$42
+	LDA #$40
 	.byte $3A ; NOP (implied)
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test 8 [All NOP Instructions]: opcode $3C ;;;
+	JSR WaitForVBlank	; This test checks if NOP $2002 will update the PPU Vblank Flag.
+	JSR Clockslide_29780; So we need to wait an additional frame.
+	JSR TEST_AllNops_FixFlags ; Fix flags that were changed by WaitForVBlank and Clockslide_29780.
 	.byte $3C, $EA, $3A ; NOP $3ACA, X (A mirror of $2002)
 	.byte $3C, $EA, $1A ; NOP $1ACA, X (A mirror of $02CA)
-	.byte $3C, $CA, $CA ; NOP $CACA, X
+	.byte $3C, $CA, $CA ; NOP $CACA, X (This is to veify the correct number of operands. $CA is the DEX instruction.)
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_EvaluateAbsolute
 	
 	;;; Test 9 [All NOP Instructions]: opcode $44 ;;;
+	LDY #$41
+	LDA #$40
 	.byte $44, $CA ; NOP <$CA
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 
 	;;; Test A [All NOP Instructions]: opcode $54 ;;;
+	LDY #$41
+	LDA #$40
 	.byte $54, $CA ; NOP <$CA, X
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test B [All NOP Instructions]: opcode $5A ;;;
+	LDY #$42
+	LDA #$40
 	.byte $5A ; NOP (implied)
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test C [All NOP Instructions]: opcode $5C ;;;
+	JSR WaitForVBlank	; This test checks if NOP $2002 will update the PPU Vblank Flag.
+	JSR Clockslide_29780; So we need to wait an additional frame.
+	JSR TEST_AllNops_FixFlags ; Fix flags that were changed by WaitForVBlank and Clockslide_29780.
 	.byte $5C, $EA, $3A ; NOP $3ACA, X (A mirror of $2002)
 	.byte $5C, $EA, $1A ; NOP $1ACA, X (A mirror of $02CA)
-	.byte $5C, $CA, $CA ; NOP $CACA, X
+	.byte $5C, $CA, $CA ; NOP $CACA, X (This is to veify the correct number of operands. $CA is the DEX instruction.)
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_EvaluateAbsolute
 	
 	;;; Test D [All NOP Instructions]: opcode $64 ;;;
+	LDY #$41
+	LDA #$40
 	.byte $64, $CA ; NOP <$CA
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test E [All NOP Instructions]: opcode $74 ;;;
+	LDY #$41
+	LDA #$40
 	.byte $74, $CA ; NOP <$CA, X
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test F [All NOP Instructions]: opcode $7A ;;;
+	LDY #$42
+	LDA #$40
 	.byte $7A ; NOP (implied)
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test G [All NOP Instructions]: opcode $7C ;;;
+	JSR WaitForVBlank	; This test checks if NOP $2002 will update the PPU Vblank Flag.
+	JSR Clockslide_29780; So we need to wait an additional frame.
+	JSR TEST_AllNops_FixFlags ; Fix flags that were changed by WaitForVBlank and Clockslide_29780.
 	.byte $7C, $EA, $3A ; NOP $3ACA, X (A mirror of $2002)
 	.byte $7C, $EA, $1A ; NOP $1ACA, X (A mirror of $02CA)
-	.byte $7C, $CA, $CA ; NOP $CACA, X
+	.byte $7C, $CA, $CA ; NOP $CACA, X (This is to veify the correct number of operands. $CA is the DEX instruction.)
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_EvaluateAbsolute
 	
 	;;; Test H [All NOP Instructions]: opcode $80 ;;;
+	LDY #$41
+	LDA #$40
 	.byte $80, $CA ; NOP #CA
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test I [All NOP Instructions]: opcode $82 ;;;
+	LDY #$41
+	LDA #$40
 	.byte $82, $CA ; NOP #CA
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test J [All NOP Instructions]: opcode $89 ;;;
+	LDY #$41
+	LDA #$40
 	.byte $89, $CA ; NOP #CA
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test K [All NOP Instructions]: opcode $C2 ;;;
+	LDY #$41
+	LDA #$40
 	.byte $C2, $CA ; NOP #CA
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test L [All NOP Instructions]: opcode $D4 ;;;
+	LDY #$41
+	LDA #$40
 	.byte $D4, $CA ; NOP <$CA, X
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test M [All NOP Instructions]: opcode $DA ;;;
+	LDY #$42
+	LDA #$40
 	.byte $DA ; NOP (implied)
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test N [All NOP Instructions]: opcode $DC ;;;
+	JSR WaitForVBlank	; This test checks if NOP $2002 will update the PPU Vblank Flag.
+	JSR Clockslide_29780; So we need to wait an additional frame.
+	JSR TEST_AllNops_FixFlags ; Fix flags that were changed by WaitForVBlank and Clockslide_29780.
 	.byte $DC, $EA, $3A ; NOP $3ACA, X (A mirror of $2002)
 	.byte $DC, $EA, $1A ; NOP $1ACA, X (A mirror of $02CA)
-	.byte $DC, $CA, $CA ; NOP $CACA, X
+	.byte $DC, $CA, $CA ; NOP $CACA, X (This is to veify the correct number of operands. $CA is the DEX instruction.)
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_EvaluateAbsolute
 	
 	;;; Test O [All NOP Instructions]: opcode $E2 ;;;
+	LDY #$41
+	LDA #$40
 	.byte $E2, $CA ; NOP #CA
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test P [All NOP Instructions]: opcode $EA ;;;
+	LDY #$42
+	LDA #$40
 	.byte $EA ; NOP (implied)
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test Q [All NOP Instructions]: opcode $F4 ;;;
+	LDY #$41
+	LDA #$40
 	.byte $F4, $CA ; NOP <$CA, X
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test R [All NOP Instructions]: opcode $FA ;;;
+	LDY #$42
+	LDA #$40
 	.byte $FA ; NOP (implied)
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
+	DEY	; With the wrong number of operands, X is decremented, and Y will be non-zero.
 	JSR TEST_AllNops_Evaluate
 	
 	;;; Test S [All NOP Instructions]: opcode $FC ;;;
+	JSR WaitForVBlank	; This test checks if NOP $2002 will update the PPU Vblank Flag.
+	JSR Clockslide_29780; So we need to wait an additional frame.
+	JSR TEST_AllNops_FixFlags ; Fix flags that were changed by WaitForVBlank and Clockslide_29780.
 	.byte $FC, $EA, $3A ; NOP $3ACA, X (A mirror of $2002)
 	.byte $FC, $EA, $1A ; NOP $1ACA, X (A mirror of $02CA)
-	.byte $FC, $CA, $CA ; NOP $CACA, X
+	.byte $FC, $CA, $CA ; NOP $CACA, X (This is to veify the correct number of operands. $CA is the DEX instruction.)
+	JSR TEST_AllNops_StoreFlags ; Store flags to be read during evaluation.
 	JSR TEST_AllNops_EvaluateAbsolute
 	
 	;; END OF TEST ;;
