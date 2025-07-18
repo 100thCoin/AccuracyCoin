@@ -39,8 +39,8 @@ dontSetPointer = $7
 byte8 = $8
 byte9 = $9
 
-byteF = $F; immediate use. Store something here and use it in the same function. If a JSR happens, assume this value is stale.
-currentSubTest = $10
+byteF = $F
+ErrorCode = $10
 initialSubTest = $11
 result_DMADMASync_PreTest = $12
 menuTabXPos = $14
@@ -139,6 +139,8 @@ PowerOn_SP = $373
 PowerOn_P = $374
 
 PowerOn_MagicNumber = $3F0
+
+;$400 to $4FF is where I store the results of the tests.
 
 result_Unimplemented = $0400
 result_CPUInstr = $0401
@@ -290,6 +292,9 @@ result_OAM_Corruption = $47B
 result_JSREdgeCases = $47C
 result_AllNOPs = $47D
 
+result_PaletteRAMQuirks = $47E
+
+
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
 result_PowOn_CPUReg = $03FD ; page 3 omits the test from the all-test-result-table.
 result_PowOn_PPURAM = $03FE ; page 3 omits the test from the all-test-result-table.
@@ -306,90 +311,100 @@ result_PowOn_PPUReset = $0418
 OpenBusTestFakedOpenBusBehavior:
 	NOP	; An incorrect implementation of open bus might execute all the way to here from address $5000.
 	NOP	; The two NOPS are for alignment, and this BRK takes the PC to some "test failed" handler.
-	BRK	;
+	BRK	; Pushes 3 bytes to the stack, and moves the PC to the address determined by $FFFE, which is address $0600.
 	
 CannotWriteToROM_01:
 	.byte $01; This value is used in the "Cannot write to ROM" test.
 	
 RESET:	; This ROM, despite the guidance of the NesDev Wiki's "startup code", writes a bunch of uninitialized registers, and reads uninitialized RAM. Intentionally.
-	STA <$00
-	PHP
-	PLA
-	AND #$CF
-	STA <$01
-	LDA PowerOn_MagicNumber
-	CMP #$5A
-	BEQ RESET_SkipPowerOnTests
-	LDA <$00
-	STA PowerOn_A	; For use in TEST_PowerOnState_CPU_Registers
-	STY PowerOn_Y
-	STX PowerOn_X
-	TSX
-	STX PowerOn_SP
-	LDA <$01
-	STA PowerOn_P
+	STA <$00		; First thing we do at power on is store A to address $00 as a temporary place to hold it. This does not modify the CPU flags.
+	PHP				; Push the processor flags...
+	PLA				; ... and pull them off.
+	AND #$CF		; Remove the B flag, and other garbage flag.
+	STA <$01		; And store this somewhere temporary.
+	LDA PowerOn_MagicNumber	; Before we store these to the "test results", let's verify this is a cold boot and not a warm boot.
+	CMP #$5A		; Assume a cold boot won't have this valeu here.
+	BEQ RESET_SkipPowerOnTests	; If the value was $5A, skip storing stuff to RAM.
+	LDA <$00		; Okay cool, it's a cold boot. Let's start storing some stuff. Copy the value we set aside...
+	STA PowerOn_A	; And store the value for use in TEST_PowerOnState_CPU_Registers
+	STY PowerOn_Y	; Ditto for the Y register.
+	STX PowerOn_X	; And the X register.
+	TSX				; Let's fetch the stack pointer...
+	STX PowerOn_SP	; And store it for that test.
+	LDA <$01		; We stored the flags here, so let's copy these...
+	STA PowerOn_P	; And paste it in RAM.
 RESET_SkipPowerOnTests:
 
-	SEI
-	CLD
+	SEI		 ; Time for some regular power on code. Fun fact: The I flag is already set at power on and when hitting reset. The CPU just does that. So this line isn't needed.
+	CLD		 ; Disable the Decimal Flag. Who knows, maybe you hit reset in the middle of the Decimal Flag test.
 	LDX #$EF ; Due to some tests modifying the stack pointer, it's convenient to put it at EF instead of FF.
 	TXS		 ; This prevents some tests where the resulting stack pointer is 00 from pushing data, and overwriting the bottom of the stack.
 	LDA #$40
-	STA $4017
+	STA $4017; Disable the APU Frame Counter IRQ.
 TEST_PPUResetFlag:
+	; All throughout this ROM, you will see me label the various tests like so:
+	; 3 semicolons, the error code that will appear if the test fails here, the name of the test in square brackets, then a description of what is being tested.
+	; Here's an example:
+	
 	;;; Test 1 [PPU Reset Flag]: Are PPU Registers writable before the first pre-render line? ;;;
 	; They shouldn't be, as that's the job of the PPU Reset Flag!
 	; Let's see if the PPU Reset flag exists.
 	LDA #$27
-	STA $2006 ; "magic address"
+	STA $2006 ; "magic address" (Writing to $2006 twice will update the 'v' register of the PPU)
 	LDA #$BF
-	STA $2006 ; PPUADDR = $27BF
-	LDA #$5A ; "magic number". All over this ROM, you will frequently see me using the value $5A for tests. That's 01011010 in binary, and I just assume that if something goes wrong, it won't stumble on that number by random chance.
+	STA $2006 ; 'v' = $27BF
+	LDA #$5A  ; "magic number". All over this ROM, you will frequently see me using the value $5A for tests. That's 01011010 in binary, and I just assume that if something goes wrong, it won't stumble on that number by random chance.
 	STA $2007
 	; Okay, I'll be back in 2 frames to check on you...
-	LDX #$FF
+	LDX #$FF  ; We're going to stall for VBlank, increment X, then X=0, so we're going to stall until next vblank yet again.
 	LDA $2002
 VblLoop:
-	LDA $2002
-	BPL VblLoop
-	INX
-	BEQ VblLoop
+	LDA $2002 ; This is PPU_STATUS. Bit 7 tells us if the PPU is current in VBlank or not.
+	BPL VblLoop ; So if bit 7 is 0 (we are not in VBlank) the Negative flag is not set, so "Branch of Plus" will be taken.
+	INX	; X++
+	BEQ VblLoop ; If X is zero, we do this again.
 	; Now that the PPU is responsive, let's copy the resting values.
-	LDA PowerOn_MagicNumber
-	CMP #$5A
-	BEQ PostResetFlagTest
+	LDA PowerOn_MagicNumber	; Check again if this is a cold or a warm boot.
+	CMP #$5A				
+	BEQ PostResetFlagTest	; If this is a warm boot, skip copying the uninitialized RAM and VRAM.
 
 	JSR Read32NametableBytes
 	JSR ReadPaletteRAM
 	
-	; Let's also see if the magic number was written, to verify if the reset flag exists.
-	; It's worth noting that in its current state, this test fails on my console.
+	; Let's also see if the magic number was written to VRAM, to verify if the reset flag exists.
+	; It's worth noting that in its current state, this test fails on my console. I assume this has something to do with the flash cart I'm using.
 	LDA #6
 	STA PowerOnTest_PPUReset ; set to FAIL (error code $1) by default. Overwrite with PASS if it passes.
 	LDA #$27
 	STA $2006
 	LDA #$BF
-	STA $2006
+	STA $2006 ; Set 'v' back to where we attempted to write our magic number.
 	LDA $2007 ; load buffer
 	LDA $2007 ; read buffer
 	CMP #$5A
-	BEQ PostResetFlagTest
+	BEQ PostResetFlagTest	; If A = $5A at this point, you fail the test since that means we wrote to VRAM before the ppu reset flag cleared. (Or uninitialed VRAM there was $5A?)
 	; The value of $5A was not written to VRAM, so the reset flag does exist!
 	LDA #1
 	STA PowerOnTest_PPUReset ; Store a passing result here.
-	;; End of test ;;
+	; I also indicate whenever a test is over with the following comment:
+	;; END OF TEST ;;		
 PostResetFlagTest:	
 	JSR DisableRendering
 	
-	; With those values copied for future reference, let's overwrite the nametable.
+	; With uninitialized values from VRAM and Palette RAM copied for future reference, let's overwrite the palette and nametable.
 	JSR SetUpDefaultPalette
 	JSR ClearNametable
-	JSR ClearRAMExceptPage3
+	JSR ClearRAMExceptPage3 ; Page 3 holds a copy of uninitialized RAM, VRAM, Palette RAM...
 	LDA #$5A
-	STA PowerOn_MagicNumber ; this is used to indicate that we pressed the reset button, so we should skip overwriting the power on test results.
-ReloadMainMenu:
+	STA PowerOn_MagicNumber ; At this point, let's write out magic number to RAM, indicating that any reset after this point is a warm boot.
+							; So now if the reset button is pressed, we skip writing to the results of TEST_PowerOnState_CPU_Registers, and skip running the PPU reset flag test.
+							; I guess that means you could hit the reset button at any point before this to ruin the results of those tests.
+							; I'm not sure why you would do that though...
+ReloadMainMenu: ; Theres an option to run every test in the ROM, and it draws a table of the results. This will run when exiting that screen with the table.
+	; If your emulator fails to reach the main menu of this ROM, check the value of address $EC.
+	; This can help inform you of specifically where your emulator hangs.
 	INC <Debug_EC ; 00 -> 01
-	JSR ClearPage2
+	JSR ClearPage2 ; Page 2 is used for OAM.
 	LDA #02
 	STA $4014 ; Set up OAM
 	
@@ -398,13 +413,18 @@ ReloadMainMenu:
 	INC <Debug_EC ; 01 -> 02
 	; set up the NMI routine.
 	JSR SetUpNMIRoutineForMainMenu
-	LDA #$20
+	
+	; Let's also verify that JSR is pushing the correct values to the stack.
+	; A handful of my subroutines pull off the values pushed by JSR, and use them to read data stored next to the JSR instruction.
+	; I need my code to still be able to load the menu even if the JSR return addresses are wrong.
+	; To verify this, I'll just put a JSR at address $0000, and jump there.
+	LDA #$20 ; JSR
 	STA <$00
 	LDA #Low(VerifyReturnAddressesAreCorrect)
 	STA <$01
 	LDA #High(VerifyReturnAddressesAreCorrect)
 	STA <$02
-	LDA #$60
+	LDA #$60 ; RTS
 	STA <$03
 	INC <Debug_EC ; 02 -> 03
 	JSR $0000 ; Verify return addresses pushed by JSR are correct.	
@@ -414,7 +434,7 @@ ReloadMainMenu:
 	STA <JSRFromRAM3
 	
 	LDA #0
-	STA $100 ; initialize the placeholder test results.
+	STA $100 ; initialize the placeholder test results. (While this ROM was in an early state, I had a list of tests I wanted to make, and stored all their results at $100)
 	; and also initialize the "print tests" results, as these tests use page 3, which is mostly uninitilized.
 	STA result_UnOp_Magic
 	STA result_PowOn_CPURAM
@@ -442,18 +462,19 @@ ReloadMainMenu:
 	LDA #High(Suite_CPUBehavior)
 	STA <suitePointer+1
 	INC <Debug_EC ; 06 -> 07
-	JSR LoadSuiteMenu
+	JSR LoadSuiteMenu	; Determine all the tests on the current page, and store the pointers in RAM.
 	INC <Debug_EC ; 07 -> 08
-	JSR DrawPageNumber
+	JSR DrawPageNumber	; Draw the correct page number at the top of the screen.
 	INC <Debug_EC ; 08 -> 09
-	JSR WaitForVBlank
+	JSR WaitForVBlank	; Stall until the PPU is in VBlank.
 	INC <Debug_EC ; 09 -> 0A
-	JSR ResetScroll
+	JSR ResetScroll		; Set the ppu 'v' and 't' registers to $2000, and reset the fine scroll values as well.
 	INC <Debug_EC ; 0A -> 0B
-	JSR EnableRendering_BG
+	JSR EnableRendering_BG; Enable rendering the background. (We don't need sprites here.)
 	INC <Debug_EC ; 0B -> 0C
-	JSR EnableNMI
+	JSR EnableNMI		; Enable the Non Maskable Interrupt.
 	INC <Debug_EC ; 0C -> 0D
+	; If your emulator hangs here, you probably haven't implemented the NMI?
 InfiniteLoop:
 	JMP InfiniteLoop	; This is the spinning loop while I wait for the NMI to occur.
 ;;;;;;;;;;;;;;;;;;;;
@@ -685,6 +706,7 @@ Suite_PPUBehavior:
 	table "PPU Register Mirroring",  $FF, result_PPURegMirror, TEST_PPURegMirroring
 	table "PPU Register Open Bus",	 $FF, result_PPUOpenBus, TEST_PPU_Open_Bus
 	table "PPU Read Buffer", $FF, result_PPUReadBuffer, TEST_PPUReadBuffer
+	table "Palette RAM Quirks", $FF, result_PaletteRAMQuirks, TEST_PaletteRAMQuirks
 	.byte $FF
 	
 	;; PPU VBL Timing ;;
@@ -715,7 +737,7 @@ Suite_SpriteZeroHits:
 Suite_PPUMisc:
 	.byte "PPU Misc.", $FF
 	table "RMW $2007 Extra Write", $FF, result_RMW2007, TEST_RMW2007
-	;table "Palette Corruption", $FF, result_Unimplemented, DebugTest
+	;table "Palette Corruption", $FF, result_Unimplemented, DebugTest (I did not write a test for this, because it relies on a specific cpu/ppu clock alignment.)
 	.byte $FF
 	
 Suite_CPUBehavior2:
@@ -735,14 +757,14 @@ AutomaticallyRunEveryTestInROM:   ; This function is used to run every test in t
 	LDA #1
 	STA <RunningAllTests          ; The "RunningAllTests" variable is used to prevent any graphical changes to the "running all tests screen".
 	JSR DisableNMI                ; Disable the NMI.
-	JSR DisableRendering
-	JSR ClearNametable
+	JSR DisableRendering		  ; Disable rendering.
+	JSR ClearNametable			  ; Clear the nametable.
 	LDA #0
 	STA <dontSetPointer
-	JSR PrintText
+	JSR PrintText				  ; Print "Running test 0" on screen.
 	.word $21E8
 	.byte "Running test 0", $FF
-	JSR ResetScroll
+	JSR ResetScroll				  ; And fix the PPU scroll.
 	LDY #0
 	STY <PostAllTestTally
 AutomaticallyRunEntireROM_Loop:
@@ -794,7 +816,7 @@ AERROP_RT_Skip:
 	JSR DisableRendering
 	JSR ClearPage2
 	LDA #1
-	STA <$10 ; this is "currentSubTest" but since all the tests are over, let's use this to count the number of sprites I'm adding to OAM. Set to 1 by default just to avoid sprite zero hits on the menu.
+	STA <$10 ; this is "ErrorCode" but since all the tests are over, let's use this to count the number of sprites I'm adding to OAM. Set to 1 by default just to avoid sprite zero hits on the menu.
 	LDA #0
 	STA <PostAllPassTally
 	STA <PostAllTestTally
@@ -1027,7 +1049,8 @@ PressStartToContinue:
 	JMP ReloadMainMenu
 PressStartToContinue_End:
 	RTI
-	
+;;;;;;;
+
 	.org $9200
 	
 DMASyncWith48:
@@ -1061,7 +1084,8 @@ DMASync48_Loop:
 	JSR Clockslide_50
 	NOP
 	CMP <$C9
-	RTS 
+	RTS
+;;;;;;;
 	
 DMASyncWith60:
 	; This fuction very relaibly exits with exactly 50 CPU cycles until the DMA occurs.
@@ -1094,7 +1118,8 @@ DMASync60_Loop:
 	JSR Clockslide_50
 	NOP
 	CMP <$C9
-	RTS 
+	RTS
+;;;;;;;
 	
 DMASyncWithA5:
 	; This fuction very relaibly exits with exactly 50 CPU cycles until the DMA occurs.
@@ -1127,7 +1152,8 @@ DMASyncA5_Loop:
 	JSR Clockslide_50
 	NOP
 	CMP <$C9
-	RTS 
+	RTS
+;;;;;;;
 	
 DMASyncWith68:
 	; This fuction very relaibly exits with exactly 50 CPU cycles until the DMA occurs.
@@ -1160,7 +1186,8 @@ DMASync68_Loop:
 	JSR Clockslide_50
 	NOP
 	CMP <$C9
-	RTS 
+	RTS
+;;;;;;;
 	
 VerifyReturnAddressesAreCorrect:
 	TSX
@@ -1171,16 +1198,17 @@ VerifyReturnAddressesAreCorrect:
 	SEC
 	SBC #02
 	STA <IncorrectReturnAddressOffset
-	RTS	
+	RTS
+;;;;;;;
 	
 	.bank 1
-	.org $A000
+	.org $A000	; This next line of code is located at address $A000 in the ROM.
 	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                 TESTS                   ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	
-DebugTest:
+DebugTest:  ; This test is no longer in use. It was a placeholder back when I had a list of tests I wanted to add, but had yet to write code for them.
 	LDA #02 ; FAIL! (Error code 0 will let me know the test isn't implemented yet, hence it ran DebugTest.)
 	RTS
 ;;;;;;;
@@ -1204,7 +1232,7 @@ TEST_RamMirroring:
 	LDA $1D80 ; Read from a mirror of $580
 	CMP #2
 	BNE TEST_Fail ; if any value other than 2 is read, that's a fail.
-	INC <currentSubTest 
+	INC <ErrorCode 
 	
 	;;; Test 2 [RAM Mirroring]: writing to mirrors. ;;;
 	; The description of test 1 only mentions reading from mirrors, but writing to them follows the exact same behavior.
@@ -1224,7 +1252,7 @@ TEST_RamMirroring:
 ;;;;;;;
 
 TEST_Fail:
-	LDA <currentSubTest
+	LDA <ErrorCode
 	ASL A
 	ASL A
 	ORA #02 ; Fail
@@ -1272,7 +1300,7 @@ TEST_OpenBus:
 	BEQ TEST_Fail
 	LDA $4654
 	BEQ TEST_Fail
-	INC <currentSubTest 
+	INC <ErrorCode 
 	
 	;;; Test 2 [Open Bus]: Reading from open bus always returns the high byte of the address read. ;;;
 	; As explained above, when reading from one of these addresses, the second operand is the value that remains on the databus.
@@ -1286,7 +1314,7 @@ TEST_OpenBus:
 	LDA $5FFF
 	CMP #$5F
 	BNE TEST_Fail
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 3 [Open Bus]: Indexed addressing crossing a page boundary does not update the data bus. ;;;
 	; But the rule of "the high byte is the value returned" isn't always the case.
@@ -1295,7 +1323,7 @@ TEST_OpenBus:
 	LDA $50F8, Y ; This offset changes the high byte of the value read, but not the data bus. (Read from $5108, the value read should be $50)
 	CMP #$50
 	BNE TEST_Fail
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 4 [Open Bus]: The databus actually exists, and the open bus behavior isn't being faked. ;;;
 	; This is tested by moving the program counter to open bus, and running a very choreographed function.
@@ -1338,11 +1366,9 @@ TEST_OpenBus_PrepIRQLoop:
 	LDA <$56
 	CMP #$60
 	BNE TEST_Fail
-	INC <currentSubTest 
+	INC <ErrorCode 
 	
 	;;; Test 5 [Open Bus]: Dummy Reads update databus, test by reading $4015 ;;;
-	; On second thought... this was already tested by the controller reading test, wasn't it?
-	; Oh well.
 	; This doubles as a test of dummy read cycles, and the PPU Databus. Here's what happens.
 	; LDA $3FFF, X (X=$16)
 	; 1: fetch opcode 
@@ -1379,7 +1405,7 @@ TEST_OpenBus_ContinueTest4:    ; Anyway, that was the greatest crime against pro
 	AND #$20 ; Again, only check bit 5.
 	CMP #$20 ; Bit 5 was set when reading from the PPU Bus, so bit 5 of $4015 should be set.
 	BNE TEST_Fail
-	INC <currentSubTest 
+	INC <ErrorCode 
 	
 	;;; Test 6 [Open Bus]: The upper 3 bits when reading from the controller are open bus. ;;;
 	; This is just checking to see if the controllers have the open bus bits.
@@ -1417,7 +1443,7 @@ TEST_OpenBus_ContinueTest4:    ; Anyway, that was the greatest crime against pro
 	AND #$E0
 	CMP #$E0 ; However, in this case, the open bus bits are all set.
 	BNE TEST_Fail2
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 7 [Open Bus]: Reading from $4015 does not update the databus. ;;;
 	; Address $4015 is special. All the values read here are internal to the 2A03 chip, so the databus isn't used. 
@@ -1434,7 +1460,7 @@ TEST_OpenBus_ContinueTest4:    ; Anyway, that was the greatest crime against pro
 	LDA $40FF,X
 	CMP #$40
 	BNE TEST_Fail2
-	INC <currentSubTest 
+	INC <ErrorCode 
 	
 	;;; Test 8 [Open Bus]: Writing always updates the databus, even writing to $4015 ;;;
 	; LSR <56,X
@@ -1557,14 +1583,14 @@ TEST_DummyReads:
 	JSR Clockslide_29780 ; Wait a frame so the VBlank flag (bit 7) gets set
 	LDA $20F2, X ; If bit 7 of A gets set, then $2002 was only read once.
 	BMI TEST_Fail2
-	INC <currentSubTest 
+	INC <ErrorCode 
 	
 	;;; Test 2 [Dummy Read Cycles]: The dummy read does NOT occur if a page boundary is not crossed ;;;	
 	LDX #0
 	JSR Clockslide_29780 ; Wait a frame so the VBlank flag (bit 7) gets set
 	LDA $2002, X ; The page boundary is not crossed, so there should only have been 1 read.
 	BPL TEST_Fail2
-	INC <currentSubTest 
+	INC <ErrorCode 
 	
 	;;; Test 3 [Dummy Read Cycles]: The dummy read is on the correct address ;;;	
 	; The dummy read happens after the low byte is updated, but before the high byte.
@@ -1573,7 +1599,7 @@ TEST_DummyReads:
 	LDA $3FF0, X ; Dummy read $3F52 (A mirror of $2002), then read $4052 (Open bus emulation is NOT needed to pass this test!)
 	LDA $2002	 ; If bit 7 of A gets set, then the dummy read was from the wrong address (bit 7 of $2002 was not cleared by the dummy read).
 	BMI TEST_Fail2
-	INC <currentSubTest 	
+	INC <ErrorCode 	
 	
 	;;; Test 4 [Dummy Read Cycles]: STA $2002, X (where X=0) reads $2002 once. ;;;
 	LDX #0
@@ -1581,7 +1607,7 @@ TEST_DummyReads:
 	STA $2002, X ; The dummy read cycle will read from $2002.
 	LDA $2002	 ; If bit 7 of A gets set, then $2002 was not read during the STA
 	BMI TEST_Fail2
-	INC <currentSubTest 	
+	INC <ErrorCode 	
 	
 	;;; Test 5 [Dummy Read Cycles]: STA dummy read is on the correct address ;;;
 	LDX #$62
@@ -1589,7 +1615,7 @@ TEST_DummyReads:
 	STA $3FF0, X ; The dummy read cycle will read from $2002.
 	LDA $2002	 ; If bit 7 of A gets set, then $2002 was not read during the STA
 	BMI TEST_Fail3
-	INC <currentSubTest 	
+	INC <ErrorCode 	
 
 	;;; Test 6 [Dummy Read Cycles]: LDA ($2002),Y (where Y=3) does not have a dummy read. ;;;
 	; The page boundary isn't crossed, so no dummy read.
@@ -1599,7 +1625,7 @@ TEST_DummyReads:
 	LDA [$0050],Y  ; The dummy read does NOT happen because a page boundary was not crossed.
 	LDA $2002 ; The dummy read didn't occur, so bit 7 should be set.
 	BPL TEST_Fail3 
-	INC <currentSubTest 	
+	INC <ErrorCode 	
 	
 	;;; Test 7 [Dummy Read Cycles]: LDA ($3FF0),Y (where Y=62) dummy read occurs, and is on the correct address ;;;
 	LDY #$62
@@ -1607,7 +1633,7 @@ TEST_DummyReads:
 	LDA [$0052],Y
 	LDA $2002	 ; If bit 7 of A gets set, then $2002 was not read during the LDA
 	BMI TEST_Fail3
-	INC <currentSubTest 
+	INC <ErrorCode 
 	
 	;;; Test 8 [Dummy Read Cycles]: STA ($2002),Y (where Y=1) does not have a dummy read. ;;;
 	; The page boundary isn't crossed, so no dummy read.
@@ -1616,7 +1642,7 @@ TEST_DummyReads:
 	STA [$0050],Y
 	LDA $2002	 ; The dummy read didn't occur, so bit 7 should be set.
 	BPL TEST_Fail3
-	INC <currentSubTest 
+	INC <ErrorCode 
 	
 	;;; Test 9 [Dummy Read Cycles]: STA ($3FF0),Y (where Y=62) dummy read is on the correct address ;;;
 	LDY #$62
@@ -1624,14 +1650,14 @@ TEST_DummyReads:
 	STA [$0052],Y
 	LDA $2002	 ; If bit 7 of A gets set, then $2002 was not read during the STA
 	BMI TEST_Fail3
-	INC <currentSubTest 
+	INC <ErrorCode 
 	
 	;;; Test A [Dummy Read Cycles]: LDA ($2002,X) does not dummy-read $2002 ;;;
 	LDX #0
 	JSR Clockslide_29750 ; Wait (slightly less than) a frame so the VBlank flag gets set
 	LDA [$50,X]
 	BPL TEST_Fail3 ; If bit 7 of A is set, then we pass the test. The dummy read was at $0050, which we can't test for.
-	INC <currentSubTest 	
+	INC <ErrorCode 	
 	
 	;;; Test B [Dummy Read Cycles]: STA ($2002,X) does not dummy-read $2002 ;;;
 	LDX #0
@@ -1691,7 +1717,7 @@ TEST_PPU_Open_Bus:
 	LDA $2000 ; Address $2000 is write-only, so the value read is the value of the PPU bus. ($5A)
 	CMP #$5A
 	BNE TEST_FailPPUOpenBus
-	INC <currentSubTest 
+	INC <ErrorCode 
 	
 	;;; Test 2 [PPU Open Bus]: All PPU Registers update PPU Open Bus. ;;;
 	; Writing to $2000 updates the PPU Databus
@@ -1753,7 +1779,7 @@ TEST_PPU_Open_Bus:
 	LDA $2000
 	CMP #$24
 	BNE TEST_FailPPUOpenBus
-	INC <currentSubTest 
+	INC <ErrorCode 
 	
 	;;; Test 3 [PPU Open Bus]: Address $2002, bits 0 through 4 are open bus ;;;
 	LDA $2002
@@ -1763,7 +1789,7 @@ TEST_PPU_Open_Bus:
 	AND #$1F
 	CMP #$15
 	BNE TEST_FailPPUOpenBus2
-	INC <currentSubTest 
+	INC <ErrorCode 
 	JSR ResetScroll
 
 	LDA <$50	; This value will be $00 if you are running [PPU Open Bus], but $01 if you are running [Dummy Write Cycles], which re-runs thsi test to verify the ppu bus works as a prerequisite.
@@ -1836,10 +1862,10 @@ TEST_DummyWrites:
 	STA <$50				; The PPU_Open_Bus test uses address $50 to skip the decay test, since that's not needed here.
 	JSR TEST_PPU_Open_Bus	; It feels pretty silly running another test inside this test.
 	LDX #1					; But hey, it saves on bytes.
-	STX <currentSubTest		; reset the current sub test, as running TEST_PPU_Open_Bus changed it.
+	STX <ErrorCode		; reset the current sub test, as running TEST_PPU_Open_Bus changed it.
 	CMP #$01				
 	BNE TEST_FailPPUOpenBus2
-	INC <currentSubTest 
+	INC <ErrorCode 
 	
 	; Here's how the test works.
 	; Prep the PPU databus with a specific value, usually $25 or $26.
@@ -1917,7 +1943,7 @@ TEST_DummyWrites:
 	JSR DoubleLDA2007 ; Read from VRAM
 	CMP #$22 ;
 	BNE TEST_FailDummyWrites
-	INC <currentSubTest 
+	INC <ErrorCode 
 	JMP TEST_DummyWritesPt2
 ;;;;;;;
 TEST_FailDummyWrites:
@@ -2100,21 +2126,21 @@ TEST_UnofficialInstructionsExist:
 	; But if this was treated as a 1-byte NOP, X=98
 	CPX #$98
 	BEQ TEST_Fail4
-	INC <currentSubTest 
+	INC <ErrorCode 
 	
 	;;; Test 2 [Unofficial Instructions Exist]: Was it a 2-byte nop? ;;;
 	; And if this was treated as a 2-byte NOP, A=0F
 	CMP #$0F
 	BEQ TEST_Fail4
 	; Alright! It was treated as a 3-byte NOP, which is what it should be.
-	INC <currentSubTest 
+	INC <ErrorCode 
 	
 	;;; Test 3 [Unofficial Instructions Exist]: NOP Absolute updates PPUSTATUS ;;;
 	JSR Clockslide_29780 ; wait for next frame.
 	.byte $0C, $02, $20 ; NOP $2002
 	LDA $2002
 	BMI TEST_Fail4 ; if bit 7 was still set after that NOP $2002, that's a fail!
-	INC <currentSubTest 
+	INC <ErrorCode 
 	
 	;;; Test 4 [Unofficial Instructions Exist]: Does SLO exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
@@ -2128,7 +2154,7 @@ TEST_UnofficialInstructionsExist:
 	CMP #$84
 	BNE TEST_Fail4
 	; SLO exists!
-	INC <currentSubTest 
+	INC <ErrorCode 
 
 	;;; Test 5 [Unofficial Instructions Exist]: Does ANC exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
@@ -2140,7 +2166,7 @@ TEST_UnofficialInstructionsExist:
 	CMP #$8C
 	BNE TEST_Fail4
 	; ANC exists!
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 6 [Unofficial Instructions Exist]: Does RLA exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
@@ -2155,7 +2181,7 @@ TEST_UnofficialInstructionsExist:
 	CMP #$85
 	BNE TEST_Fail4
 	; RLA exists!
-	INC <currentSubTest 
+	INC <ErrorCode 
 	
 	;;; Test 7 [Unofficial Instructions Exist]: Does SRE exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
@@ -2167,7 +2193,7 @@ TEST_UnofficialInstructionsExist:
 	CMP #$DE
 	BNE TEST_Fail4	
 	; SRE exists!
-	INC <currentSubTest 
+	INC <ErrorCode 
 	
 	;;; Test 8 [Unofficial Instructions Exist]: Does ASR exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
@@ -2177,7 +2203,7 @@ TEST_UnofficialInstructionsExist:
 	CMP #$20
 	BNE TEST_Fail5	
 	; ASR exists!
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 9 [Unofficial Instructions Exist]: Does RRA exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
@@ -2189,7 +2215,7 @@ TEST_UnofficialInstructionsExist:
 	CMP #$C1
 	BNE TEST_Fail5	
 	; RRA exists!
-	INC <currentSubTest 
+	INC <ErrorCode 
 	
 	;;; Test A [Unofficial Instructions Exist]: Does ARR exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
@@ -2202,7 +2228,7 @@ TEST_UnofficialInstructionsExist:
 	CMP #$A0
 	BNE TEST_Fail5		
 	; ARR exists!
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test B [Unofficial Instructions Exist]: Does SAX exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
@@ -2215,7 +2241,7 @@ TEST_UnofficialInstructionsExist:
 	CMP #$20
 	BNE TEST_Fail5
 	; SAX exists!
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test C [Unofficial Instructions Exist]: Does ANE exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
@@ -2226,7 +2252,7 @@ TEST_UnofficialInstructionsExist:
 	CMP #$FF
 	BEQ TEST_Fail5	
 	; ANE exists!
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test D [Unofficial Instructions Exist]: Does SHA exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
@@ -2248,7 +2274,7 @@ TEST_UnofficialInstructionsExist:
 	CMP #$1F
 	BNE TEST_Fail5
 	; SHA exists!
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test E [Unofficial Instructions Exist]: Does SHX exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
@@ -2267,7 +2293,7 @@ TEST_UnofficialInstructionsExist:
 	CMP #$05
 	BNE TEST_Fail5
 	; SHX exists!
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	JMP TEST_UnofficialInstructions_Continue
 TEST_Fail5:	; This is in the middle of the test, since it saves bytes to branch here.
@@ -2291,7 +2317,7 @@ TEST_UnofficialInstructions_Continue:
 	CMP #$05
 	BNE TEST_Fail5
 	; SHY exists!
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test G [Unofficial Instructions Exist]: Does SHS exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
@@ -2321,7 +2347,7 @@ TEST_UnofficialInstructions_SHS_Continue:
 	CMP #$1F ; See if this was the right value too.
 	BNE TEST_Fail5
 	; SHS exists!
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test H [Unofficial Instructions Exist]: Does SHA ($zp), Y exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
@@ -2346,7 +2372,7 @@ TEST_UnofficialInstructions_SHS_Continue:
 	CMP #$1F
 	BNE TEST_Fail5
 	; SHA ($zp), Y exists!
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test I [Unofficial Instructions Exist]: Does LAX exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
@@ -2358,7 +2384,7 @@ TEST_UnofficialInstructions_SHS_Continue:
 	CPX $0500
 	BNE TEST_Fail5
 	; LAX exists!
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test J [Unofficial Instructions Exist]: Does LXA exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
@@ -2372,7 +2398,7 @@ TEST_UnofficialInstructions_SHS_Continue:
 	CPX #$F0
 	BEQ TEST_Fail5
 	; LXA exists!
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test K [Unofficial Instructions Exist]: Does LAE exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
@@ -2398,7 +2424,7 @@ TEST_UnofficialInstructions_SHS_Continue:
 	CPX #$02
 	BNE TEST_Fail6
 	; LAE exists!
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test L [Unofficial Instructions Exist]: Does DCP exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
@@ -2407,7 +2433,7 @@ TEST_UnofficialInstructions_SHS_Continue:
 	.word $0500
 	BNE TEST_Fail6	
 	; DCP exists!
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test M [Unofficial Instructions Exist]: Does AXS exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
@@ -2418,7 +2444,7 @@ TEST_UnofficialInstructions_SHS_Continue:
 	CPX #$20
 	BNE TEST_Fail6	
 	; AXS exists!
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test N [Unofficial Instructions Exist]: Does ISC exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
@@ -2429,7 +2455,7 @@ TEST_UnofficialInstructions_SHS_Continue:
 	CMP #$DF
 	BNE TEST_Fail6	
 	; LAE exists!
-	INC <currentSubTest
+	INC <ErrorCode
 	;; END OF TEST ;;
 	LDA #1
 	RTS
@@ -2852,20 +2878,20 @@ Test_UnOpEvaluateResults:
 	LDA [Test_UnOp_ExpectedResultAddrLo],Y
 	CMP <Test_UnOp_ValueAtAddressResult
 	BNE FAIL_UnOpTest ; Error code 1: The result at the expected address was incorrect
-	INC <currentSubTest
+	INC <ErrorCode
 Test_UnOpEvaluateResults_StartA:
 	LDA <Copy_A
 	CMP <Test_UnOp_CMP
 	BNE FAIL_UnOpTest ; Error code 2: The result of the A register was incorrect
-	INC <currentSubTest
+	INC <ErrorCode
 	LDX <Copy_X
 	CPX <Test_UnOp_CPX
 	BNE FAIL_UnOpTest ; Error code 3: The result of the X register was incorrect
-	INC <currentSubTest
+	INC <ErrorCode
 	LDY <Copy_Y
 	CPY <Test_UnOp_CPY
 	BNE FAIL_UnOpTest ; Error code 4: The result of the Y register was incorrect
-	INC <currentSubTest
+	INC <ErrorCode
 	LDA <Copy_Flags
 	CMP <Test_UnOp_CM_Flags
 	BNE FAIL_UnOpTest ; Error code 5: The result of the flags were incorrect
@@ -2882,23 +2908,23 @@ Test_UnOpEvaluateResultsIncludingStackPointer:
 	LDA [Test_UnOp_ExpectedResultAddrLo],Y
 	CMP <Test_UnOp_ValueAtAddressResult
 	BNE FAIL_UnOpTest ; Error code 1: The result at the expected address was incorrect
-	INC <currentSubTest
+	INC <ErrorCode
 	LDA <Copy_A
 	CMP <Test_UnOp_CMP
 	BNE FAIL_UnOpTest ; Error code 2: The result of the A register was incorrect
-	INC <currentSubTest
+	INC <ErrorCode
 	LDX <Copy_X
 	CPX <Test_UnOp_CPX
 	BNE FAIL_UnOpTest ; Error code 3: The result of the X register was incorrect
-	INC <currentSubTest
+	INC <ErrorCode
 	LDY <Copy_Y
 	CPY <Test_UnOp_CPY
 	BNE FAIL_UnOpTest ; Error code 4: The result of the Y register was incorrect
-	INC <currentSubTest
+	INC <ErrorCode
 	LDA <Copy_Flags
 	CMP <Test_UnOp_CM_Flags
 	BNE FAIL_UnOpTest ; Error code 5: The result of the flags were incorrect
-	INC <currentSubTest
+	INC <ErrorCode
 	LDA <Copy_SP2
 	CMP <Test_UnOp_CPS
 	BNE FAIL_UnOpTest ; Error code 6: The result of the stack pointer was incorrect
@@ -2933,7 +2959,7 @@ TEST_AddrInitAXYF_PreLoop2:
 	JSR TEST_UnOpRunTest
 	; Evaluating the test.
 	LDA <initialSubTest
-	STA <currentSubTest	
+	STA <ErrorCode	
 	JSR Test_UnOpEvaluateResults
 	; If you made it this far, we passed this test!
 	; (not necessarily the entire suite, but this specific test, at least)
@@ -2962,7 +2988,7 @@ TEST_AddrInitAXYFS_PreLoop:
 	JSR TEST_UnOpRunTest
 	; Evaluating the test.
 	LDA <initialSubTest
-	STA <currentSubTest	
+	STA <ErrorCode	
 	JSR Test_UnOpEvaluateResultsIncludingStackPointer
 	; If you made it this far, we passed this test!
 	; (not necessarily the entire suite, but this specific test, at least)
@@ -2993,7 +3019,7 @@ TEST_ImmOperandAXYF_PreLoop2:
 	JSR FixRTS
 	JSR TEST_UnOpRunTest
 	LDA #2
-	STA <currentSubTest	
+	STA <ErrorCode	
 	JSR Test_UnOpEvaluateResults_StartA
 	; If you made it this far, we passed this test!
 	; (not necessarily the entire suite, but this specific test, at least)
@@ -4407,7 +4433,7 @@ TEST_DMA_Plus_OpenBus:
 	LDA $4000
 	CMP #$40
 	BNE FAIL_DMA_Plus_OpenBus
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 2 [DMA + Open Bus]: If the DMA occurs just before the Open Bus read, it will update the databus to $00 ;;;
 	JSR DMASync_50CyclesRemaining	; sync DMA
@@ -4465,17 +4491,17 @@ TEST_DMA_Plus_2007R:
 	;;; Test 1 [DMA + $2007 Read]: verify PPU buffer behavior ;;;
 	CMP #$00
 	BEQ TEST_Fail7 ; if the value of A is $00, then your PPU buffer is probably not implemented correctly.
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 2 [DMA + $2007 Read]: Check DMA timing ;;;
 	CMP #$01
 	BEQ TEST_Fail7 ; if the value of A is $01, then the timing of the DMA is off.
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 3 [DMA + $2007 Read]: Check the DMA dummy reads occured the correct number of times ;;;	
 	CMP #$03
 	BMI TEST_Fail7
-	INC <currentSubTest
+	INC <ErrorCode
 	;; END OF TEST ;;
 	
 	JSR ResetScrollAndWaitForVBlank
@@ -4494,10 +4520,10 @@ TEST_DMA_Plus_2007W:
 	;;; Test 1 [DMA + $2007 Write]: The DMA + $2006 Read test passes. ;;;
 	JSR TEST_DMA_Plus_2007R
 	LDX #1
-	STX <currentSubTest
+	STX <ErrorCode
 	CMP #1
 	BNE TEST_Fail7
-	INC <currentSubTest
+	INC <ErrorCode
 
 	JSR TEST_DMA_Plus_2007_Prep	; the v register is now at 2401
 	JSR DMASync_50CyclesRemaining	; sync DMA
@@ -4678,7 +4704,7 @@ TEST_NMI_Control:
 	JSR Clockslide_29780 ; Wait 1 frame.
 	CPX #0
 	BNE FAIL_NMI_Control1 ; If the NMI occurs, it will run INX, ... RTI. That would increment X to 1, thus failing the test.
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 2 [NMI Control]: The NMI should occur at vblank when enabled. ;;;
 	; Again, reaching this test would be impossible without the NMI occuring, so I have a hunch it won't fail this one.
@@ -4688,7 +4714,7 @@ TEST_NMI_Control:
 	JSR Clockslide_29780 ; Wait 1 frame.
 	CPX #1
 	BNE FAIL_NMI_Control1 ; If the NMI occurs, it will run INX, ... RTI. That would increment X to 1, thus passing the test.
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 3 [NMI Control]: The NMI should occur when enabled during vblank, if the Vblank flag is enabled. ;;;
 	JSR DisableNMI
@@ -4698,7 +4724,7 @@ TEST_NMI_Control:
 	JSR EnableNMI
 	CPX #1
 	BNE FAIL_NMI_Control1
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 4 [NMI Control]: The NMI should NOT occur when enabled during vblank, if the Vblank flag is disabled. ;;;
 	JSR DisableNMI
@@ -4708,7 +4734,7 @@ TEST_NMI_Control:
 	JSR Clockslide_2269 ; wait long enough that VBlank should be over.
 	CPX #0
 	BNE FAIL_NMI_Control1
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 5 [NMI Control]: The NMI should NOT occur a second time if writing $80 to $2000 when the NMI flag is already enabled. ;;;
 	JSR DisableNMI
@@ -4719,7 +4745,7 @@ TEST_NMI_Control:
 	JSR EnableNMI	
 	CPX #1
 	BNE FAIL_NMI_Control2	; If X was 2, then the NMI ran twice, thus failing the test.
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 6 [NMI Control]: (previous test) but the NMI was enabled going into VBlank. ;;;
 	; The NMI is enabled going into this test.
@@ -4728,7 +4754,7 @@ TEST_NMI_Control:
 	JSR EnableNMI ; (and the NMI should not happen a second time)
 	CPX #1
 	BNE FAIL_NMI_Control2	; If X was 2, then the NMI ran twice, thus failing the test.
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 7 [NMI Control]: The NMI should occur an additional time if you disable and then re-enable the NMI. ;;;
 	JSR DisableNMI
@@ -4740,7 +4766,7 @@ TEST_NMI_Control:
 	JSR EnableNMI ; (and the NMI should happen a second time)
 	CPX #2
 	BNE FAIL_NMI_Control2
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 8 [NMI Control]: The NMI should occur 2 instructions after the NMI is enabled. ;;;
 	; STA $2000
@@ -5023,7 +5049,7 @@ TEST_Sprite0Hit_Behavior:
 	LDA $2002	; Bit 6 should be set, since the sprite zero hit should have occured.
 	AND #$40
 	BEQ FAIL_Sprite0Hit_Behavior1
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 2 [Sprite Zero Hit Behavior]: Sprite zero hits should not happen if Background Rendering is disabled. ;;;
 	JSR DisableRendering_BG ; only disable rendering the background.
@@ -5033,7 +5059,7 @@ TEST_Sprite0Hit_Behavior:
 	LDA $2002	; Bit 6 should NOT be set, since the sprite zero hit should not have occured.
 	AND #$40
 	BNE FAIL_Sprite0Hit_Behavior1
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 3 [Sprite Zero Hit Behavior]: Sprite zero hits should not happen if Sprite Rendering is disabled. ;;;
 	JSR WaitForVBlank
@@ -5044,7 +5070,7 @@ TEST_Sprite0Hit_Behavior:
 	LDA $2002	; Bit 6 should NOT be set, since the sprite zero hit should not have occured.
 	AND #$40
 	BNE FAIL_Sprite0Hit_Behavior1
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 4 [Sprite Zero Hit Behavior]: Sprite zero hits should not happen if both sprites and background Rendering are disabled. ;;;
 	JSR WaitForVBlank
@@ -5054,7 +5080,7 @@ TEST_Sprite0Hit_Behavior:
 	LDA $2002	; Bit 6 should NOT be set, since the sprite zero hit should not have occured.
 	AND #$40
 	BNE FAIL_Sprite0Hit_Behavior1
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 5 [Sprite Zero Hit Behavior]: Sprite zero hits should not happen if sprite zero is completely transparent. ;;;
 	JSR WaitForVBlank
@@ -5067,7 +5093,7 @@ TEST_Sprite0Hit_Behavior:
 	LDA $2002	; Bit 6 should NOT be set, since the sprite zero hit should not have occured.
 	AND #$40
 	BNE FAIL_Sprite0Hit_Behavior
-	INC <currentSubTest	
+	INC <ErrorCode	
 	
 	;;; Test 6 [Sprite Zero Hit Behavior]: Sprite zero hits can happen at X=254. (verify for the next test) ;;;
 	JSR WaitForVBlank	
@@ -5084,7 +5110,7 @@ TEST_Sprite0Hit_Behavior:
 	LDA $2002	; Bit 6 should be set, since the sprite zero hit should have occured.
 	AND #$40
 	BEQ FAIL_Sprite0Hit_Behavior
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 7 [Sprite Zero Hit Behavior]: Sprite zero hits cannot happen at X=255. ;;;
 	JSR WaitForVBlank	
@@ -5097,7 +5123,7 @@ TEST_Sprite0Hit_Behavior:
 	LDA $2002	; Bit 6 should NOT be set, since the sprite zero hit should not have occured.
 	AND #$40
 	BNE FAIL_Sprite0Hit_Behavior
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 8 [Sprite Zero Hit Behavior]: Sprite zero hits should not happen if sprite zero is at X=0, and the PPU's 8 pixel mask is enabled (show BG, no sprite). ;;;
 	JSR WaitForVBlank
@@ -5117,7 +5143,7 @@ TEST_Sprite0Hit_Behavior:
 	LDA $2002	; Bit 6 should NOT be set, since the sprite zero hit should not have occured.
 	AND #$40
 	BNE FAIL_Sprite0Hit_Behavior
-	INC <currentSubTest	
+	INC <ErrorCode	
 	BNE TEST_Sprite0Hit_Behavior_Continued ; branch always around this fail condition.
 	
 FAIL_Sprite0Hit_Behavior:
@@ -5137,7 +5163,7 @@ TEST_Sprite0Hit_Behavior_Continued:
 	LDA $2002	; Bit 6 should NOT be set, since the sprite zero hit should not have occured.
 	AND #$40
 	BNE FAIL_Sprite0Hit_Behavior
-	INC <currentSubTest	
+	INC <ErrorCode	
 
 	;;; Test A [Sprite Zero Hit Behavior]: Despite the 8 pixel mask, if the sprite has visible pixels beyond the mask (X>0, X<8) the Sprite Zero Hit occurs. ;;;
 	JSR WaitForVBlank
@@ -5149,7 +5175,7 @@ TEST_Sprite0Hit_Behavior_Continued:
 	LDA $2002	; Bit 6 should be set, since the sprite zero hit should have occured.
 	AND #$40
 	BEQ FAIL_Sprite0Hit_Behavior
-	INC <currentSubTest	
+	INC <ErrorCode	
 
 	;;; Test B [Sprite Zero Hit Behavior]: Sprite zero hits can happen at Y=238. (verify for the next test) ;;;
 	JSR WaitForVBlank	
@@ -5166,7 +5192,7 @@ TEST_Sprite0Hit_Behavior_Continued:
 	LDA $2002	; Bit 6 should be set, since the sprite zero hit should have occured.
 	AND #$40
 	BEQ FAIL_Sprite0Hit_Behavior
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test C [Sprite Zero Hit Behavior]: Sprite zero hits cannot happen at Y>=239. ;;;
 	JSR WaitForVBlank	
@@ -5180,7 +5206,7 @@ TEST_Sprite0Hit_Behavior_Continued:
 	LDA $2002	; Bit 6 should NOT be set, since the sprite zero hit should not have occured.
 	AND #$40
 	BNE FAIL_Sprite0Hit_Behavior2
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test D [Sprite Zero Hit Behavior]: Sprite Zero Hit test with a sprite that isn't a solid 8x8 square. ;;;
 	; If this test fails, it could be for one of two reasons.
@@ -5199,7 +5225,7 @@ TEST_Sprite0Hit_Behavior_Continued:
 	LDA $2002	; Bit 6 should NOT be set, since the sprite zero hit should not have occured.
 	AND #$40
 	BNE FAIL_Sprite0Hit_Behavior2
-	INC <currentSubTest	
+	INC <ErrorCode	
 	
 	;;; Test E [Sprite Zero Hit Behavior]: The sprite zero hit flag is not set until the PPU cycle in which the dot is drawn. ;;;
 	JSR WaitForVBlank
@@ -5271,7 +5297,7 @@ TEST_ArbitrarySpriteZeroLoop:
 	INX
 	CPX #64
 	BNE TEST_ArbitrarySpriteZeroLoop
-	INC <currentSubTest	
+	INC <ErrorCode	
 	
 	;;; Test 2 [Arbitrary Sprite Zero]: The first processed sprite of a scanline is treated as "sprite zero". ;;;
 	; This test is a bit tricky to understand. Let's break down the sprite evaluation process by which ppu cycles in a scanline are doing which task.
@@ -5358,7 +5384,7 @@ TEST_ArbitrarySpriteZeroLoop:
 	AND #$40					; mask away every bit except the Sprite Zero Hit flag.
 	BNE FAIL_ArbitrarySpriteZero; If bit 6 was non-zero, the sprite zero hit did occur, thus failing the test.
 	
-	INC <currentSubTest			; And if we passed this, increment the subtest so the error code is adjusted for this next test.
+	INC <ErrorCode			; And if we passed this, increment the subtest so the error code is adjusted for this next test.
 	
 	;;; Test 3 [Arbitrary Sprite Zero]: Misaligned OAM can properly draw a sprite, and yes, it can even trigger a sprite zero hit. ;;;
 	; So in that previous test, PPUOAMAddress manually set to a non-zero value just before sprite evaluation. However, this value was a multiple of 4, so it wasn't too complicated.
@@ -5447,7 +5473,7 @@ SprOverflow_Prep1:
 	LDA $2002
 	AND #$20 ; Bit 5 holds the sprite overflow flag
 	BEQ FAIL_SprOverflow
-	INC <currentSubTest	
+	INC <ErrorCode	
 	
 	;;; Test 2 [Sprite Overflow Behavior]: The Sprite Overflow Flag is NOT the same thing as the CPU's V flag. ;;;
 	; The first emulator I ever made was making this mistake, ha! I doubt anybody is making this mistake, but I'll test for it anyway.
@@ -5461,7 +5487,7 @@ SprOverflow_Prep1:
 	LDA $2002
 	AND #$20 ; Bit 5 holds the sprite overflow flag
 	BEQ FAIL_SprOverflow
-	INC <currentSubTest		
+	INC <ErrorCode		
 	
 	;;; Test 3 [Sprite Overflow Behavior]: 8 sprites in a single scanline will not set the Sprite Overflow Flag. ;;;
 	LDA #$FF
@@ -5473,7 +5499,7 @@ SprOverflow_Prep1:
 	LDA $2002
 	AND #$20 ; Bit 5 holds the sprite overflow flag. (in this case, not set because only 8 sprites existed on the busiest scanline)
 	BNE FAIL_SprOverflow
-	INC <currentSubTest		
+	INC <ErrorCode		
 
 	;; END OF TEST ;;
 	JSR ClearOverscanNametable
@@ -5509,16 +5535,16 @@ TEST_MisalignedOAM_Behavior:
 	JSR PREP_SpriteZeroHit			
 	JSR MisalignedOAM_SpriteZeroTest
 	LDX #1
-	STX <currentSubTest
+	STX <ErrorCode
 	CMP #1
 	BNE FAIL_MisalignedOAM_Behavior
 	; Thsi test also relies on proper Sprite Overflow Flag emulation, so let's check that one too.
 	JSR TEST_SprOverflow_Behavior
 	LDX #1
-	STX <currentSubTest
+	STX <ErrorCode
 	CMP #1
 	BNE FAIL_MisalignedOAM_Behavior
-	INC <currentSubTest	
+	INC <ErrorCode	
 	
 	;;; Test 2 [Misaligned OAM Behavior]: Misaligned OAM "+4 behavior" Offset by 1" ;;;	
 	; Misaligned OAM should stay misaligned until an object's Y position is out of the range of this scanline, at which point the OAM address is incremented by 4 and bitwise ANDed with $FC.
@@ -5599,7 +5625,7 @@ TEST_MisalignedOAM_P4_Y_1_Loop:
 	LDA $2002					; Read PPUSTATUS, putting the sprite overflow flag in bit 5.
 	AND #$20 					; mask away bit 5. The result should be A = $20, since the sprite overflow flag *should* be set.
 	BEQ FAIL_MisalignedOAM_Behavior
-	INC <currentSubTest	
+	INC <ErrorCode	
 	
 	;;; Test 3 [Misaligned OAM Behavior]: Misaligned OAM "+5 behavior" Offset by 1 ;;;
 	; If Secondary OAM is full, instead of incrementing the OAM Address by 4 and bitwise ANDing with $FC, you should instead only increment the OAM address by 5.
@@ -5636,7 +5662,7 @@ TEST_MisalignedOAM_P5_Y_1_Loop:
 	LDA $2002					; Read PPUSTATUS, putting the sprite overflow flag in bit 5.
 	AND #$20 					; mask away bit 5. The result should be A = $20, since the sprite overflow flag *should* be set.
 	BEQ FAIL_MisalignedOAM_Behavior1
-	INC <currentSubTest	
+	INC <ErrorCode	
 	
 	;;; Test 4 [Misaligned OAM Behavior]: Misaligned OAM "+4* behavior" Offset by 1 (* Only +1 with the X Position) ;;;
 	; In the "Arbitrary Sprite Zero" test, I said the following:
@@ -5691,7 +5717,7 @@ TEST_MisalignedOAM_P4_1_Loop:
 	LDA $2002
 	AND #$20 ; Bit 5 holds the sprite overflow flag.
 	BEQ FAIL_MisalignedOAM_Behavior1
-	INC <currentSubTest	
+	INC <ErrorCode	
 
 	;;; Test 5 [Misaligned OAM Behavior]: Misaligned OAM "+4* behavior" Offset by 1, Second OAM Full, so OAMAddr +=5 (* Only +1 with the X Position) ;;;
 	; If Secondary OAM is full, instead of incrementing the OAM Address by 1 and bitwise ANDing with $FC, you should instead only increment the OAM address by 5.
@@ -5727,7 +5753,7 @@ TEST_MisalignedOAM_P4_1F_Loop:
 	LDA $2002
 	AND #$20 ; Bit 5 holds the sprite overflow flag.
 	BEQ FAIL_MisalignedOAM_Behavior1
-	INC <currentSubTest	
+	INC <ErrorCode	
 	BNE TEST_MisalignedOAM_Continue ; Skip the fail handler. I moved the fail handler here because branches were exceeding $80 bytes.
 	
 FAIL_MisalignedOAM_Behavior1:
@@ -5767,7 +5793,7 @@ TEST_MisalignedOAM_P4_2_Loop:
 	LDA $2002
 	AND #$20 ; Bit 5 holds the sprite overflow flag.
 	BEQ FAIL_MisalignedOAM_Behavior1
-	INC <currentSubTest	
+	INC <ErrorCode	
 
 	;;; Test 7 [Misaligned OAM Behavior]: Misaligned OAM "+4* behavior" Offset by 3 (* Only +1 with the X Position) ;;;
 	JSR ClearPage2
@@ -6003,7 +6029,7 @@ TEST_Address2004_Behavior:
 	LDA $2002
 	AND #$40
 	BEQ FAIL_Address2004_Behavior
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 2 [Address $2004 behavior]: Reads from $2004 give you a value in OAM, but do not increment the OAM address ;;;
 	JSR ClearPage2
@@ -6020,7 +6046,7 @@ TEST_Address2004_Behavior:
 	LDA $2004
 	CMP #$5A
 	BNE FAIL_Address2004_Behavior	; The OAM Address didn't increment, so the value will still be $5A.
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 3 [Address $2004 behavior]: Reads from the attribute bytes are missing bits 2 through 5 ;;;
 	; If OAM is misaligned, it wouldn't be the attribute bytes in that case.
@@ -6036,7 +6062,7 @@ TEST_Address2004_Behavior:
 	LDA $2004
 	CMP #$E3
 	BNE FAIL_Address2004_Behavior1	; You should read the value $E8
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 4 [Address $2004 behavior]: Reads from $2004 during PPU cycle 1 to 64 of a visible scanline (with rendering enabled) will always read $FF ;;;
 	JSR ClearPage2
@@ -6060,7 +6086,7 @@ TEST_Address2004_Behavior:
 	LDA $2004	; +9 cycles before the read.
 	CMP #$FF
 	BNE FAIL_Address2004_Behavior1	; Despite OAM Address $00 being $5A, the PPU is busy clearing Secondary-OAM to $FF, so this will read $FF.
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 5 [Address $2004 behavior]: Reads from $2004 during PPU cycle 1 to 64 of a visible scanline (with rendering disabled) does a regular read of $2004 ;;;
 	JSR WaitForVBlank
@@ -6078,7 +6104,7 @@ TEST_Address2004_Behavior:
 	LDA $2004	; +9 cycles before the read.
 	CMP #$5A
 	BNE FAIL_Address2004_Behavior1	; Despite being between cycle 1 and 64 of a visible scanline, since rendering is disabled, it reads $5A.
-	INC <currentSubTest
+	INC <ErrorCode
 	BNE TEST_Address2004_Behavior_Continue ; brnach alaways around the fail case.
 	
 FAIL_Address2004_Behavior1:
@@ -6107,7 +6133,7 @@ TEST_Address2004_Behavior_Continue:
 	LDA $2004
 	CMP #$8C
 	BNE FAIL_Address2004_Behavior1	; Despite being between cycle 1 and 64 of a visible scanline, since rendering is disabled, it reads $5A.
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 7 [Address $2004 behavior]: Writing to $2004 on a visible scanline doesn't write to OAM ;;;
 	; leeching off the results of the previous test...
@@ -6122,7 +6148,7 @@ TEST_Address2004_Behavior_Loop:
 	LDA $2004
 	CMP #$5A
 	BNE FAIL_Address2004_Behavior1
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 8 [Address $2004 behavior]: Reads from $2004 during PPU cycle 65 to 256 of a visible scanline (with rendering enabled) reads from the current OAM address, which is changing every other ppu cycle.;;;
 	JSR WaitForVBlank
@@ -6146,7 +6172,7 @@ TEST_Address2004_Behavior_loop:			; Set up page 2 so every value is essentially 
 	BEQ FAIL_Address2004_Behavior1	; It definitely shouldn't be $00.
 	CMP #$FF
 	BEQ FAIL_Address2004_Behavior1	; Since it's inconsistent between CPU/PPU clock alignments, (and probably different on different consolre revisions) we'll simply just check that it isn't FF.
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 9 [Address $2004 behavior]: Reads from $2004 during PPU cycle 256 to 320 of a visible scanline (with rendering enabled) reads $FF again. ;;;
 	JSR WaitForVBlank
@@ -6167,7 +6193,7 @@ TEST_Address2004_Behavior_loop:			; Set up page 2 so every value is essentially 
 	LDA $2004
 	CMP #$FF
 	BNE FAIL_Address2004_Behavior2	; This reads $FF. (I'll need to look into why, but I know this is the case.)
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test A [Address $2004 behavior]: Writing to $2004 on a visible scanline increments the OAM address by 4, and bitwise AND the OAM Address with $FC ;;;
 	LDA #$8C
@@ -6211,7 +6237,7 @@ FAIL_Address2004_Behavior2:
 
 FAIL_APURegActivation_Pre:
 	LDA #1
-	STA <currentSubTest
+	STA <ErrorCode
 	JMP TEST_Fail
 
 FAIL_APURegActivation0:
@@ -6255,7 +6281,7 @@ TEST_APURegActivation:
 
 	JSR ResetScrollAndWaitForVBlank
 	LDA #02
-	STA <currentSubTest
+	STA <ErrorCode
 	; It is assumed we're not going to crash when running this test if those 2 pre-requisites pass.
 
 	;;; Test 2 [APU Register Activation]: Pre-requisite test: Reading from $4015 clears the "frame interrupt flag" ;;;
@@ -6270,7 +6296,7 @@ TEST_APURegActivation:
 	LDA $4015
 	AND #$40
 	BNE FAIL_APURegActivation0 ; If this fails, the Frame interrupt flag wasn't cleared when read last time.
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 3 [APU Register Activation]: Can the DMA read from the APU registers when the CPU is not executing out of page $40? ;;;	
 	; What's happening here?
@@ -6291,7 +6317,7 @@ TEST_APURegActivation:
 	LDA $4015
 	AND #$40
 	BEQ FAIL_APURegActivation0 ; If this fails, the DMA read from the APU registers.
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 4 [APU Register Activation]: Can your emulator handle the wacky setup required to determine if the APU registers are active due to the 6502 address bus? (this could cause a crash) ;;;
 	; Oh- also don't press anything on controller 2 during this test. thanks. :)
@@ -6394,7 +6420,7 @@ TEST_APURegActivation:
 	; And hey, if you didn't, I sure hope you executed an RTS. Speaking of, let's check for that magic number set by the LDA inside the BRK routine.
 	CMP #$A9
 	BNE FAIL_APURegActivation
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 5 [APU Register Activation]: The DMA can read from the APU registers when the CPU is executing out of page $40? ;;;
 	; Step 1: copy OAM to page 2.
@@ -6455,7 +6481,7 @@ TEST_APURegActivation_SkipResetY:
 	INX								; Increment X for the next one.	
 	BNE TEST_APURegActivation_Eval_2
 	; Bravo!
-	INC <currentSubTest
+	INC <ErrorCode
 	BNE TEST_APURegActivation_Continue
 
 FAIL_APURegActivation:
@@ -6611,7 +6637,7 @@ TEST_APURegActivation_Skip0602:
 TEST_APURegActivation_YSkip3:
 	INX								; Increment X for the next one.	
 	BNE TEST_APURegActivation_Eval_4
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 6 [APU Register Activation]: The controller ports might not have been visible by the OAM DMA, but did the controller ports get clocked? ;;;
 
@@ -6646,7 +6672,7 @@ TEST_DMA_Plus_4015R:
 	JSR Clockslide_100
 	BIT $4015	; If the frame interrupt flag is set, bit 6 will be set. (set the overflow flag)
 	BVC FAIL_DMA_Timing
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 2 [DMA + $4015 Read]: Does the DMA happen at the right time? ;;;
 	JSR DMASync_50CyclesRemaining
@@ -6754,7 +6780,7 @@ TEST_ControllerStrobing:
 	AND #$7F
 	CMP #$7F
 	BNE FAIL_ControllerStrobing
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 2 [Controller Strobing] The controller is only strobed if the value written to $4016 has a 1 in bit 0. (continued)
 	LDA #3
@@ -6764,7 +6790,7 @@ TEST_ControllerStrobing:
 	JSR ReadControllerInto50_and_A
 	AND #$7F
 	BNE FAIL_ControllerStrobing	; the result should be $00
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 3 [Controller Strobing]: Do controller strobes only happen when the CPU transitions from a get cycle to a put cycle? ;;;
 	; This test will run DEC $4016
@@ -6783,7 +6809,7 @@ TEST_ControllerStrobing:
 	JSR ReadControllerInto50_and_A
 	AND #$7F
 	BNE FAIL_ControllerStrobing	; the result should be $00
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 4 [Controller Strobing]: Do controller strobes only happen when the CPU transitions from a get cycle to a put cycle? (continued) ;;;
 	; This results in a 1-cycle strobe of the controller ports, however they actually aren't strobed at all!
@@ -6811,7 +6837,7 @@ TEST_InstructionTiming:
 	LDA <result_DMADMASync_PreTest
 	CMP #1
 	BNE FAIL_InstructionTiming
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 2 [Instruction Timing]: Is the DMA Timing Reliable enough for this test? ;;;
 	JSR CheckDMATiming
@@ -6833,7 +6859,7 @@ TEST_InstructionTiming:
 	BNE FAIL_InstructionTiming
 	; If JSR + RTS does not equal 12 cycles, then we have a problem.
 	; otherwise...
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 3 [Instruction Timing]: The immediate addressing mode takes 2 cycles ;;;
 	; If you fail this test, press select to view the debug menu.
@@ -6856,7 +6882,7 @@ TEST_InstructionTiming_Loop_Imm:
 	INX
 	CPX #11
 	BNE TEST_InstructionTiming_Loop_Imm
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 4 [Instruction Timing]: The Zero Page addressing mode for non-Read-Modify-Write instructions take 3 cycles ;;;
 	LDX #0
@@ -6876,7 +6902,7 @@ TEST_InstructionTiming_Loop_ZP:
 	INX
 	CPX #10
 	BNE TEST_InstructionTiming_Loop_ZP
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 5 [Instruction Timing]: The Zero Page addressing mode for Read-Modify-Write instructions take 5 cycles ;;;
 	LDX #0
@@ -6896,7 +6922,7 @@ TEST_InstructionTiming_Loop_ZP2:
 	INX
 	CPX #6
 	BNE TEST_InstructionTiming_Loop_ZP2
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 6 [Instruction Timing]: The Indexed Zero Page addressing mode for non-Read-Modify-Write instructions take 4 cycles ;;;
 	LDX #0
@@ -6918,7 +6944,7 @@ TEST_InstructionTiming_Loop_iZP:
 	INX
 	CPX #10
 	BNE TEST_InstructionTiming_Loop_iZP
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 7 [Instruction Timing]: The Indexed Zero Page addressing mode for Read-Modify-Write instructions take 6 cycles ;;;
 	LDX #0
@@ -6940,7 +6966,7 @@ TEST_InstructionTiming_Loop_i2ZP:
 	INX
 	CPX #6
 	BNE TEST_InstructionTiming_Loop_i2ZP
-	INC <currentSubTest
+	INC <ErrorCode
 		BNE FAIL_InstructionTiming_Continue
 FAIL_InstructionTiming2:
 	JMP TEST_Fail
@@ -6966,7 +6992,7 @@ TEST_InstructionTiming_Loop_A:
 	INX
 	CPX #15
 	BNE TEST_InstructionTiming_Loop_A
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 9 [Instruction Timing]: The Absolute addressing mode for Read-Modify-Write instructions take 6 cycles ;;;
 	LDX #0
@@ -6988,7 +7014,7 @@ TEST_InstructionTiming_Loop_A2:
 	INX
 	CPX #6
 	BNE TEST_InstructionTiming_Loop_A2
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test A [Instruction Timing]: The indexed Absolute addressing mode for STA instructions always take 5 cycles ;;;
 	LDX #0
@@ -7030,7 +7056,7 @@ TEST_InstructionTiming_Loop_iA_2:
 	INX
 	CPX #2
 	BNE TEST_InstructionTiming_Loop_iA_2
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test B [Instruction Timing]: The indexed Absolute addressing mode for many instructions take an extra cycle if the page boundary was crossed. ;;;
 	LDX #0
@@ -7072,7 +7098,7 @@ TEST_InstructionTiming_Loop_i2Ap:
 	INX
 	CPX #16
 	BNE TEST_InstructionTiming_Loop_i2Ap
-	INC <currentSubTest
+	INC <ErrorCode
 	BNE TEST_InstructionTiming_Cont2
 FAIL_InstructionTiming3:
 	JMP TEST_Fail
@@ -7118,7 +7144,7 @@ TEST_InstructionTiming_Loop_2RMWiA:
 	INX
 	CPX #6
 	BNE TEST_InstructionTiming_Loop_2RMWiA
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test D [Instruction Timing]: The Indirect, X instructions always take 6 cycles (well, except for the unofficial ones) ;;;
 	LDA #05
@@ -7143,7 +7169,7 @@ TEST_InstructionTiming_Loop_indX:
 	INX
 	CPX #8
 	BNE TEST_InstructionTiming_Loop_indX
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test E [Instruction Timing]: The Indirect, Y instructions take an extra cycle if a page boundary is crossed.;;;
 	LDX #0
@@ -7184,7 +7210,7 @@ TEST_InstructionTiming_Loop_Y2ind:
 	INX
 	CPX #7
 	BNE TEST_InstructionTiming_Loop_Y2ind
-	INC <currentSubTest
+	INC <ErrorCode
 
 	LDA $4015
 	LDA #$40
@@ -7213,7 +7239,7 @@ TEST_InstructionTiming_Loop_Implied:
 	CPX #22
 	BNE TEST_InstructionTiming_Loop_Implied
 	CLD
-	INC <currentSubTest
+	INC <ErrorCode
 	BNE TEST_InstructionTiming_Cont3
 FAIL_InstructionTiming4:
 	JMP TEST_Fail
@@ -7227,7 +7253,7 @@ TEST_InstructionTiming_Cont3:
 	STY $500  ; for easy debugging.
 	CPY #3
 	BNE FAIL_InstructionTiming4
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test H [Instruction Timing]: PHA takes 3 cycles ;;;
 	JSR CycleClockBegin
@@ -7237,7 +7263,7 @@ TEST_InstructionTiming_Cont3:
 	STY $500  ; for easy debugging.
 	CPY #3
 	BNE FAIL_InstructionTiming4
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test I [Instruction Timing]: PLP takes 4 cycles ;;;
 	PHA
@@ -7247,7 +7273,7 @@ TEST_InstructionTiming_Cont3:
 	STY $500  ; for easy debugging.
 	CPY #4
 	BNE FAIL_InstructionTiming4
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test J [Instruction Timing]: PLA takes 4 cycles ;;;
 	PHA
@@ -7257,7 +7283,7 @@ TEST_InstructionTiming_Cont3:
 	STY $500  ; for easy debugging.
 	CPY #4
 	BNE FAIL_InstructionTiming4
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test K [Instruction Timing]: JMP takes 3 cycles ;;;
 	JSR CycleClockBegin
@@ -7267,7 +7293,7 @@ TEST_InstructionTiming_JMP:
 	STY $500  ; for easy debugging.
 	CPY #3
 	BNE FAIL_InstructionTiming4
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test L [Instruction Timing]: JSR takes 6 cycles ;;;
 	JSR CycleClockBegin
@@ -7279,7 +7305,7 @@ TEST_InstructionTiming_JSR:
 	STY $500  ; for easy debugging.
 	CPY #6
 	BNE FAIL_InstructionTiming4
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test M [Instruction Timing]: RTS takes 6 cycles ;;;
 	LDA #HIGH(TEST_InstructionTiming_RTS-1)
@@ -7293,7 +7319,7 @@ TEST_InstructionTiming_RTS:
 	STY $500  ; for easy debugging.
 	CPY #6
 	BNE FAIL_InstructionTiming5
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test N [Instruction Timing]: RTI takes 6 cycles ;;;
 	LDA #HIGH(TEST_InstructionTiming_RTI)
@@ -7308,7 +7334,7 @@ TEST_InstructionTiming_RTI:
 	STY $500  ; for easy debugging.
 	CPY #6
 	BNE FAIL_InstructionTiming5
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test O [Instruction Timing]: BRK takes 7 cycles ;;;
 	LDA #$40
@@ -7320,7 +7346,7 @@ TEST_InstructionTiming_RTI:
 	STY $500  ; for easy debugging.
 	CPY #6+7
 	BNE FAIL_InstructionTiming5
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test P [Instruction Timing]: JMP (indirect) takes 5 cycles ;;;
 	LDA #LOW(TEST_InstructionTiming_JMPIndirect)
@@ -7563,7 +7589,7 @@ TEST_IFlagLatency:
 	LDA <$50	; the IRQ routine will overwrite this value, so it should be $00 instead of $5A
 	CMP #00
 	BNE FAIL_IFlagLatency1
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 2 [Interrupt Flag Latency]: Does the IRQ happen immediately after CLI, or after the following instruction? ;;;
 	JSR TEST_IFlagLatency_StartTest ; clear address $50, and sync with DMA. X=0
@@ -7579,7 +7605,7 @@ TEST_IFlagLatency:
 	LDA <$50
 	CMP #02
 	BNE FAIL_IFlagLatency1
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 3 [Interrupt Flag Latency]: Does SEI immediately prevent the IRQ from happening? (it should not) ;;;
 	JSR TEST_IFlagLatency_StartTest ; clear address $50, and sync with DMA. X=0
@@ -7594,7 +7620,7 @@ TEST_IFlagLatency:
 	LDA <$50
 	CMP #01
 	BNE FAIL_IFlagLatency1
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 4 [Interrupt Flag Latency]: Check if the interrupt flag was pushed to the stack in the previous test (it should be) ;;;
 	TSX
@@ -7603,7 +7629,7 @@ TEST_IFlagLatency:
 	LDA $100, X
 	AND #flag_i ; the I flag is #$04
 	BEQ FAIL_IFlagLatency1
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 5 [Interrupt Flag Latency]: Does the IRQ run again immediately after the RTI in SEI CLI? (it should) ;;;
 	LDA #LOW(TEST_IFlagLatency_IRQ2)
@@ -7626,7 +7652,7 @@ TEST_IFlagLatency:
 	LDA <$50 ; Did the second IRQ run before the second INX?
 	CMP #1
 	BNE FAIL_IFlagLatency
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 6 [Interrupt Flag Latency]: RTI updates the I flag before the check for an interrupt ;;;
 	JSR TEST_IFlagLatency_IRQPrep ; Re-set up the original IRQ routine.
@@ -7652,7 +7678,7 @@ TEST_IFlagLatency_RTI:
 	LDA <$50
 	CMP #$5A
 	BNE FAIL_IFlagLatency
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 7 [Interrupt Flag Latency]: Does the IRQ happen immediately after PLP, or after the following instruction? ;;;
 	JSR TEST_IFlagLatency_StartTest ; clear address $50, and sync with DMA. X=0
@@ -7668,7 +7694,7 @@ TEST_IFlagLatency_RTI:
 	LDA <$50
 	CMP #01
 	BNE FAIL_IFlagLatency
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 8 [Interrupt Flag Latency]: Does the IRQ happen at the correct CPU cycle? ;;;
 	; In order to test the Interrupt polling behavior of branches, we need the IRQ to happen at the correct CPU cycle.
@@ -7682,7 +7708,7 @@ TEST_IFlagLatency_RTI:
 	LDA <$50	; the IRQ routine will overwrite this value, so it should be $00 instead of $5A
 	CMP #01
 	BNE FAIL_IFlagLatency
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 9 [Interrupt Flag Latency]: Do branches poll for interrupts before cycle 2? (They should) ;;;
 	JSR TEST_IFlagLatency_StartTest ; clear address $50, and sync with DMA. X=0
@@ -7698,13 +7724,13 @@ TEST_IFlagLatency_Branch1:
 	LDA <$50
 	CMP #$00
 	BNE FAIL_IFlagLatency
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test A [Interrupt Flag Latency]: Do branches poll for interrupts before cycle 3? (They should not) ;;;
 	JSR TEST_IFlagLatency_StartTest_10ExtraCycles ; clear address $50, and sync with DMA. X=0. We have 12 cycles until the DMA instead of the usual 2 these tests have used.
 	LDA #$5A ; +2 (10 cycles until DMA)
 	STA <$50 ; +3 (7 cycles until DMA)
-	LDA <currentSubTest ; +3 cycles (4 cycles until DMA). This is also using a known non-zero-value, so this branch WILL be taken.
+	LDA <ErrorCode ; +3 cycles (4 cycles until DMA). This is also using a known non-zero-value, so this branch WILL be taken.
 	CLI		 ; +2 cycles (2 cycles until DMA)
 	BNE TEST_IFlagLatency_Branch2 ; [1: read opcode] (poll for interrupts, no interrupts) [2: read operand] [DMC DMA, set IRQ Level detector low] [3: move the PC] (End of instruction. did not poll again).
 TEST_IFlagLatency_Branch2:
@@ -7713,7 +7739,7 @@ TEST_IFlagLatency_Branch2:
 	LDA <$50
 	CMP #$01
 	BNE FAIL_IFlagLatency
-	INC <currentSubTest
+	INC <ErrorCode
 	; And hey, if you pass this one, keep in mind that I only test with BNE here, but this applies to every branch, not just BNE.
 	
 	; This next test needs to occur at a known page boundary, so let's jump to approximately address $FE00.
@@ -7791,7 +7817,7 @@ TEST_NmiAndBrkLoop:
 	INX ; X+=1
 	CPX #32
 	BNE TEST_NmiAndBrkLoop
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 2 [NMI overlap BRK]: Check the answer key. ;;;
 	; And now we check with the answer key.
@@ -8003,7 +8029,7 @@ TEST_RMW2007_ClearNametableLoop:
 	.byte $25, $5B
 	CMP #$5B
 	BNE FAIL_RMW2007
-	INC <currentSubTest
+	INC <ErrorCode
 	;;; Test 2 [RMW $2007]: Is palette RAM inaccessible to this extra write? ;;;
 	
 	JSR WaitForVBlank ; moving v to palette RAM while rendering is disabled will draw a series of pixels of the color at that palette ram index. I'd like to hide this inside vblank.
@@ -8026,7 +8052,7 @@ TEST_RMW2007_ClearNametableLoop:
 	LDA $2007 ; Palette RAM doesn't use the PPU Read buffer.
 	CMP #$2B
 	BEQ FAIL_RMW2007
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 3 [RMW $2007]: Did we write to the nametable at $3F2B instead? (Well- the mirror at $272B.) ;;;
 	; As it turns out, you shouldn't have written there either.
@@ -8082,7 +8108,7 @@ TEST_APULengthCounter:
 	;;; Test 1 [APU Length Counter]: The pulse 1 channel isn't playing yet. ;;;
 	LDA $4015
 	BNE FAIL_APULengthCounter
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 2 [APU Length Counter]: Writing to $4003 will start playing audio. ;;;
 	LDA #$18
@@ -8090,7 +8116,7 @@ TEST_APULengthCounter:
 	LDA $4015
 	CMP #1	; The pulse 1 channel should now be playing.
 	BNE FAIL_APULengthCounter ; Otherwise, fail the test!
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 3 [APU Length Counter]: The audio will in-fact stop playing if we wait long enough. ;;;
 	LDX #15
@@ -8100,7 +8126,7 @@ TEST_APULengthCounter_DelayQuarterSecondLoop:	; Let's wait for 15 frames. About 
 	BNE TEST_APULengthCounter_DelayQuarterSecondLoop
 	LDA $4015
 	BNE FAIL_APULengthCounter ; The pulse 1 channel should no longer be playing.
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 4 [APU Length Counter]: Writing $80 to $4017 will immediately clock the Length Counter. ;;;
 	LDA #0
@@ -8113,7 +8139,7 @@ TEST_APULengthCounter_DelayQuarterSecondLoop:	; Let's wait for 15 frames. About 
 	STA $4017 ; This clocks it again, so it now equals zero. And just like that, the pulse 1 channel is no longer playing audio.
 	LDA $4015
 	BNE FAIL_APULengthCounter ; The pulse 1 channel should no longer be playing.
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 5 [APU Length Counter]: Writing $00 to $4017 will not clock the Length Counter. ;;;
 	LDA #0
@@ -8126,7 +8152,7 @@ TEST_APULengthCounter_DelayQuarterSecondLoop:	; Let's wait for 15 frames. About 
 	LDA $4015
 	CMP #1
 	BNE FAIL_APULengthCounter ; The pulse 1 channel should still be playing.
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 6 [APU Length Counter]: Disabling the audio channel will immediately clear the length counter to zero. ;;;
 	LDA #$18
@@ -8137,7 +8163,7 @@ TEST_APULengthCounter_DelayQuarterSecondLoop:	; Let's wait for 15 frames. About 
 	STA $4015 ; enable the pulse 1 channel agian.
 	LDA $4015 ; The length counter was reset, so the pulse 1 channel isn't playing.
 	BNE FAIL_APULengthCounter1
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 7 [APU Length Counter]: The length counter cannot be set when the channel is disabled. ;;;
 	LDA #0
@@ -8148,7 +8174,7 @@ TEST_APULengthCounter_DelayQuarterSecondLoop:	; Let's wait for 15 frames. About 
 	STA $4015 ; enable the pulse 1 channel agian.
 	LDA $4015 ; The pulse 1 channel isn't playing.
 	BNE FAIL_APULengthCounter1
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 8 [APU Length Counter]: If the channel is set to play infinitely, it won't clock the length counter. ;;;
 	LDA #0
@@ -8165,7 +8191,7 @@ TEST_APULengthCounter_DelayQuarterSecondLoop:	; Let's wait for 15 frames. About 
 	LDA $4015
 	CMP #1
 	BNE FAIL_APULengthCounter1 ; The pulse 1 channel should still be playing.
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 9 [APU Length Counter]: If the channel is set to play infinitely, the length counter is left unchanged. ;;;
 	; For the most part, I just copied what blargg did for this entire test.
@@ -8203,7 +8229,7 @@ TEST_APULengthTable:
 	
 	JSR TEST_APULengthCounter
 	LDX #0
-	STX <currentSubTest
+	STX <ErrorCode
 	CMP #1
 	BNE FAIL_APULengthTable
 	
@@ -8231,7 +8257,7 @@ TEST_APULengthTable_UpdateCounterLoop:
 	TYA
 	CMP TEST_APULengthTable_AnswerKey, X
 	BNE FAIL_APULengthTable
-	INC <currentSubTest
+	INC <ErrorCode
 	INX
 	CPX #32
 	BNE TEST_APULengthTableLoop
@@ -8257,7 +8283,7 @@ TEST_FrameCounterIRQ:
 	JSR Clockslide_30000 ; wait long enough that the IRQ flag would be set.
 	LDA $4015
 	BEQ FAIL_FrameCounterIRQ
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 2 [APU Frame Counter IRQ]: The IRQ flag is not set when the APU Frame counter is in the 4-step mode, and the IRQ flag is disabled. ;;;
 	LDA #$40
@@ -8265,7 +8291,7 @@ TEST_FrameCounterIRQ:
 	JSR Clockslide_30000 ; wait long enough that the IRQ flag would be set.
 	LDA $4015
 	BNE FAIL_FrameCounterIRQ
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 3 [APU Frame Counter IRQ]: The IRQ flag is not set when the APU Frame counter is in the 5-step mode, and the IRQ flag is enabled. ;;;
 	LDA #$80
@@ -8273,7 +8299,7 @@ TEST_FrameCounterIRQ:
 	JSR Clockslide_30000 ; wait long enough that the IRQ flag would be set.
 	LDA $4015
 	BNE FAIL_FrameCounterIRQ
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 4 [APU Frame Counter IRQ]: The IRQ flag is not set when the APU Frame counter is in the 5-step mode, and the IRQ flag is disabled. ;;;
 	LDA #$C0
@@ -8281,7 +8307,7 @@ TEST_FrameCounterIRQ:
 	JSR Clockslide_30000 ; wait long enough that the IRQ flag would be set.
 	LDA $4015
 	BNE FAIL_FrameCounterIRQ
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 5 [APU Frame Counter IRQ]: Reading the IRQ flag clears the IRQ flag. ;;;
 	LDA #$00	
@@ -8290,7 +8316,7 @@ TEST_FrameCounterIRQ:
 	LDA $4015 ; read it, clearing it
 	LDA $4015 ; read it again, but it's already cleared.
 	BNE FAIL_FrameCounterIRQ
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 6 [APU Frame Counter IRQ]: The IRQ flag should be cleared when the APU transitions from a "put" cycle to a "get" cycle.  ;;;
 	LDA #$00	
@@ -8303,7 +8329,7 @@ TEST_FrameCounterIRQ:
 	.byte $1F	; SLO Absolute, X
 	.word $4015 ; This reads from $4015 twice!
 	BNE FAIL_FrameCounterIRQ ; If SLO is properly emulated, you might see bit 7 set here (failing the test). The flag is actually cleared before the second read, so it bit 7 should be 0.
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 7 [APU Frame Counter IRQ]: The IRQ flag should not be cleared when the APU transitions from a "get" cycle to a "put" cycle. ;;;
 	; If you are reading this, then you probably passed test 6 and failed test 7.
@@ -8340,7 +8366,7 @@ TEST_FrameCounterIRQ:
 	.byte $1F	; SLO Absolute, X
 	.word $4015 ; This reads from $4015 twice!
 	BEQ FAIL_FrameCounterIRQ2 ; If SLO is properly emulated, bit 7 will be set if you passed the test. The frame counter interrupt flag gets cleared after the second read in this case.
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 8 [APU Frame Counter IRQ]: Changing the Frame Counter to 5-step mode after the flag was set does not clear the flag. ;;;
 	LDA #$00	
@@ -8350,7 +8376,7 @@ TEST_FrameCounterIRQ:
 	STA $4017 ; 5-step mode, enable IRQ
 	LDA $4015 ; read the IRQ flag, which will still be set.
 	BEQ FAIL_FrameCounterIRQ2
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 9 [APU Frame Counter IRQ]: Disabling the IRQ flag will clear the IRQ flag. ;;;
 	LDA #$00	
@@ -8360,7 +8386,7 @@ TEST_FrameCounterIRQ:
 	STA $4017 ; clear the IRQ flag.
 	LDA $4015 ; read the IRQ flag, which will no longer be set.
 	BNE FAIL_FrameCounterIRQ2
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test A [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (see if it's set too early) ;;;
 	JSR WaitForVBlank
@@ -8377,7 +8403,7 @@ TEST_FrameCounterIRQ:
 	JSR Clockslide_26
 	LDA $4015 ; If the flag *is* set, it was set too early, so you fail the test.
 	BNE FAIL_FrameCounterIRQ2
-	INC <currentSubTest
+	INC <ErrorCode
 	BNE TEST_FrameCounterIRQ_Continue
 	
 FAIL_FrameCounterIRQ2:
@@ -8401,7 +8427,7 @@ TEST_FrameCounterIRQ_Continue:
 	JSR Clockslide_27
 	LDA $4015 ; If the flag is *not* set, it was set too late, so you fail the test.
 	BEQ FAIL_FrameCounterIRQ2
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test C [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (If the write occurs on a "put" CPU cycle, the IRQ is delayed by 1 CPU cycle) ;;;
 	JSR WaitForVBlank
@@ -8419,7 +8445,7 @@ TEST_FrameCounterIRQ_Continue:
 	JSR Clockslide_27
 	LDA $4015 ; If the flag *is* set, it was set too early, so you fail the test.
 	BNE FAIL_FrameCounterIRQ2
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test D [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (see if it's set on the correct cycle) ;;;
 	JSR WaitForVBlank
@@ -8437,7 +8463,7 @@ TEST_FrameCounterIRQ_Continue:
 	JSR Clockslide_28
 	LDA $4015 ; If the flag is *not* set, it was set too late, so you fail the test.
 	BEQ FAIL_FrameCounterIRQ2
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test E [APU Frame Counter IRQ]: Reading $4015 on the same cycle the IRQ flag is set, will not clear the IRQ flag (it gets set again on the following 2 CPU cycles) ;;;
 	JSR WaitForVBlank
@@ -8454,7 +8480,7 @@ TEST_FrameCounterIRQ_Continue:
 	LDA $4015 ; Read on the same cycle the IRQ flag is set.
 	LDA $4015 ; Read again! But it won't be cleared, since the IRQ flag gets set again.
 	BEQ FAIL_FrameCounterIRQ3
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test F [APU Frame Counter IRQ]: Reading $4015 on the cycle after the IRQ flag is set, will not clear the IRQ flag (it gets set again on the following CPU cycle) ;;;
 	JSR WaitForVBlank
@@ -8471,7 +8497,7 @@ TEST_FrameCounterIRQ_Continue:
 	LDA $4015 ; Read on the same cycle the IRQ flag is set.
 	LDA $4015 ; Read again! But it won't be cleared, since the IRQ flag gets set again.
 	BEQ FAIL_FrameCounterIRQ3
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test G [APU Frame Counter IRQ]: Reading $4015 2 cycles after the IRQ flag is set, will not clear the IRQ flag (it gets set again on this CPU cycle) ;;;
 	JSR WaitForVBlank
@@ -8488,7 +8514,7 @@ TEST_FrameCounterIRQ_Continue:
 	LDA $4015 ; Read on the same cycle the IRQ flag is set.
 	LDA $4015 ; Read again! But it won't be cleared, since the IRQ flag gets set again.
 	BEQ FAIL_FrameCounterIRQ3
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test H [APU Frame Counter IRQ]: Reading $4015 3 cycles after the IRQ flag is set, will clear the IRQ flag (it does not get set again on this CPU cycle) ;;;
 	JSR WaitForVBlank
@@ -8505,7 +8531,7 @@ TEST_FrameCounterIRQ_Continue:
 	LDA $4015 ; Read on the same cycle the IRQ flag is set.
 	LDA $4015 ; Read again! But it will be cleared.
 	BNE FAIL_FrameCounterIRQ3
-	INC <currentSubTest
+	INC <ErrorCode
 	BNE TEST_FrameCounterIRQ_Continue2
 		
 FAIL_FrameCounterIRQ3:
@@ -8536,7 +8562,7 @@ TEST_FrameCounterIRQ_Continue2:
 	LDA $4015
 	AND #$40
 	BNE FAIL_FrameCounterIRQ3
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test J [APU Frame Counter IRQ]: Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It happens on this cycle) ;;;
 	JSR WaitForVBlank
@@ -8553,7 +8579,7 @@ TEST_FrameCounterIRQ_Continue2:
 	LDA $4015
 	AND #$40
 	BEQ FAIL_FrameCounterIRQ3
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test K [APU Frame Counter IRQ]: Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It happens on this cycle too) ;;;
 	JSR WaitForVBlank
@@ -8570,7 +8596,7 @@ TEST_FrameCounterIRQ_Continue2:
 	LDA $4015
 	AND #$40
 	BEQ FAIL_FrameCounterIRQ4
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test L [APU Frame Counter IRQ]:  Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It does not happen on this cycle) ;;;
 	JSR WaitForVBlank
@@ -8587,7 +8613,7 @@ TEST_FrameCounterIRQ_Continue2:
 	LDA $4015
 	AND #$40
 	BNE FAIL_FrameCounterIRQ4
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test M [APU Frame Counter IRQ]: Despite the frame counter interrupt flag being set for those two cycles, an IRQ will not occur even if the CPU I flag is clear. ;;;
 	JSR TEST_IFlagLatency_IRQPrep
@@ -8609,7 +8635,7 @@ TEST_FrameCounterIRQ_Continue2:
 	LDA <$50
 	CMP #$5A
 	BEQ FAIL_FrameCounterIRQ4
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;; END OF TEST ;;
 	LDA #1
@@ -8644,7 +8670,7 @@ TEST_FrameCounter4Step:
 	LDA <$00 ; 4 cycles
 	LDA $4015 ; the pulse channel should still be playing for 1 more cycle.
 	BEQ FAIL_FrameCounter4Step
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 2 [APU Frame Counter 4-Step Mode]: Verify the timing of the first clock  (Read the cycle it stops);;;
 	LDA #2
@@ -8668,7 +8694,7 @@ TEST_FrameCounter4Step:
 	NOP ; 3 cycles to go
 	LDA $4015 ; the pulse channel should have stopped just before you read.
 	BNE FAIL_FrameCounter4Step
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 3 [APU Frame Counter 4-Step Mode]: Verify the timing of the second clock while not inhibiting Frame Counter IRQs (read 1 cycle early. It's still going) ;;;
 	LDA #2
@@ -8686,7 +8712,7 @@ TEST_FrameCounter4Step:
 	LDA $4015 ; the pulse channel should still be playing for 1 more cycle.
 	AND #$01  ; If you passed the Frame Counter IRQ test, bit 6 of $4015 should be set here, so it's very important we run AND #1
 	BEQ FAIL_FrameCounter4Step
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 4 [APU Frame Counter 4-Step Mode]: Verify the timing of the second clock while not inhibiting Frame Counter IRQs (Read the cycle it stops) ;;;
 	LDA #2
@@ -8704,7 +8730,7 @@ TEST_FrameCounter4Step:
 	LDA $4015; the pulse channel should have stopped just before you read.
 	AND #$01 ; If you passed the Frame Counter IRQ test, bit 6 of $4015 should be set here, so it's very important we run AND #1
 	BNE FAIL_FrameCounter4Step2
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 5 [APU Frame Counter 4-Step Mode]: Verify the timing of the third clock (read 1 cycle early. It's still going) ;;;
 	LDA #2
@@ -8727,7 +8753,7 @@ TEST_FrameCounter4Step:
 	LDA <$00 ; 4  cycles to go
 	LDA $4015 ; the pulse channel should still be playing for 1 more cycle.
 	BEQ FAIL_FrameCounter4Step2
-	INC <currentSubTest	
+	INC <ErrorCode	
 	
 	;;; Test 6 [APU Frame Counter 4-Step Mode]: Verify the timing of the third clock  (Read the cycle it stops) ;;;
 	LDA #2
@@ -8751,7 +8777,7 @@ TEST_FrameCounter4Step:
 	NOP ; 3 cycles to go
 	LDA $4015 ; the pulse channel should have stopped just before you read.
 	BNE FAIL_FrameCounter4Step2	
-	INC <currentSubTest	
+	INC <ErrorCode	
 	
 	;; END OF TEST ;;
 	LDA #1
@@ -8805,7 +8831,7 @@ TEST_FrameCounter5Step:
 	NOP ; 4 cycles
 	LDA $4015 ; the pulse channel should still be playing for 1 more cycle.
 	BEQ FAIL_FrameCounter5Step
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 2 [APU Frame Counter 5-Step Mode]: Verify the timing of the first clock  (Read the cycle it stops);;;
 	LDA #2
@@ -8826,7 +8852,7 @@ TEST_FrameCounter5Step:
 	LDA <$00 ; 3 cycle to go
 	LDA $4015 ; the pulse channel should have stopped just before you read.
 	BNE FAIL_FrameCounter5Step
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 3 [APU Frame Counter 5-Step Mode]: Verify the timing of the second clock (read 1 cycle early. It's still going) ;;;
 	LDA #2
@@ -8847,7 +8873,7 @@ TEST_FrameCounter5Step:
 	NOP ; 4 cycles
 	LDA $4015 ; the pulse channel should still be playing for 1 more cycle.
 	BEQ FAIL_FrameCounter5Step
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 4 [APU Frame Counter 5-Step Mode]: Verify the timing of the second clock  (Read the cycle it stops);;;
 	LDA #2
@@ -8868,7 +8894,7 @@ TEST_FrameCounter5Step:
 	LDA <$00 ; 3 cycle to go
 	LDA $4015 ; the pulse channel should have stopped just before you read.
 	BNE FAIL_FrameCounter5Step2
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 5 [APU Frame Counter 5-Step Mode]: Verify the timing of the third clock (read 1 cycle early. It's still going) ;;;
 	LDA #2
@@ -8889,7 +8915,7 @@ TEST_FrameCounter5Step:
 	NOP ; 6 cycles to go
 	LDA $4015 ; the pulse channel should still be playing for 1 more cycle.
 	BEQ FAIL_FrameCounter5Step2
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 6 [APU Frame Counter 5-Step Mode]: Verify the timing of the third clock  (Read the cycle it stops);;;
 	LDA #2
@@ -8944,7 +8970,7 @@ TEST_DeltaModulationChannel:
 	LDA $4015	; the DMC should have stopped by now.
 	AND #$10
 	BNE FAIL_DeltaModulationChannel	; If bit 4 is still set, then fail the test.
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 2 [APU Delta Modulation Channel]: Restarting the DMC should re-load the sample length. ;;;
 	LDA #$10
@@ -8962,7 +8988,7 @@ TEST_DeltaModulationChannel:
 	LDA $4015	; the DMC should have stopped by now.
 	AND #$10
 	BNE FAIL_DeltaModulationChannel	; If bit 4 is still set, then fail the test.
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 3 [APU Delta Modulation Channel]: Writing $10 to $4015 should start palying a new sample if the previous one ended. ;;;
 	LDA #$10
@@ -8973,7 +8999,7 @@ TEST_DeltaModulationChannel:
 	LDA $4015	; the DMC should be playing.
 	AND #$10
 	BEQ FAIL_DeltaModulationChannel
-	INC <currentSubTest
+	INC <ErrorCode
 	JSR Clockslide_4320
 	
 	;;; Test 4 [APU Delta Modulation Channel]: Writing $10 to $4015 while a sample is currently playing shouldn't affect anything. ;;;
@@ -8989,7 +9015,7 @@ TEST_DeltaModulationChannel:
 	LDA $4015	; the DMC should have stopped by now.
 	AND #$10
 	BNE FAIL_DeltaModulationChannel2
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 5 [APU Delta Modulation Channel]: Writing $00 to $4015 will immediately stop the sample. ;;;
 	LDA #$10
@@ -9000,7 +9026,7 @@ TEST_DeltaModulationChannel:
 	LDA $4015	; the DMC should have stopped
 	AND #$10
 	BNE FAIL_DeltaModulationChannel2
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 6 [APU Delta Modulation Channel]: Writing to $4013 doesn't change the sample length of the currently playing sample. ;;;
 	LDA #$10
@@ -9024,7 +9050,7 @@ TEST_DeltaModulationChannel:
 	LDA $4015	; the DMC should have stopped by now.
 	AND #$10
 	BNE FAIL_DeltaModulationChannel2
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 7 [APU Delta Modulation Channel]: The DMC IRQ Flag should not be set when disabled. ;;;
 	; Friendly reminder that in the prep before test 1, we run:
@@ -9036,7 +9062,7 @@ TEST_DeltaModulationChannel:
 	JSR Clockslide_8640 ; wait for sample to end.
 	LDA $4015 ; Bit 7 (which sets the Negative flag) is set if the DMC IRQ flag is set.
 	BMI FAIL_DeltaModulationChannel2	; in this case, it should not be set.
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 8 [APU Delta Modulation Channel]: The DMC IRQ Flag should be set when enabled, and a sample ends. ;;;
 	SEI			; prevent IRQs from actually interrupting the CPU.
@@ -9047,7 +9073,7 @@ TEST_DeltaModulationChannel:
 	JSR Clockslide_8640 ; wait for sample to end.
 	LDA $4015 ; Bit 7 (which sets the Negative flag) is set if the DMC IRQ flag is set.
 	BPL FAIL_DeltaModulationChannel2	; in this case, it should be set.
-	INC <currentSubTest
+	INC <ErrorCode
 	BNE FAIL_DeltaModulationChannelContinue ; branch around the fail condition.
 
 FAIL_DeltaModulationChannel2:
@@ -9057,7 +9083,7 @@ FAIL_DeltaModulationChannelContinue:
 	;;; Test 9 [APU Delta Modulation Channel]: Reading $4015 does not clear the IRQ flag. ;;;
 	LDA $4015 ; Bit 7 should still be set.
 	BPL FAIL_DeltaModulationChannel2
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test A [APU Delta Modulation Channel]: Writing to $4015 does clear the IRQ flag. ;;;
 	LDA #$10  ; Demonstrated by writing $10, but writing a zero will also clear the IRQ flag.
@@ -9066,7 +9092,7 @@ FAIL_DeltaModulationChannelContinue:
 	BMI FAIL_DeltaModulationChannel2
 	LDA #$0
 	STA $4015
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test B [APU Delta Modulation Channel]: Disabling the IRQ flag clears the IRQ flag. ;;;
 	LDA #$10
@@ -9077,7 +9103,7 @@ FAIL_DeltaModulationChannelContinue:
 	STA $4010	; disable the IRQ flag.
 	LDA $4015
 	BMI FAIL_DeltaModulationChannel2
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test C [APU Delta Modulation Channel]: Looping samples should loop. ;;;
 	; In other words, bit 4 of address $4015 will be set until you force the sample to stop.
@@ -9095,7 +9121,7 @@ FAIL_DeltaModulationChannelContinue:
 	LDA $4015
 	AND #$10
 	BNE FAIL_DeltaModulationChannel2
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test D [APU Delta Modulation Channel]: Looping samples should not set the IRQ flag when they loop. ;;;
 	LDA #$CF	; loop + enable IRQ flag! (and the fastest sample rate)
@@ -9108,7 +9134,7 @@ FAIL_DeltaModulationChannelContinue:
 	STA $4015
 	LDA $4015	; Even if the sample is force-stopped, the IRQ flag is not set.
 	BMI FAIL_DeltaModulationChannel2
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test E [APU Delta Modulation Channel]: Clearing the looping flag and then setting it again should keep the sample looping. ;;;
 	LDA #$10
@@ -9124,7 +9150,7 @@ FAIL_DeltaModulationChannelContinue:
 	BEQ FAIL_DeltaModulationChannel3 ; it should still be playing.
 	LDA #$00
 	STA $4015
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test F [APU Delta Modulation Channel]: Clearing the looping flag will not immediately end the sample. The sample will then play for it's remaining bytes. ;;;
 	LDA #$10
@@ -9141,7 +9167,7 @@ FAIL_DeltaModulationChannelContinue:
 	BPL FAIL_DeltaModulationChannel3 ; The IRQ flag should have been set.
 	AND #$10
 	BNE FAIL_DeltaModulationChannel3
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test G [APU Delta Modulation Channel]: A looping sample will re-load the sample length from $4013 every time the sample loops. ;;;
 	LDA #$CF	; loop + enable IRQ flag! (and the fastest sample rate)
@@ -9164,7 +9190,7 @@ FAIL_DeltaModulationChannelContinue:
 	BPL FAIL_DeltaModulationChannel3 ; The IRQ flag should have been set.
 	AND #$10
 	BNE FAIL_DeltaModulationChannel3
-	INC <currentSubTest
+	INC <ErrorCode
 	BNE FAIL_DeltaModulationChannelC2 ; branch around another fail condition.
 
 FAIL_DeltaModulationChannel3:
@@ -9183,7 +9209,7 @@ FAIL_DeltaModulationChannelC2:
 	LDA $4015	; the DMC should have stopped by now.
 	AND #$10
 	BNE FAIL_DeltaModulationChannel3
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test I [APU Delta Modulation Channel]: There should be a one-byte buffer that's filled immediately if empty. ;;;
 	LDA #$8F
@@ -9216,7 +9242,7 @@ TEST_DeltaModulationChannelTestILoop:
 	LDA $4015	
 	AND #$10
 	BNE FAIL_DeltaModulationChannel3
-	INC <currentSubTest
+	INC <ErrorCode
 	; Thanks again to blargg for those tests!
 	; Now to extend this suite for some specific timing tests.
 	
@@ -9225,7 +9251,7 @@ TEST_DeltaModulationChannelTestILoop:
 	JSR Clockslide_47
 	LDA $4000	; [Read Opcode] [Read Operand] [Read Operand] [DMC DMA! Databus = $00] [Read Open Bus]
 	BNE FAIL_DeltaModulationChannel3	; and if the read from $4000 wasn't $00, then fail the test.
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test K [APU Delta Modulation Channel]: Check that that Sample Address overflows to $8000 instead of $0000 ;;;
 	; This requires the DMC DMA to update the databus, so you need to have open bus emulation correct.	
@@ -9256,7 +9282,7 @@ TEST_DMC_OverflowLoop: ; DMA every 432 CPU cycles.
 	; now that A = the $40th byte read:
 	CMP #$EA
 	BNE FAIL_DeltaModulationChannel4
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test L [APU Delta Modulation Channel]: Check that the DMA will be delayed by 1 CPU cycle if the write to $4015 (which enables the DMC) occurs 2 cycles before the DMA timer reaches 0. ;;;
 	; Keep in mind, at the moment we're writing $10 to $4015, the DMC sample still has 1 bit remaining before the buffer is cleared.
@@ -9290,7 +9316,7 @@ TEST_DMC_OverflowLoop: ; DMA every 432 CPU cycles.
 	JSR Clockslide_24	; 3 cycles left.
 	LDA $4000 ; [read opcode] [read operand] [read operand] [DMC DMA] [Read open bus]
 	BNE FAIL_DeltaModulationChannel4
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test M [APU Delta Modulation Channel]: Check that the DMA will be delayed by 2 CPU cycles if the write to $4015 occurs 1 cycles before the DMA timer reaches 0. ;;;
 	; The order of operations is: 
@@ -9320,7 +9346,7 @@ TEST_DMC_OverflowLoop: ; DMA every 432 CPU cycles.
 	JSR Clockslide_23	; 3 cycles left.
 	LDA $4000 ; [read opcode] [read operand] [read operand] [DMC DMA] [Read open bus]
 	BNE FAIL_DeltaModulationChannel4
-	INC <currentSubTest
+	INC <ErrorCode
 	BNE FAIL_DeltaModulationChannelC3
 FAIL_DeltaModulationChannel4:
 	JMP FAIL_AndDisableAudioChannels
@@ -9394,7 +9420,7 @@ TEST_DMABusConflict:
 	JSR Clockslide_47
 	LDA $4000	; [Read Opcode] [Read Operand] [Read Operand] [DMC DMA! Databus = $00] [Read Open Bus]
 	BNE FAIL_DMC_Conflicts1	; and if the read from $4000 wasn't $00, then fail the test.
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 2 [DMA Bus Conflicts]: The bus conflicts exist. ;;;
 	; I know, we're jumping right into this one.
@@ -9479,7 +9505,7 @@ TEST_DMC_Conflict_AnswerLoop_EarlyFamicom:
 	STA <$50	; pass code 3. (early famicom)
 	
 TEST_DMC_Test3:
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 3 [DMA Bus Conflicts]: The bus conflicts clears the APU Frame Counter Interrupt Flag. ;;;
 	LDA $4015	; The bus conflict will read from $4015, clearing the frame counter's interrupt flag. 
@@ -9672,10 +9698,10 @@ TEST_ImpliedDummyRead:
 	; This is used to verify the timing that the Frame Counter Interrupt flag gets cleared.
 	JSR TEST_SLO_1F
 	LDX #1
-	STX <currentSubTest
+	STX <ErrorCode
 	CMP #1
 	BNE FAIL_ImpliedDummyRead1
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 2 [Implied Dummy Reads]: Prerequisite check. Does the frame counter interrupt flag get set if we enable it? ;;;
 	LDA #0
@@ -9700,7 +9726,7 @@ TEST_ImpliedDummyRead:
 	BNE FAIL_ImpliedDummyRead1 ; If SLO is properly emulated, you might see bit 7 set here (failing the test). The flag is actually cleared before the second read, so it bit 7 should be 0.
 	; This test *very deliberately* makes sure the double-reads from $4015 will always have bit 6 cleared before the second read, so we don't need to test for the alternate alignment here.
 
-	INC <currentSubTest
+	INC <ErrorCode
 	BNE TEST_ImpliedDummyReadPreReqContinue
 
 FAIL_ImpliedDummyRead1:
@@ -9731,7 +9757,7 @@ TEST_ImpliedDummyReadPreReqContinue:
 	LDA $4000
 	CMP #$48
 	BNE FAIL_ImpliedDummyRead1
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 4 [Implied Dummy Reads]: Prerequisite check. Is open bus accurate enough for this test? ;;;
 	; This test actually does work on an everdrive (and it would be nice not to fail because of unrelated open bus issues.)
@@ -9793,7 +9819,7 @@ TEST_ImpliedDummyReadPreReqContinue:
 	; and if we didn't crash, we passed the pre-requisite test. woo hoo.
 	
 	; And that should be all the pre-requisites.
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 5 [Implied Dummy Reads]: Do the implied instructions have dummy reads? (They should). ;;;
 	; This test extends to every error code after this.
@@ -9885,7 +9911,7 @@ TEST_ImpliedDummyRead_Post:
 
 	LDA <$60
 	BEQ FAIL_ImpliedDummyRead2
-	INC <currentSubTest	
+	INC <ErrorCode	
 
 	LDX <Copy_X
 	INX
@@ -9982,7 +10008,7 @@ TEST_ImpliedDummyRead_Loop2:	; This loop tests the opcodes that do have bit 5 se
 TEST_ImpliedDummyRead_Post2:
 	LDA <$60
 	BEQ FAIL_ImpliedDummyRead3
-	INC <currentSubTest	
+	INC <ErrorCode	
 
 	LDX <Copy_X
 	INX
@@ -10034,7 +10060,7 @@ TEST_ImpliedDummyRead_Continue2:
 TEST_ImpliedDummyRead_PostPHP:
 	LDA <$60
 	BEQ FAIL_ImpliedDummyRead4
-	INC <currentSubTest	
+	INC <ErrorCode	
 	; Okay cool, that's 22 opcodes down now.
 	; Let's test PHA now.
 
@@ -10074,7 +10100,7 @@ TEST_ImpliedDummyRead_PostPHA:
 
 	LDA <$60
 	BEQ FAIL_ImpliedDummyRead4
-	INC <currentSubTest	
+	INC <ErrorCode	
 	BNE TEST_ImpliedDummyRead_Continue3
 FAIL_ImpliedDummyRead4:
 	JMP FAIL_ImpliedDummyRead
@@ -10117,7 +10143,7 @@ TEST_ImpliedDummyRead_Loop5:	; This loop tests PLP and PLA
 TEST_ImpliedDummyRead_Post5:
 	LDA <$60
 	BEQ FAIL_ImpliedDummyRead5
-	INC <currentSubTest	
+	INC <ErrorCode	
 
 	LDX <Copy_X
 	INX
@@ -10168,7 +10194,7 @@ TEST_ImpliedDummyRead_Post6:
 	LDA $4015
 	AND #$40
 	BNE FAIL_ImpliedDummyRead5
-	INC <currentSubTest	
+	INC <ErrorCode	
 
 	LDX <Copy_X
 	INX
@@ -10208,7 +10234,7 @@ TEST_ImpliedDummyRead_PostJSR:
 	LDA $4015
 	AND #$40
 	BNE FAIL_ImpliedDummyRead5
-	INC <currentSubTest	
+	INC <ErrorCode	
 
 	; 29 opcodes tested now.
 	; I still want to test branches, though to be honest, I'm not currently sure how to safely do that.
@@ -10303,7 +10329,7 @@ TEST_AddrMode_AbsIndex:
 	LDA $590, X ; Read from address $680
 	CMP #$5A ; Check if it was the correct address.
 	BNE FAIL_AddrMode_AbsIndex
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 2 [Absolute Indexed Wraparound]: Wrapping around from address $FFFF to $0000 ;;;
 	LDA #$5A
@@ -10318,7 +10344,7 @@ TEST_AddrMode_AbsIndex:
 	LDA $FFFF, X	; $FFFF + $51 = $0050
 	CMP #$A5 ; Check if it was the correct address.
 	BNE FAIL_AddrMode_AbsIndex
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 3 [Absolute Indexed Wraparound]: The same applies to indexing with Y ;;;
 	LDY #$51
@@ -10343,7 +10369,7 @@ TEST_AddrMode_ZPgIndex:
 	LDA <$50, X ; read from address $58
 	CMP #$A5	; compare with $A5
 	BNE FAIL_AddrMode_ZPgIndex ; And fail the test if the expected value wasn't read.
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 2 [Zero Page Indexed Wraparound]: Indexing should always remain on the zero page. ;;;
 	; For instance, suppose X = $20. LDA <$F0, X won't read from address $0110, rather, it will read from address $0010.
@@ -10354,7 +10380,7 @@ TEST_AddrMode_ZPgIndex:
 	LDA <$FF, X
 	CMP #$A5
 	BNE FAIL_AddrMode_ZPgIndex
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 3 [Zero Page Indexed Wraparound]: This also applies to Zero Page with Y indexing. ;;;
 	LDY #1
@@ -10384,7 +10410,7 @@ TEST_AddrMode_Indirect:
 TEST_AddrMode_Indirect_Pass1:
 	CPX #0
 	BNE FAIL_AddrMode_Indirect
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 2 [Indirect Addressing Wraparound]: The Address bus wraps around the page when reading the low and high bytes with indirect addressing ;;;
 	; Basically, if the indirect jump is at a page boundary, (address $5FF, for instance) the high byte will be read from the same page as the low byte.
@@ -10449,7 +10475,7 @@ TEST_AddrMode_IndIndeX:
 	; The result of which, should be the value at address $580
 	CMP #$5A
 	BNE FAIL_AddrMode_IndIndeX
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 2 [Indirect Addressing, X Wraparound]: The X indexing is confined to the zero page. ;;;
 	; Set up $158 to point to address $680
@@ -10463,7 +10489,7 @@ TEST_AddrMode_IndIndeX:
 	LDA [$0068, X]
 	CMP #$5A
 	BNE FAIL_AddrMode_IndIndeX
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 3 [Indirect Addressing, X Wraparound]: The Address bus wraps around the page when reading the low and high bytes with indirect addressing ;;;
 	LDA #$80
@@ -10517,7 +10543,7 @@ TEST_AddrMode_IndIndeY:
 	; The result of which, should be the value at address $580
 	CMP #$5A
 	BNE FAIL_AddrMode_IndIndeY
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 2 [Indirect Addressing, Y Wraparound]: The Y indexing is allowed to cross page boundaries. ;;;
 	; Address $610 will hold the value $5A.
@@ -10535,7 +10561,7 @@ TEST_AddrMode_IndIndeY:
 	; The result of which, should be the value at address $610
 	CMP #$5A
 	BNE FAIL_AddrMode_IndIndeY
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 3 [Indirect Addressing, Y Wraparound]: The Address bus wraps around the page when reading the low and high bytes with indirect addressing ;;;
 	; LDA ($FF), Y works like this:
@@ -10592,7 +10618,7 @@ TEST_AddrMode_Relative:
 	LDA #$A5
 	STA <$53
 	JSR $0052	; This will branch to $FFF9, running an RTS. Otherwise, running a BRK.	
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 2 [Relative Addressing]: Branching from page $FF to page $00 ;;;
 	LDA #$E6
@@ -10601,7 +10627,7 @@ TEST_AddrMode_Relative:
 	STA <$51
 	LDA #$80
 	STA <$55
-	JSR TEST_FFFF_Branch_Wraparound
+	JSR TEST_AddrMode_Relative_FFF5
 	LDA <$55
 	CMP #$81
 	BNE FAIL_AddrMode_Relative
@@ -10628,7 +10654,7 @@ TEST_DecimalFlag:
 	; But remember, the decimal does NOT work on the NES. So the result should *actually* be the correct result of subtracting the two hexadecimal numbers, which is $3F.
 	CMP #$3F
 	BNE FAIL_DecimalFlag
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 2 [The Decimal Flag]: Despite this flag not working, it still gets pushed in a PHP/BRK instruction ;;;
 	PHP ; the decimal flag is set.
@@ -10655,15 +10681,15 @@ FAIL_BFlag:
 	JMP TEST_Fail
 
 TEST_BFlag: 
-	;;; Test 1 [The B Flag]: The B flag of the 6502 processor flags is set by PHP ;;;
+	;;; Test 1 [The B Flag]: The "B flag" is set in the value pushed to the stack by by PHP ;;;
 	PHP
 	PLA
 	STA <$50	; we'll get back to this one.
 	AND #$10
 	BEQ FAIL_BFlag
-	INC <currentSubTest
+	INC <ErrorCode
 	
-	;;; Test 2 [The B Flag]: The B flag of the 6502 processor flags is set by BRK ;;;
+	;;; Test 2 [The B Flag]: The "B flag" is set in the value pushed to the stack by by BRK ;;;
 	; Set up the BRK routine
 	LDA #$4C
 	STA $600
@@ -10681,7 +10707,7 @@ TEST_BFlag_BRK:
 	LDA <$51
 	AND #$10
 	BEQ FAIL_BFlag ; the B flag should be set.
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 3 [The B Flag]: This emulator should be capable of running an IRQ before I run an IRQ test. ;;;
 	LDA #LOW(TEST_BFlag_BRK2)
@@ -10704,9 +10730,9 @@ TEST_BFlag_BRK2:
 	STA $4017
 	; this IRQ should set the interrupt flag, but better safe than sorry?
 	SEI
-	INC <currentSubTest
+	INC <ErrorCode
 	
-	;;; Test 4 [The B Flag]: The B Flag should not be set when processor flags get pushed by an IRQ ;;;
+	;;; Test 4 [The B Flag]: The "B Flag" should not be set when processor flags get pushed by an IRQ ;;;
 	PLA ; pull off processor flags.
 	STA <$52	; we'll get back to this one.
 	PLA ; pull off the return address
@@ -10714,7 +10740,7 @@ TEST_BFlag_BRK2:
 	LDA <$52
 	AND #$10
 	BNE FAIL_BFlag ; the B flag should NOT be set.
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 5 [The B Flag]: The B Flag should not be set when processor flags get pushed by an NMI ;;;
 	; we already set up $700 a while back.
@@ -10738,7 +10764,7 @@ TEST_BFlag_NMI:
 	LDA <$53
 	AND #$10
 	BNE FAIL_BFlag2 ; the B flag should NOT be set.
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 6, 7, 8, and 9 [The B Flag]: Bit 5 of the processor status is always set. ;;;
 	LDX #0
@@ -10746,7 +10772,7 @@ TEST_BFlag_Bit5Loop:
 	LDA <$50, X
 	AND #$20
 	BEQ FAIL_BFlag2
-	INC <currentSubTest
+	INC <ErrorCode
 	INX
 	CPX #4
 	BNE TEST_BFlag_Bit5Loop
@@ -10783,7 +10809,7 @@ TEST_PPUReadBuffer:
 	; this value should be $5A, even if the buffer isn't working.
 	CMP #$5A
 	BNE FAIL_PPUReadBuffer
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 2 [PPU Read Buffer]: Reading address $2007 should increment the "v" register. ;;;
 	JSR ResetScrollAndWaitForVBlank
@@ -10803,12 +10829,12 @@ TEST_PPUReadBuffer:
 	LDA $2007	; this should read 0 from the buffer, and put 1 in the buffer.
 	LDA $2007	; this should read 1 from the buffer, and put 2 in the buffer.
 	BEQ FAIL_PPUReadBuffer
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 3 [PPU Read Buffer]: There should be a 1-bute buffer when reading from $2007 ;;;
 	CMP #1
 	BNE FAIL_PPUReadBuffer
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 4 [PPU Read Buffer]: Reading from CHR ROM should use the buffer. ;;;
 	JSR ResetScrollAndWaitForVBlank
@@ -10819,7 +10845,7 @@ TEST_PPUReadBuffer:
 	LDA $2007 ; read $3C from CHR ROM.
 	CMP #$3C
 	BNE FAIL_PPUReadBuffer
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 5 [PPU Read Buffer]: Reading from Palette RAM should NOT use the buffer. ;;;
 	JSR ResetScrollAndWaitForVBlank
@@ -10829,7 +10855,7 @@ TEST_PPUReadBuffer:
 	LDA $2007 ; read $30
 	CMP #$30
 	BNE FAIL_PPUReadBuffer2
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 6 [PPU Read Buffer]: Writing to $2006 does not modify the buffer value. ;;;
 	JSR ResetScrollAndWaitForVBlank
@@ -10843,7 +10869,7 @@ TEST_PPUReadBuffer:
 	LDA $2007 ; read the value of $01 from the buffer.
 	CMP #$01
 	BNE FAIL_PPUReadBuffer2
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 7 [PPU Read Buffer]: The value on the nametable at $2700 through $27FF should be put in the buffer when reading from palette RAM at $3F00 through $3FFF. ;;;
 	JSR ResetScrollAndWaitForVBlank
@@ -11028,7 +11054,7 @@ TEST_DMCDMAPlusOAMDMA_Loop2:
 	INX
 	CPX #$10
 	BNE TEST_DMCDMAPlusOAMDMA_Loop2
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 2 [DMC DMA + OAM DMA]: Compare results with answer key ;;;
 	LDX #0
@@ -11105,7 +11131,7 @@ TEST_ExplicitDMAAbort_Loop1:
 	INX
 	CPX #$10
 	BNE TEST_ExplicitDMAAbort_Loop1
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 2 [Explicit DMA Abort]: Compare results with answer key ;;;
 	LDX #0
@@ -11140,7 +11166,7 @@ TEST_ImplicitDMAAbort:
 	JSR CheckDMATiming
 	CPY #4 ; 
 	BNE FAIL_ImplicitDMAAbort
-	INC <currentSubTest
+	INC <ErrorCode
 
 	JSR ClearPage2
 	LDX #0
@@ -11295,7 +11321,7 @@ TEST_ImplicitDMAAbort_KeyLoop1:
 	INX
 	CPX #$10
 	BNE TEST_ImplicitDMAAbort_KeyLoop1
-	INC <currentSubTest
+	INC <ErrorCode
 	LDX #0
 
 	;;; Test 3 [Implicit DMA Abort]: Compare results with answer key ;;;
@@ -11307,7 +11333,7 @@ TEST_ImplicitDMAAbort_KeyLoop2:
 	INX
 	CPX #$10
 	BNE TEST_ImplicitDMAAbort_KeyLoop2
-	INC <currentSubTest
+	INC <ErrorCode
 	LDX #0
 
 	;;; Test 4 [Implicit DMA Abort]: Compare results with answer key ;;;
@@ -11351,7 +11377,7 @@ TEST_ImplicitDMAAbort_AltLoop1:
 	INX
 	CPX #$10
 	BNE TEST_ImplicitDMAAbort_AltLoop1
-	INC <currentSubTest
+	INC <ErrorCode
 	LDX #0
 
 	;;; Test 3 [Implicit DMA Abort]: Compare results with answer key ;;;
@@ -11363,7 +11389,7 @@ TEST_ImplicitDMAAbort_AltLoop2:
 	INX
 	CPX #$10
 	BNE TEST_ImplicitDMAAbort_AltLoop2
-	INC <currentSubTest
+	INC <ErrorCode
 	LDX #0
 
 	;;; Test 4 [Implicit DMA Abort]: Compare results with answer key ;;;
@@ -11441,10 +11467,10 @@ TEST_ControllerClocking:
 	; This upcoming test requires SLO to be implemented, so let's confirm it works.
 	JSR TEST_SLO_1F
 	LDX #2
-	STX <currentSubTest
+	STX <ErrorCode
 	CMP #1
 	BNE FAIL_ControllerClocking
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 3 [Controller Clocking]: What happens on two consecutive read cycles from $4016? ;;;
 	; There are actually 2 outcomes here.
@@ -11481,7 +11507,7 @@ TEST_ControllerClocking_Loop2:
 	.word $4016 ; Double-Read address $4016
 	AND #2		; If the double read picked up the ninth value of the shift register, then you fail the test.
 	BNE FAIL_ControllerClocking
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 5 [Controller Clocking]: The DMC DMA can clock the controller. ;;;
 	; This is pretty much the exact same thing as the [DMA + $4016] test
@@ -11506,7 +11532,7 @@ TEST_ControllerClocking_Loop3:
 TEST_ControllerClocking_Exit3:
 	CPX #6
 	BNE FAIL_ControllerClocking2
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 6 [Controller Clocking]: The DMC DMA bus conflicting with $4016 counts as a consecutive read, so LDA $4016 would only end up clocking once in that situation. ;;;
 	JSR TEST_ControllerClocking_Strobe
@@ -11813,7 +11839,7 @@ TEST_OAM_Corruption:
 	LDA $2004
 	CMP #$5A
 	BNE FAIL_OAM_Corruption	
-	INC <currentSubTest
+	INC <ErrorCode
 	; Okay, now that we know this emulator won't crash, that *actually* leads us to:
 	
 	;;; Test 2 [OAM Corruption]: Disabling rendering in the middle of a visible scanline can cause OAM Corruption ;;;
@@ -11854,7 +11880,7 @@ TEST_OAM_Corruption:
 	; If X == 8*4, the delay was 2 ppu cycles.
 	; If X == 8*5, the delay was 3 ppu cycles.
 	STX <$50 ; This could be useful for debugging?
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 3 [OAM Corruption]: OAM Does not get corrupt immediately after disabling rendering ;;;
 	JSR Sync_ToPreRenderDot324 ; Like before, sync the CPU with rendering enabled after an OAM DMA.
@@ -11866,7 +11892,7 @@ TEST_OAM_Corruption:
 	JSR TEST_OAM_Corruption_Evaluate
 	CPX #0
 	BNE FAIL_OAM_Corruption ; If X does not make it to zero (it detected a corrupted row of OAM), fail the test.
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 4 [OAM Corruption]: OAM Does not get corrupt immediately after re-enabling rendering ;;;
 	; You have to wait until the first ppu cycle on a line between the pre-render-line and line 339.
@@ -11927,7 +11953,7 @@ TEST_JSREdgeCases:
 	LDA IncorrectReturnAddressOffset
 	CMP #0
 	BNE FAIL_JSREdgeCases
-	INC <currentSubTest
+	INC <ErrorCode
 	
 	;;; Test 2 [JSR Edge Cases]: Open bus pre-requisite ;;;
 	LDA $4000
@@ -11939,7 +11965,7 @@ TEST_JSREdgeCases:
 	LDA $3FF0, X
 	CMP #$5A
 	BNE FAIL_JSREdgeCases
-	INC <currentSubTest
+	INC <ErrorCode
 
 	;;; Test 3 [JSR Edge Cases]: What value is on the data bus after JSR? ;;;
 	; Here are all the cycles of JSR. (Simplified. JSR is actually a super odd instruction. I recommend looking at it in visual 6502 some time.)
@@ -12022,7 +12048,7 @@ TEST_AllNops_Evaluate:	; This just checks a bunch of variables to make sure the 
 	CPX <Copy_SP
 	.byte $F0, $03 ; BEQ +3 bytes
 	JMP TEST_AllNops_Evaluate_SP
-	INC <currentSubTest
+	INC <ErrorCode
 	LDX #$40
 	RTS
 ;;;;;;;
@@ -12056,7 +12082,7 @@ TEST_AllNops_EvaluateAbsolute: ; This does the same thing as TEST_AllNops_Evalua
 	LDA $2002
 	.byte $10, $03 ; BPL +3 bytes
 	JMP TEST_AllNops_Evaluate_Dummy
-	INC <currentSubTest
+	INC <ErrorCode
 	LDA #$40
 	TAX
 	RTS
@@ -12480,6 +12506,173 @@ TEST_AllNOPs:
 	LDA #1
 	RTS
 ;;;;;;;
+FAIL_PaletteRAMQuirks:
+	JSR WaitForVBlank
+	JSR SetUpDefaultPalette
+	JSR ResetScroll
+	JSR EnableRendering
+	JMP TEST_Fail
+
+TEST_PaletteRAMQuirks:
+	;;; Test 1 [Palette RAM Quirks]: Does this emulator pass the PPU Read Buffer Test? ;;;
+	; As a pre-requisite, this test requires you pass TEST_PPUReadBuffer
+	JSR TEST_PPUReadBuffer
+	LDX #1
+	STA <ErrorCode ; Set the error code to 1.
+	CMP #1
+	BNE FAIL_PaletteRAMQuirks
+	INC <ErrorCode
+	
+	;;; Test 2 [Palette RAM Quirks]: Palette RAM should be mirrored through $3FFF ;;;
+	JSR DisableRendering
+	JSR SetPPUADDRFromWord
+	.byte $3F, $0F
+	LDA #$3F
+	STA $2007
+	JSR SetPPUADDRFromWord
+	.byte $3F, $EF
+	LDA #0
+	STA $2002 ; clear the PPU bus
+	LDA $2007
+	CMP #$3F
+	BNE FAIL_PaletteRAMQuirks
+	
+	INC <ErrorCode
+	;;; Test 3 [Palette RAM Quirks]: The backdrop colors for palettes 1, 2, and 3 are not mirrors of the backdrop color of palette 0 ;;;
+	JSR WaitForVBlank
+	JSR SetPPUADDRFromWord
+	.byte $3F, $00
+	LDA #$3F
+	STA $2007
+	LDA $2007 ; $3F01
+	LDA $2007 ; $3F02
+	LDA $2007 ; $3F03
+	LDA #0
+	STA $2002 ; clear the PPU bus
+	LDA $2007 ; $3F04
+	CMP #$3F
+	BEQ FAIL_PaletteRAMQuirks
+	LDA $2007 ; $3F05
+	LDA $2007 ; $3F06
+	LDA $2007 ; $3F07
+	LDA #0
+	STA $2002 ; clear the PPU bus
+	LDA $2007 ; $3F08
+	CMP #$3F
+	BEQ FAIL_PaletteRAMQuirks
+	LDA $2007 ; $3F09
+	LDA $2007 ; $3F0A
+	LDA $2007 ; $3F0B
+	LDA #0
+	STA $2002 ; clear the PPU bus
+	LDA $2007 ; $3F0C
+	CMP #$3F
+	BEQ FAIL_PaletteRAMQuirks2
+	JSR SetUpDefaultPalette
+	INC <ErrorCode
+	
+	;;; Test 4 [Palette RAM Quirks]: The backdrop colors for sprites are mirrors of the backdrop colors for backgrounds ;;;
+	JSR WaitForVBlank ; These functions (at the cost of taking up as few bytes here as possible) take a long time to run.
+	JSR SetPPUADDRFromWord ; I'd like to avoid drawing garbage colors on screen during these tests, so we're waiting for Vblank.
+	.byte $3F, $00
+	LDA #$3F
+	STA $2007
+	JSR SetPPUADDRFromWord ; And let's read from the mirror of this palette RAM address.
+	.byte $3F, $10
+	LDA #0
+	STA $2002 ; clear the PPU bus
+	LDA $2007
+	CMP #$3F			   ; We wrote $3F, so the mirror here should read $3F.
+	BNE FAIL_PaletteRAMQuirks2
+	JSR SetUpDefaultPalette
+	JSR WaitForVBlank
+	
+	JSR WaitForVBlank ; These functions (at the cost of taking up as few bytes here as possible) take a long time to run.
+	JSR SetPPUADDRFromWord ; I'd like to avoid drawing garbage colors on screen during these tests, so we're waiting for Vblank.
+	.byte $3F, $14
+	LDA #$3F
+	STA $2007
+	JSR SetPPUADDRFromWord ; And let's read from the mirror of this palette RAM address.
+	.byte $3F, $04
+	LDA #0
+	STA $2002 ; clear the PPU bus
+	LDA $2007
+	CMP #$3F			   ; We wrote $3F, so the mirror here should read $3F.
+	BNE FAIL_PaletteRAMQuirks2
+	JSR SetUpDefaultPalette
+	JSR WaitForVBlank
+
+	JSR WaitForVBlank ; These functions (at the cost of taking up as few bytes here as possible) take a long time to run.
+	JSR SetPPUADDRFromWord ; I'd like to avoid drawing garbage colors on screen during these tests, so we're waiting for Vblank.
+	.byte $3F, $08
+	LDA #$3F
+	STA $2007
+	JSR SetPPUADDRFromWord ; And let's read from the mirror of this palette RAM address.
+	.byte $3F, $18
+	LDA #0
+	STA $2002 ; clear the PPU bus
+	LDA $2007
+	CMP #$3F			   ; We wrote $3F, so the mirror here should read $3F.
+	BNE FAIL_PaletteRAMQuirks2
+	JSR SetUpDefaultPalette
+	JSR WaitForVBlank
+	
+	JMP TEST_PaletteRAMQuirksCont
+FAIL_PaletteRAMQuirks2:
+	JMP FAIL_PaletteRAMQuirks
+TEST_PaletteRAMQuirksCont:
+	
+	JSR WaitForVBlank ; These functions (at the cost of taking up as few bytes here as possible) take a long time to run.
+	JSR SetPPUADDRFromWord ; I'd like to avoid drawing garbage colors on screen during these tests, so we're waiting for Vblank.
+	.byte $3F, $1C
+	LDA #$3F
+	STA $2007
+	JSR SetPPUADDRFromWord ; And let's read from the mirror of this palette RAM address.
+	.byte $3F, $0C
+	LDA #0
+	STA $2002 ; clear the PPU bus
+	LDA $2007
+	CMP #$3F			   ; We wrote $3F, so the mirror here should read $3F.
+	BNE FAIL_PaletteRAMQuirks2
+	JSR SetUpDefaultPalette
+
+	INC <ErrorCode
+	;;; Test 5 [Palette RAM Quirks]: The values in Palette RAM are 6 bit, not 8 bit. ;;;
+	JSR WaitForVBlank
+	JSR SetPPUADDRFromWord
+	.byte $3F, $1F
+	LDA #$FF
+	STA $2007
+	JSR SetPPUADDRFromWord
+	.byte $3F, $1F
+	LDA #0
+	STA $2002 ; clear the PPU bus
+	LDA $2007
+	CMP #$3F
+	BNE FAIL_PaletteRAMQuirks2
+	
+	JSR SetPPUADDRFromWord
+	.byte $3F, $1F
+	LDA #$FF
+	STA $2007
+	JSR SetPPUADDRFromWord
+	.byte $3F, $1F
+	LDA #$FF
+	STA $2002 ; Set the ppu bus to $FF
+	LDA $2007 ; The upper 2 bits read from palette RAM are copies of the PPU bus.
+	CMP #$FF
+	BNE FAIL_PaletteRAMQuirks2
+	
+	;;END OF TEST;;
+	JSR WaitForVBlank
+	JSR SetUpDefaultPalette
+	JSR ResetScroll
+	JSR EnableRendering
+	LDA #1
+	RTS
+;;;;;;;
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                ENGINE                   ;;
@@ -13320,7 +13513,7 @@ DrawTEST:	; This will print "TEST", "PASS", "FAIL x" or "...." depending on if t
 	BNE DrawTEST_PrintDRAW
 DrawTEST_NotDRAW: ; some tests say "DRAW" instead of "TEST". These say "TEST" though.
 	LDA [suitePointerList,X]
-	STA <currentSubTest
+	STA <ErrorCode
 	; 0 = "TEST"
 	; 1 = "PASS"
 	; 2 = "FAIL"
@@ -13359,7 +13552,7 @@ DrawTEST_PrintDRAW:
 	; we failed, so print an error code.
 	LDA #$24
 	STA $2007
-	lda <currentSubTest
+	lda <ErrorCode
 	AND #$FC
 	LSR A
 	LSR A
@@ -14050,7 +14243,7 @@ RunTest_AllTestSkipNMI:
 	JSR ResetScroll		          ; Reset the scroll before the test, since we just modified 'v' inside the previous subroutines.
 RunTest_AllTestSkipDrawing1:
 	LDA #1
-	STA <currentSubTest           ; set this to 1 before running any tests.
+	STA <ErrorCode           ; set this to 1 before running any tests.
 	STA <initialSubTest			  ; Some tests have multiple sets of tests to run, all using the same code. So writing here changes the test value.
 	LDA #$80
 	STA <Test_UnOp_SP			  ; Some tests might modify the stack pointer. The test will use a value of $80 just to be sure it's not overwriting other stack data.
@@ -14710,7 +14903,7 @@ TEST_IFlagLatency_PageBoundaryTest:
 	JSR TEST_IFlagLatency_StartTest_10ExtraCycles ; clear address $50, and sync with DMA. X=0. We have 12 cycles until the DMA instead of the usual 2 these tests have used.
 	LDA #$5A ; +2 (10 cycles until DMA)
 	STA <$50 ; +3 (7 cycles until DMA)
-	LDA <currentSubTest ; +3 cycles (4 cycles until DMA). This is also using a known non-zero-value, so this branch WILL be taken.
+	LDA <ErrorCode ; +3 cycles (4 cycles until DMA). This is also using a known non-zero-value, so this branch WILL be taken.
 	CLI		 ; +2 cycles (2 cycles until DMA)
 	BNE TEST_IFlagLatency_Branch3 ; [1: read opcode] (poll for interrupts, no interrupts) [2: read operand] [DMC DMA, set IRQ Level detector low] [3: move the PC] (Poll for interrupts, we got one!) [4: update PC high]
 	NOP	; The PC will be here at address $FEFF while taking the branch.
@@ -14798,7 +14991,7 @@ DMASyncWithoutOpenBus:
 	; It's worth noting that function *is* consistent on hardware, and it does work. However, despite this, a lot of emulators have incorrect timing for reads from $4015, and won't actually be in sync after this runs.
 	; Hence the existence of the open bus DMA Sync routine, but wouldn't you know it- even fewer emulators implement the DMC DMA updating the data bus, so... not much I can do about that.
 	LDX #0
-    LDA #$80	; Sloest Speed
+    LDA #$80	; Slowest Speed
     STA $4010	; Also enable the DMC IRQ
     LDA #0
     STA $4013	; Length = 0 (+1)
@@ -14876,21 +15069,21 @@ Clockslide:
 	; LDA $2002			 ; +3 cycles
 	
 Clockslide_50:
-	.byte $C9
+	.byte $C9	; If you start executing here, there are 38 cycles between here and the RTS instruction. (+6 for the JSR, +6 for the RTS = 50)
 Clockslide_49:
-	.byte $C9
+	.byte $C9	; If you start executing here, there are 37 cycles between here and the RTS instruction. (+6 for the JSR, +6 for the RTS = 49)
 Clockslide_48:
-	.byte $C9
+	.byte $C9	; If you start executing here, there are 36 cycles between here and the RTS instruction. (+6 for the JSR, +6 for the RTS = 48)
 Clockslide_47:
-	.byte $C9
+	.byte $C9	; ... and so on.
 Clockslide_46:
-	.byte $C9
+	.byte $C9	; In case you're wondering how this works...
 Clockslide_45:
-	.byte $C9
+	.byte $C9	; opcode $C9 is for "CMP Immediate". (Which unfortunately updates the CPU status flags...)
 Clockslide_44:
-	.byte $C9
+	.byte $C9	; CMP Immediate takes 2 cycles, and is also 2 bytes long. (Opcode and Operand)
 Clockslide_43:
-	.byte $C9
+	.byte $C9	; 
 Clockslide_42:
 	.byte $C9
 Clockslide_41:
@@ -14944,13 +15137,13 @@ Clockslide_18:
 Clockslide_17:
 	.byte $C9
 Clockslide_16:
-	.byte $C9
+	.byte $C9	; If this is executed, the $C5 is the operand. +2 cycles.
 Clockslide_15:
-	.byte $C5
+	.byte $C5	; CMP <ZeroPage (takes 3 cycles). If this is executed, the $EA is the operand.
 Clockslide_14:
-	.byte $EA
+	.byte $EA	; NOP (no operands)
 Clockslide_12:
-	.byte $60
+	.byte $60	; RTS (+6 cycles)
 ;;;;;;;;;;;;;
 
 DMASync: ; Line up the CPU and the DMA. The DMA occurs 406 CPU cycles after the RTS. (typically, this leads into a few clockslides, and another RTS)
@@ -15044,13 +15237,13 @@ VblSync_skip4:
 ;;;;;;;;;;;;;;;;;;;;;
 
 	.org $FFBE
-VblSync_ABORT:	; This emulator failed to pre-test, implying that this will loop infinitely, so instead of doing that, just don't bother.
+VblSync_ABORT:	; This emulator failed the pre-test, implying that this will loop infinitely, so instead of doing that, just don't bother.
 	PLA
 	RTS
 ;;;;;;;
 
 	.org $FFC0
-	; 17 00s. This will be the DPCM "audio sample" played during the CMD DMA Sync loop. It should just be silence.
+	; 17 00s. This will be the DPCM "audio sample" played during the DMC DMA Sync loop. It should just be silence.
 	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 
 VblSync_Loop2:
@@ -15063,7 +15256,7 @@ VblSync_Loop2:
 	RTS
 ;;;;;;;
 
-VblSync_Plus_A: ; In this context, A is a PPU cycle.
+VblSync_Plus_A: ; In this context, the value of A will translate to 1 additional PPU cycle. (by stalling for 29781*A CPU cycles)
 	PHA
 	LDA <result_VblankSync_PreTest		; Check if this sync routine will loop infinitely.
 	BMI VblSync_ABORT	; If it will, just RTS without syncing. It was going to fail the test anyway with frame timing that incorrect.
@@ -15078,12 +15271,12 @@ VblSync_Plus_A_Loop:
 	JMP VblSync_Plus_A_End	; I ran out of space, so I moved it up there.
 	
 	;.org $FFF5
-TEST_FFFF_Branch_Wraparound:
-	; This is part of test 3 of Test_FFFF_Plus_X_Wraparound
+TEST_AddrMode_Relative_FFF5:
+	; This is part of test 2 of TEST_AddrMode_Relative
 	; A = 0, so this branch to $0050 is always taken.
 	LDA #0
-	.byte $F0, $57; BNE $0050
-	; Address $0050 is a branch to this RTS.
+	.byte $F0, $57; BNE to address $0050
+	; Address $0050 contains bytes that will branch back here to this RTS.
 	RTS
 ;;;;;;;
 	.org $FFFA	; Interrupt vectors go here:
