@@ -3,7 +3,7 @@ AccuracyCoin is a large collection of NES accuracy tests on a single NROM cartri
 
 This ROM was designed for the RP2A03G CPU and the RP2C02G PPU. Some tests might fail on hardware with a different revision.
 
-This ROM currently has 125 tests designed to print error codes narrowing down the specific issues your NES emulator might have. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
+This ROM currently has 125 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
 Here's an example of the menu in this ROM shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been run yet. (The cursor is currently next to the "RAM Mirroring" test.)
 
@@ -29,11 +29,11 @@ After running a test, you can press "Select" to reveal this menu:
 
 This menu will print several bytes on screen and can be useful for debugging certain tests in a situation where you don't have a way to view everything in RAM. I suggest simply using some form of memory viewer if possible.
 
-This menu does not apply to every test in the ROM, as many tests don't write anything to RAM, or the values written aren't relavent for what went wrong.
+This menu does not apply to every test in the ROM, as many tests don't write anything to RAM, or the values written aren't relevant for what went wrong.
 
 The topmost row will print the values from address $20 to $2F, which are values used in the Unofficial Instruction tests.  
 The second row will print the values from $50 to $6F, which are used in a handful of tests.  
-The remaining 8 rows will print every byte from address $500 to $5FF, which are typically where a test will store any bytes needed for it.
+The remaining 8 rows will print every byte from address $500 to $5FF, which is typically where a test will store any bytes needed for it.
 
 Here's a color-coded version of that image, with boxes around each byte:
 
@@ -53,19 +53,19 @@ For more information, I recommend reading the fully commented assembly code for 
   1: Executing address $FFFF should read addresses $0000 and $0001 as the operands.  
 
 ### The Decimal Flag
-  1: The 6502 "Binary Coded Decimal" flag should not affect the ADC or SBC instructions on the NES
-  2: Despite this flag not working, it still gets pushed in a PHP/BRK instruction
+  1: The 6502 "Binary Coded Decimal" flag should not affect the ADC or SBC instructions on the NES.  
+  2: Despite this flag not working, it still gets pushed in a PHP/BRK instruction.  
 
 ### The B Flag
-  1: The B flag of the 6502 processor flags should be set by PHP  
-  2: The B flag of the 6502 processor flags should be set by BRK  
+  1: The B flag of the 6502 processor flags should be set by PHP.  
+  2: The B flag of the 6502 processor flags should be set by BRK.  
   3: An IRQ should have occured.  
-  4: The B flag of the 6502 processor flags should not be set by an IRQ  
-  5: The B flag of the 6502 processor flags should not be set by an NMI  
-  6: Bit 5 of the 6502 processor flags should be set by PHP  
-  7: Bit 5 of the 6502 processor flags should be set by BRK  
-  8: Bit 5 of the 6502 processor flags should be set by an IRQ  
-  9: Bit 5 of the 6502 processor flags should be set by an NMI  
+  4: The B flag of the 6502 processor flags should not be set by an IRQ.  
+  5: The B flag of the 6502 processor flags should not be set by an NMI.  
+  6: Bit 5 of the 6502 processor flags should be set by PHP.  
+  7: Bit 5 of the 6502 processor flags should be set by BRK.  
+  8: Bit 5 of the 6502 processor flags should be set by an IRQ.  
+  9: Bit 5 of the 6502 processor flags should be set by an NMI.  
   
 ### Dummy read cycles
   1: A mirror of PPU_STATUS ($2002) should be read twice by LDA $20F2, X (where X = $10).  
@@ -82,8 +82,8 @@ For more information, I recommend reading the fully commented assembly code for 
 
 ### Dummy write cycles
   1: PPU Open Bus should exist.  
-  2: Read-Modify-Write instructions should write to $2006 twice.  
-  3: Read-Modify-Write instructions with X indexing should write to $2006 twice.  
+  2: Read-modify-write instructions should write to $2006 twice.  
+  3: Read-modify-write instructions with X indexing should write to $2006 twice.  
 
 ### Open Bus
   1: Reading from open bus is not all zeroes.  
@@ -153,13 +153,13 @@ For more information, I recommend reading the fully commented assembly code for 
 
 ### Absolute Indexed Wraparound
   1: Absolute indexed addressing did not read from the correct address.  
-  2: When indexing + X beyond address $FFFF, the instruction should read from the zero page.  
-  3: When indexing + Y beyond address $FFFF, the instruction should read from the zero page.  
+  2: When indexing with X beyond address $FFFF, the instruction should read from the zero page.  
+  3: When indexing with Y beyond address $FFFF, the instruction should read from the zero page.  
   
 ### Zero Page Indexed Wraparound
   1: Zero Page indexed addressing did not read from the correct address.  
-  2: When indexing + X beyond address $00FF, the instruction should still read from the zero page.  
-  3: When indexing + Y beyond address $00FF, the instruction should still read from the zero page.  
+  2: When indexing with X beyond address $00FF, the instruction should still read from the zero page.  
+  3: When indexing with Y beyond address $00FF, the instruction should still read from the zero page.  
   
 ### Indirect Addressing Wraparound
   1: JMP (Indirect) did not move the program counter to the correct address.  
