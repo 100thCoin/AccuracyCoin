@@ -15274,7 +15274,7 @@ TEST_AddrMode_Relative_FFF5:
 	; This is part of test 2 of TEST_AddrMode_Relative
 	; A = 0, so this branch to $0050 is always taken.
 	LDA #0
-	.byte $F0, $57; BNE to address $0050
+	.byte $F0, $57; BEQ to address $0050
 	; Address $0050 contains bytes that will branch back here to this RTS.
 	RTS
 ;;;;;;;
