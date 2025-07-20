@@ -200,7 +200,7 @@ For more information, I recommend reading the fully commented assembly code for 
   7: If the RDY line goes low 2 cycles before the write cycle, the A register was not the correct value after the test.  
   8: If the RDY line goes low 2 cycles before the write cycle, the X register was not the correct value after the test.  
   9: If the RDY line goes low 2 cycles before the write cycle, the Y register was not the correct Value after the test.  
-  A: If the RDY line goes low 2 cycles before the write cycle, the CPU Status flags were not correct after the test.  
+  A: If the RDY line goes low 2 cycles before the write cycle, the CPU status flags were not correct after the test.  
 
  ### Unofficial Instructions: SHS
   F: The high byte corruption did not match either known behavior.  
@@ -215,8 +215,8 @@ For more information, I recommend reading the fully commented assembly code for 
   8: If the RDY line goes low 2 cycles before the write cycle, the A register was not the correct value after the test.  
   9: If the RDY line goes low 2 cycles before the write cycle, the X register was not the correct value after the test.  
   A: If the RDY line goes low 2 cycles before the write cycle, the Y register was not the correct Value after the test.  
-  B: If the RDY line goes low 2 cycles before the write cycle, the CPU Status flags were not correct after the test.  
-  C: If the RDY line goes low 2 cycles before the write cycle, the Stack pointer was not the correct value after the test.  
+  B: If the RDY line goes low 2 cycles before the write cycle, the CPU status flags were not correct after the test.  
+  C: If the RDY line goes low 2 cycles before the write cycle, the stack pointer was not the correct value after the test.  
 
 ### Interrupt flag latency
   1: An IRQ should occur when a DMC sample ends, the DMC IRQ is enabled, and the CPU's I flag is clear.  
@@ -397,18 +397,18 @@ For more information, I recommend reading the fully commented assembly code for 
   3: The DMC DMA bus conflict should clear the APU Frame Counter Interrupt Flag.  
 
 ### DMC DMA + OAM DMA
-  1: The DMC DMA timing in your emulator is off.
-  2: The overlapping DMAs did not spend the correct number of CPU cycles.
+  1: The DMC DMA timing in your emulator is off.  
+  2: The overlapping DMAs did not spend the correct number of CPU cycles.  
 
 ### Explicit DMA Abort
-  1: The DMC DMA timing in your emulator is off.
-  2: The aborted DMAs did not spend the correct number of CPU cycles.
+  1: The DMC DMA timing in your emulator is off.  
+  2: The aborted DMAs did not spend the correct number of CPU cycles.  
   
 ### Implicit DMA Abort
-  1: The DMC DMA timing in your emulator is off.
-  2: The aborted DMAs did not spend the correct number of CPU cycles.
-  3: The 1-cycle DMA should not get delayed by a write cycle, rather it just shouldn't occur in that case.
-  4: If the sample was set to keep looping, the DMC DMA timing in your emulator is off.
+  1: The DMC DMA timing in your emulator is off.  
+  2: The aborted DMAs did not spend the correct number of CPU cycles.  
+  3: The 1-cycle DMA should not get delayed by a write cycle, rather it just shouldn't occur in that case.  
+  4: If the sample was set to keep looping, the DMC DMA timing in your emulator is off.  
 
 ### PPU Reset Flag
   1: The PPU registers shouldn't be usable before the end of the first VBlank.  
