@@ -121,7 +121,7 @@ For more information, I recommend reading the fully commented assembly code for 
   L: Does "ISC Absolute" do vaguely what's expected of it?  
   
 ### All NOP Instructions
-  (See message printed on screen for more details)
+  (See message printed on screen for more details)  
   1: Opcode $04 (NOP Zero Page) malfunctioned.  
   2: Opcode $0C (NOP Absolute) malfunctioned.  
   3: Opcode $14 (NOP Zero Page, X) malfunctioned.  
