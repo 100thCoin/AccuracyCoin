@@ -7772,17 +7772,23 @@ TEST_NmiAndIrq_NMI:
 	RTI
 
 TEST_NmiAndBrk_Prep:
-	LDA #$4C
+	LDA #$09
 	STA $600
 	STA $700
-	LDA #LOW(TEST_NmiAndBrk_BRK)
+	LDA #$80
 	STA $601
-	LDA #HIGH(TEST_NmiAndBrk_BRK)	; change the IRQ pointer.
-	STA $602
-	LDA #LOW(TEST_NmiAndBrk_NMI)
 	STA $701
-	LDA #HIGH(TEST_NmiAndBrk_NMI)	; change the NMI pointer.
+	LDA #$4C
+	STA $602
 	STA $702
+	LDA #LOW(TEST_NmiAndBrk_BRK)
+	STA $603
+	LDA #HIGH(TEST_NmiAndBrk_BRK)	; change the IRQ pointer.
+	STA $604
+	LDA #LOW(TEST_NmiAndBrk_NMI)
+	STA $703
+	LDA #HIGH(TEST_NmiAndBrk_NMI)	; change the NMI pointer.
+	STA $704
 	RTS
 ;;;;;;;
 
@@ -7795,6 +7801,7 @@ TEST_NmiAndBrk:
 	; Then just read all the values and compare with an answer key.
 	JSR DisableRendering
 	LDX #0
+	LDY #0
 TEST_NmiAndBrkLoop:
 	STX <Copy_X
 	LDA #0
@@ -7807,8 +7814,6 @@ TEST_NmiAndBrkLoop:
 	JSR Clockslide37_Plus_A ; + 36 + A
 	; 8-A CPU cycles until VBlank.
 	; stall for an extra 6 cycles.
-	LDY #0
-	LDA <$00
 	BRK ; BRK will return *after* this upcoming INY, since it only gets compiled to [$00].
 	INY	; This should get skipped!
 	TYA
@@ -7857,11 +7862,11 @@ FAIL_NmiAndBrk:
 	
 
 TEST_NmiAndBrkAnswerKey:   
-	.byte $35, $35, $34, $35, $34, $25, $24, $25, $26, $27, $24, $25, $24, $25, $24, $25, $24, $25, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
-	.byte $00, $00, $00, $00, $00, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35
+	.byte $A5, $A5, $A4, $A5, $A4, $35, $34, $35, $34, $35, $24, $25, $24, $25, $24, $25, $24, $25, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
+	.byte $35, $35, $34, $35, $34, $00, $00, $00, $00, $00, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35
 TEST_NmiAndBrkAnswerKey_Alignment2: ; CPU/PPU clock alignment 2 has different results:
-    .byte $35, $35, $34, $35, $24, $25, $24, $27, $26, $25, $24, $25, $24, $25, $24, $25, $24, $25, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
-    .byte $00, $00, $00, $00, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35
+	.byte $A5, $A5, $A4, $A5, $34, $35, $34, $35, $34, $25, $24, $25, $24, $25, $24, $25, $24, $25, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
+	.byte $35, $35, $34, $35, $00, $00, $00, $00, $00, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35
 
 TEST_NmiAndIrq_Prep:
 	LDA #$4C
@@ -9116,7 +9121,7 @@ FAIL_DeltaModulationChannelContinue:
 	BEQ FAIL_DeltaModulationChannel2 ; it should still be playing, since it loops.
 	LDA #$00
 	STA $4015	; stopping the DMC should still stop the looping sample.
-	; You might fail this test if you are waiting 3 or 4 CPU cycles to disable the DMC Channel.
+	; You might fail this test if you are waiting 2 or 3 CPU cycles to disable the DMC Channel.
 	LDA $4015
 	AND #$10
 	BNE FAIL_DeltaModulationChannel2
@@ -9293,7 +9298,7 @@ TEST_DMC_OverflowLoop: ; DMA every 432 CPU cycles.
 	; - The DMC is enabled this time, so the DMA occurs.
 	;
 	; Per my current understanding, if a sample is playing, you disable the DMC, and the final bit is read from the buffer, the DMA will still attempt to run every cycle until the DMC is re-enabled.
-	; It just doesn't run until the DMA is enabled, 3 or 4 cycles after a write to $4015.
+	; It just doesn't run until the DMA is enabled, 2 or 3 cycles after a write to $4015.
 	JSR DMASync_50CyclesRemaining
 	LDA #0		;+2
 	STA $4015	;+4 disable DMC.
@@ -14986,7 +14991,7 @@ DMASync40_Loop:
 DMASyncWithoutOpenBus:
 	; This function *should* exit with exactly 406 CPU cycles until the DMA occurs.
 	; It's a very slightly modified version of the DMA sync routine made by blargg in 2005. (This version has an exit condition in case the DMA timing is so off that it would loop forever.)
-	; It doesn't rely on reading open bus, rather is just simply relies on perfectly timed DMAs, and the 3 or 4 cpu cycle delay after writing to $4015.
+	; It doesn't rely on reading open bus, rather is just simply relies on perfectly timed DMAs, and the 2 or 3 cpu cycle delay after writing to $4015.
 	; It's worth noting that function *is* consistent on hardware, and it does work. However, despite this, a lot of emulators have incorrect timing for reads from $4015, and won't actually be in sync after this runs.
 	; Hence the existence of the open bus DMA Sync routine, but wouldn't you know it- even fewer emulators implement the DMC DMA updating the data bus, so... not much I can do about that.
 	LDX #0
