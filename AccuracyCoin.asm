@@ -9460,7 +9460,8 @@ TEST_DMC_ConflictLoop: ; DMA every 432 CPU cycles.
 	LDA #$00
 	STA $4017	; Keep the interrupt flag set, but refresh the timer.
 	NOP
-	LDA <$00
+	NOP
+	NOP
 	INX	; +2   Increment X for the next loop.
 	CPX #$40 ; +2   If X = $40, we exit the loop.
 	BNE TEST_DMC_ConflictLoop ; +3 if looping. +2 if not. (total outside the clockslide = 29. 432-29 = 403)
