@@ -10659,6 +10659,9 @@ TEST_DecimalFlag:
 	; But remember, the decimal does NOT work on the NES. So the result should *actually* be the correct result of subtracting the two hexadecimal numbers, which is $3F.
 	CMP #$3F
 	BNE FAIL_DecimalFlag
+	ADC #$16
+	CMP #$56
+	BNE FAIL_DecimalFlag
 	INC <ErrorCode
 	
 	;;; Test 2 [The Decimal Flag]: Despite this flag not working, it still gets pushed in a PHP/BRK instruction ;;;
@@ -12523,7 +12526,7 @@ TEST_PaletteRAMQuirks:
 	; As a pre-requisite, this test requires you pass TEST_PPUReadBuffer
 	JSR TEST_PPUReadBuffer
 	LDX #1
-	STA <ErrorCode ; Set the error code to 1.
+	STX <ErrorCode ; Set the error code to 1.
 	CMP #1
 	BNE FAIL_PaletteRAMQuirks
 	INC <ErrorCode
