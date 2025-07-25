@@ -2117,32 +2117,17 @@ TEST_UnofficialInstructionsExist:
 	; This test does NOT verify accurate emulation of every one of these instructions.
 	; It just makes sure they all vaguely perform what's expected of them, instead of NOP.
 	; For instructions with many different addressing modes, This only checks the Immediate mode if it exists, or Absolute.
-	; let's run a 3-byte NOP, and check if it was actually 3 bytes.
-	LDA #0
-	LDX #0
-	LDY #$0F
-	; The following should be: NOP $98A2	
-	.byte $0C, $A2, $98
-	; But if this was treated as a 1-byte NOP, X=98
-	CPX #$98
-	BEQ TEST_Fail4
-	INC <ErrorCode 
 	
-	;;; Test 2 [Unofficial Instructions Exist]: Was it a 2-byte NOP? ;;;
-	; And if this was treated as a 2-byte NOP, A=0F
-	CMP #$0F
-	BEQ TEST_Fail4
-	; Alright! It was treated as a 3-byte NOP, which is what it should be.
-	INC <ErrorCode 
+	; The unofficial NOP instructions have been moved to [All NOP Instructions].
 	
-	;;; Test 3 [Unofficial Instructions Exist]: NOP Absolute updates PPUSTATUS ;;;
-	JSR Clockslide_29780 ; wait for next frame.
-	.byte $0C, $02, $20 ; NOP $2002
-	LDA $2002
-	BMI TEST_Fail4 ; if bit 7 was still set after that NOP $2002, that's a fail!
-	INC <ErrorCode 
 	
-	;;; Test 4 [Unofficial Instructions Exist]: Does SLO exist? ;;;
+	;;; Test 0 [Unofficial Instructions Exist]: As a pre-test, if NOP Absolute is 1 byte long, let's assume all of these are not implemented. ;;;
+	LDA #2
+	.byte $0C
+	RTS
+	RTS
+	
+	;;; Test 1 [Unofficial Instructions Exist]: Does SLO exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
 	LDA #$0F
 	.byte $0F ; SLO Absolute
@@ -2156,7 +2141,7 @@ TEST_UnofficialInstructionsExist:
 	; SLO exists!
 	INC <ErrorCode 
 
-	;;; Test 5 [Unofficial Instructions Exist]: Does ANC exist? ;;;
+	;;; Test 2 [Unofficial Instructions Exist]: Does ANC exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
 	LDA #$8F
 	CLC
@@ -2168,7 +2153,7 @@ TEST_UnofficialInstructionsExist:
 	; ANC exists!
 	INC <ErrorCode
 	
-	;;; Test 6 [Unofficial Instructions Exist]: Does RLA exist? ;;;
+	;;; Test 3 [Unofficial Instructions Exist]: Does RLA exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
 	LDA #$F1
 	SEC
@@ -2183,7 +2168,7 @@ TEST_UnofficialInstructionsExist:
 	; RLA exists!
 	INC <ErrorCode 
 	
-	;;; Test 7 [Unofficial Instructions Exist]: Does SRE exist? ;;;
+	;;; Test 4 [Unofficial Instructions Exist]: Does SRE exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
 	LDA #$FF
 	SEC
@@ -2195,7 +2180,7 @@ TEST_UnofficialInstructionsExist:
 	; SRE exists!
 	INC <ErrorCode 
 	
-	;;; Test 8 [Unofficial Instructions Exist]: Does ASR exist? ;;;
+	;;; Test 5 [Unofficial Instructions Exist]: Does ASR exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
 	LDA #$F0
 	.byte $4B, $42 ; ASR #$42
@@ -2205,7 +2190,7 @@ TEST_UnofficialInstructionsExist:
 	; ASR exists!
 	INC <ErrorCode
 	
-	;;; Test 9 [Unofficial Instructions Exist]: Does RRA exist? ;;;
+	;;; Test 6 [Unofficial Instructions Exist]: Does RRA exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
 	LDA #$20
 	SEC
@@ -2217,7 +2202,7 @@ TEST_UnofficialInstructionsExist:
 	; RRA exists!
 	INC <ErrorCode 
 	
-	;;; Test A [Unofficial Instructions Exist]: Does ARR exist? ;;;
+	;;; Test 7 [Unofficial Instructions Exist]: Does ARR exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
 	LDA #$F0
 	SEC
@@ -2230,7 +2215,7 @@ TEST_UnofficialInstructionsExist:
 	; ARR exists!
 	INC <ErrorCode
 	
-	;;; Test B [Unofficial Instructions Exist]: Does SAX exist? ;;;
+	;;; Test 8 [Unofficial Instructions Exist]: Does SAX exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
 	LDA #$F0
 	LDX #$2F
@@ -2243,7 +2228,7 @@ TEST_UnofficialInstructionsExist:
 	; SAX exists!
 	INC <ErrorCode
 	
-	;;; Test C [Unofficial Instructions Exist]: Does ANE exist? ;;;
+	;;; Test 9 [Unofficial Instructions Exist]: Does ANE exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
 	LDA #$FF
 	LDX #$F0
@@ -2254,7 +2239,7 @@ TEST_UnofficialInstructionsExist:
 	; ANE exists!
 	INC <ErrorCode
 	
-	;;; Test D [Unofficial Instructions Exist]: Does SHA exist? ;;;
+	;;; Test A [Unofficial Instructions Exist]: Does SHA exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
 	; Test the unstable part too, why not.
 	LDA #$1F
@@ -2276,7 +2261,7 @@ TEST_UnofficialInstructionsExist:
 	; SHA exists!
 	INC <ErrorCode
 	
-	;;; Test E [Unofficial Instructions Exist]: Does SHX exist? ;;;
+	;;; Test B [Unofficial Instructions Exist]: Does SHX exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
 	LDA #$00
 	LDX #$05
@@ -2300,7 +2285,7 @@ TEST_Fail5:	; This is in the middle of the test, since it saves bytes to branch 
 	JMP TEST_Fail
 TEST_UnofficialInstructions_Continue:
 
-	;;; Test F [Unofficial Instructions Exist]: Does SHY exist? ;;;
+	;;; Test C [Unofficial Instructions Exist]: Does SHY exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
 	LDA #$00
 	LDX #$80
@@ -2319,7 +2304,7 @@ TEST_UnofficialInstructions_Continue:
 	; SHY exists!
 	INC <ErrorCode
 	
-	;;; Test G [Unofficial Instructions Exist]: Does SHS exist? ;;;
+	;;; Test D [Unofficial Instructions Exist]: Does SHS exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
 	TSX
 	STX $501
@@ -2349,7 +2334,7 @@ TEST_UnofficialInstructions_SHS_Continue:
 	; SHS exists!
 	INC <ErrorCode
 	
-	;;; Test H [Unofficial Instructions Exist]: Does SHA ($zp), Y exist? ;;;
+	;;; Test E [Unofficial Instructions Exist]: Does SHA ($zp), Y exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
 	; Test the unstable part too, why not.
 	LDA #$80
@@ -2374,7 +2359,7 @@ TEST_UnofficialInstructions_SHS_Continue:
 	; SHA ($zp), Y exists!
 	INC <ErrorCode
 
-	;;; Test I [Unofficial Instructions Exist]: Does LAX exist? ;;;
+	;;; Test F [Unofficial Instructions Exist]: Does LAX exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
 	.byte $AF ; LAX $0500
 	.word $0500
@@ -2386,7 +2371,7 @@ TEST_UnofficialInstructions_SHS_Continue:
 	; LAX exists!
 	INC <ErrorCode
 	
-	;;; Test J [Unofficial Instructions Exist]: Does LXA exist? ;;;
+	;;; Test G [Unofficial Instructions Exist]: Does LXA exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
 	LDA #$1F 
 	LDX #$F0
@@ -2400,7 +2385,7 @@ TEST_UnofficialInstructions_SHS_Continue:
 	; LXA exists!
 	INC <ErrorCode
 	
-	;;; Test K [Unofficial Instructions Exist]: Does LAE exist? ;;;
+	;;; Test H [Unofficial Instructions Exist]: Does LAE exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
 	; This also destroys the stack pointer, so...
 	TSX
@@ -2426,7 +2411,7 @@ TEST_UnofficialInstructions_SHS_Continue:
 	; LAE exists!
 	INC <ErrorCode
 	
-	;;; Test L [Unofficial Instructions Exist]: Does DCP exist? ;;;
+	;;; Test I [Unofficial Instructions Exist]: Does DCP exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
 	LDA #$41
 	.byte $CF	; DCP $0500
@@ -2435,7 +2420,7 @@ TEST_UnofficialInstructions_SHS_Continue:
 	; DCP exists!
 	INC <ErrorCode
 	
-	;;; Test M [Unofficial Instructions Exist]: Does AXS exist? ;;;
+	;;; Test J [Unofficial Instructions Exist]: Does AXS exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
 	LDA #$F0
 	LDX #$66
@@ -2446,7 +2431,7 @@ TEST_UnofficialInstructions_SHS_Continue:
 	; AXS exists!
 	INC <ErrorCode
 	
-	;;; Test N [Unofficial Instructions Exist]: Does ISC exist? ;;;
+	;;; Test K [Unofficial Instructions Exist]: Does ISC exist? ;;;
 	JSR TEST_UnofficialInstructions_Prep
 	LDA #$22
 	.byte $EF	; ISC $0500
@@ -2454,7 +2439,7 @@ TEST_UnofficialInstructions_SHS_Continue:
 	; Increment $0500, then subtract it from A
 	CMP #$DF
 	BNE TEST_Fail6	
-	; LAE exists!
+	; ISC exists!
 	INC <ErrorCode
 	;; END OF TEST ;;
 	LDA #1
@@ -3535,9 +3520,7 @@ TEST_SHA_93:
 	
 TEST_SHA_93_CorrectLength:
 	; Determine if this instruction is using behavior 1 or 2. (or not implemented)
-	LDA #$FF
-	STA <$00 ; For checking behavior 1
-	STA $0A00; For checking behavior 2
+	JSR WriteFFToLowestPageBytes
 	LDA #$F0
 	STA <Test_UnOp_IndirectPointerLo
 	LDA #$1E
@@ -3555,9 +3538,9 @@ TEST_SHA_93_CorrectLength:
 	CMP #$FF
 	BNE TEST_SHA_Behavior2_93_JMP ; if address $0A00 was updated, this is behavior 2.
 	LDA <$00
-	CMP #$00
-	BEQ TEST_SHA_Behavior1_93_JMP ; if address $0000 was updated, this is behavior 1.
-	LDA #$3E ; (Error code F) And if address $1F00 was changed, or of nothing happened at all, this failed.
+	CMP #$FF
+	BNE TEST_SHA_Behavior1_93_JMP ; if address $0000 was updated, this is behavior 1.
+	LDA #$3E ; (Error code F) And if address $1F00 was changed, or if nothing happened at all, this failed.
 	RTS		 ; (If address $1F00 ($700) was updated, that value gets fixed before the NMI occurs.)
 ;;;;;;;
 	
@@ -3583,9 +3566,7 @@ TEST_SHA_9F:
 TEST_SHA_9F_CorrectLength:
 	
 	; Determine if this instruction is using behavior 1 or 2. (or not implemented)
-	LDA #$FF
-	STA <$00 ; For checking behavior 1
-	STA $0A00 ; For checking behavior 2
+	JSR WriteFFToLowestPageBytes
 	LDA #$55
 	LDX #$AA
 	LDY #$10
@@ -3597,9 +3578,9 @@ TEST_SHA_9F_CorrectLength:
 	CMP #$FF
 	BNE TEST_SHA_Behavior2_9F_JMP ; if address $0A00 was updated, this is behavior 2.
 	LDA <$00
-	CMP #$00
-	BEQ TEST_SHA_Behavior1_9F_JMP ; if address $0000 was updated, this is behavior 1.
-	LDA #$3E ; (Error code F) And if address $1F00 was changed, or of nothing happened at all, this failed.
+	CMP #$FF
+	BNE TEST_SHA_Behavior1_9F_JMP ; if address $0000 was updated, this is behavior 1.
+	LDA #$3E ; (Error code F) And if address $1F00 was changed, ir of nothing happened at all, this failed.
 	RTS 	 ; (If address $1F00 ($700) was updated, that value gets fixed before the NMI occurs.)
 ;;;;;;;
 	
@@ -3833,9 +3814,7 @@ TEST_SHS_9B_CorrectLength:
 	; Whichever choice of behavior your emulator used for SHA, (behavior 1 vs behavior 2) you should use the same choice of behavior for the SHS instruction. (behavior 1 or behavior 2)
 	LDX <Copy_SP
 	TXS
-	LDA #$FF
-	STA <$00 ; For checking behavior 1
-	STA $0A00 ; For checking behavior 2
+	JSR WriteFFToLowestPageBytes
 	TSX
 	STX <Copy_SP
 	LDA #$55
@@ -3851,9 +3830,9 @@ TEST_SHS_9B_CorrectLength:
 	CMP #$FF
 	BNE TEST_SHS_Behavior2_9B_JMP ; if address $0A00 was updated, this is behavior 2.
 	LDA <$00
-	CMP #$00
-	BEQ TEST_SHS_Behavior1_9B ; if address $0000 was updated, this is behavior 1.
-	LDA #$3E ; (Error code F) And if address $1F00 was changed, or of nothing happened at all, this failed.
+	CMP #$FF
+	BNE TEST_SHS_Behavior1_9B ; if address $0000 was updated, this is behavior 1.
+	LDA #$3E ; (Error code F) And if address $1F00 was changed, or if nothing happened at all, this failed.
 	RTS		 ; (If address $1F00 ($700) was updated, that value gets fixed before the NMI occurs.)
 ;;;;;;;
 	
@@ -4543,12 +4522,14 @@ TEST_DMA_Plus_2007W:
 	JSR EnableRendering_BG	
 	LDA #1
 	RTS
+;;;;;;;
 
 TEST_Fail7:
 	JSR ResetScrollAndWaitForVBlank
 TEST_Fail8:
 	JSR EnableRendering_BG	
 	JMP TEST_Fail
+;;;;;;;;;;;;;;;;;
 
 Test_ProgramCounter_Wraparound:
 	LDX #0
@@ -6639,20 +6620,8 @@ TEST_APURegActivation_YSkip3:
 	BNE TEST_APURegActivation_Eval_4
 	INC <ErrorCode
 	
-	;;; Test 6 [APU Register Activation]: The controller ports might not have been visible by the OAM DMA, but did the controller ports get clocked? ;;;
-
-	LDA $4016
-	LDA $4016	; it is assumed the B button is not pressed during the test.
-	LSR A
-	BCC FAIL_APURegActivation2	; Bingo! Look at that. The controller ports *were* clocked, but did not appear in OAM!
-	; Most amusing.
-		
-	;; END OF TEST ;;
-	LDA #0
-	STA $4015
-	LDA #1
-	RTS
-;;;;;;;
+	JMP TEST_APURegActivation_Finale ; I moved this part because it contains a lot of bytes, and ruined a bunch of branches.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 FAIL_APURegActivation2:
 FAIL_DMA_Timing:
@@ -6827,7 +6796,40 @@ TEST_ControllerStrobing:
 	RTS
 ;;;;;;;
 
-
+TEST_APURegActivation_Finale:
+	LDA #0
+	STA $4015
+	; The controller ports might not have been visible by the OAM DMA, but did the controller ports get clocked?
+	; This used to be an error code, but different consoles behave differently, so let's just print if it did or not.
+	LDA #0
+	STA <dontSetPointer ; prep this, since we're drawing stuff.
+	LDA $4016
+	LDA $4016	; it is assumed the B button is not pressed during the test.
+	LSR A
+	BCS TEST_APURegActivation_ConflictClocked	
+	; And the controller ports were NOT clocked here!
+	LDA <RunningAllTests
+	BNE TEST_APURegActivation_Res1
+	JSR PrintTextCentered
+	.word $2350
+	.byte "OAM DMA Bus Conflict no Clock", $FF
+	JSR ResetScroll
+TEST_APURegActivation_Res1:
+	LDA #5 ; Success Code 1
+	RTS
+	
+TEST_APURegActivation_ConflictClocked:
+	; Bingo! Look at that. The controller ports *were* clocked, but did not appear in OAM!
+	LDA <RunningAllTests
+	BNE TEST_APURegActivation_Res2
+	JSR PrintTextCentered
+	.word $2350
+	.byte "OAM DMA Bus Conflict Clocks", $FF
+	JSR ResetScroll
+TEST_APURegActivation_Res2:
+	LDA #9 ; Success Code 2
+	RTS
+;;;;;;;
 
 FAIL_InstructionTiming:
 	JMP TEST_Fail
@@ -11946,8 +11948,25 @@ CopyLowestPageBytesTo60:
 	STA <$66
 	LDA $700
 	STA <$67
+	LDA #$11
+	STA <$68
 	RTS
 ;;;;;;;
+
+WriteFFToLowestPageBytes:
+	LDA #$FF
+	STA <$00
+	STA $100
+	STA $200
+	STA $300
+	STA $400
+	STA $500
+	STA $600
+	STA $700
+	RTS
+;;;;;;;
+
+
 	.bank 3
 	.org $E000
 FAIL_JSREdgeCases:

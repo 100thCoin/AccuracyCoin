@@ -89,36 +89,33 @@ For more information, I recommend reading the fully commented assembly code for 
   1: Reading from open bus is not all zeroes.  
   2: Reading from open bus with LDA Absolute should simply return the high byte of the operand.  
   3: Indexed addressing crossing a page boundary should not update the data bus to the new high byte value.  
-  4: Moving the program counter to open bus should read instructions from the floating data bus values.  
+  4: Moving the program counter to open bus should read instructions from the floating data bus values. Write cycles should update the data bus.  
   5: Dummy reads should update the data bus.  
   6: The upper 3 bits when reading from the controller should be open bus.  
   7: Reading from $4015 should not update the databus.  
   8: Writing should always update the databus, even writing to $4015.  
 
 ### Unofficial Instructions
-  1: NOP Absolute should not be a 1-byte NOP.  
-  2: NOP Absolute should not be a 2-byte NOP.  
-  3: NOP Absolute reading address $2002 should clear the VBlank flag.  
-  4: Does "SLO Absolute" do vaguely what's expected of it?  
-  5: Does "ANC Immediate" do vaguely what's expected of it?  
-  6: Does "RLA Absolute" do vaguely what's expected of it?  
-  7: Does "SRE Absolute" do vaguely what's expected of it?  
-  8: Does "ASR Immediate" do vaguely what's expected of it?  
-  9: Does "RRA Absolute" do vaguely what's expected of it?  
-  A: Does "ARR Immediate" do vaguely what's expected of it?  
-  B: Does "SAX Absolute" do vaguely what's expected of it?  
-  C: Does "ANE Immediate" do vaguely what's expected of it?  
-  D: Does "SHA Absolute, Y" do vaguely what's expected of it?  
-  E: Does "SHX Absolute, Y" do vaguely what's expected of it?  
-  F: Does "SHY Absolute, X" do vaguely what's expected of it?  
-  G: Does "SHS Absolute, Y" do vaguely what's expected of it?  
-  H: Does "SHA (Indirect) Y" do vaguely what's expected of it?  
-  I: Does "LAX Absolute" do vaguely what's expected of it?  
-  J: Does "LXA Immediate" do vaguely what's expected of it?  
-  K: Does "LAE Absolute, Y" do vaguely what's expected of it?  
-  L: Does "DCP Absolute" do vaguely what's expected of it?  
-  M: Does "AXS Immediate" do vaguely what's expected of it?  
-  L: Does "ISC Absolute" do vaguely what's expected of it?  
+  1: Does "SLO Absolute" do vaguely what's expected of it?  
+  2: Does "ANC Immediate" do vaguely what's expected of it?  
+  3: Does "RLA Absolute" do vaguely what's expected of it?  
+  4: Does "SRE Absolute" do vaguely what's expected of it?  
+  5: Does "ASR Immediate" do vaguely what's expected of it?  
+  6: Does "RRA Absolute" do vaguely what's expected of it?  
+  7: Does "ARR Immediate" do vaguely what's expected of it?  
+  8: Does "SAX Absolute" do vaguely what's expected of it?  
+  9: Does "ANE Immediate" do vaguely what's expected of it?  
+  A: Does "SHA Absolute, Y" do vaguely what's expected of it?  
+  B: Does "SHX Absolute, Y" do vaguely what's expected of it?  
+  C: Does "SHY Absolute, X" do vaguely what's expected of it?  
+  D: Does "SHS Absolute, Y" do vaguely what's expected of it?  
+  E: Does "SHA (Indirect) Y" do vaguely what's expected of it?  
+  F: Does "LAX Absolute" do vaguely what's expected of it?  
+  G: Does "LXA Immediate" do vaguely what's expected of it?  
+  H: Does "LAE Absolute, Y" do vaguely what's expected of it?  
+  I: Does "DCP Absolute" do vaguely what's expected of it?  
+  J: Does "AXS Immediate" do vaguely what's expected of it?  
+  K: Does "ISC Absolute" do vaguely what's expected of it?  
   
 ### All NOP Instructions
   (See message printed on screen for more details)  
@@ -601,6 +598,10 @@ Some tests have multiple acceptable behaviors that are tested for in this ROM. T
 ### DMA + $4016 Read
   1: The controller was read the way a US-released NES / AV Famicom should read controllers.  
   2: The controller was read the way a Famicom should read controllers.  
+  
+### APU Register Activation
+  1: The controllers were not clocked by the bus conflict with the OAM DMA.  
+  2: The controllers were clocked by the bus conflict with the OAM DMA.  
   
 ### DMC DMA Bus Conflicts
   1: The controller was read the way a US-released NES should read controllers.  
