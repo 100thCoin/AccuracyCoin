@@ -227,6 +227,7 @@ For more information, I recommend reading the fully commented assembly code for 
   9: Branch instructions should poll for interrupts before cycle 2.  
   A: Branch instructions should not poll for interrupts before cycle 3.  
   B: Branch instructions should poll for interrupts before cycle 4.  
+  C: An interrupt polled successfully on the first poll of a branch, cleared, and then polled again, should still occur.  
 
 ### NMI Overlap BRK
   1: BRK Returned to the wrong address.  
@@ -303,6 +304,8 @@ For more information, I recommend reading the fully commented assembly code for 
   K: The Frame Counter Interrupt flag should have been set 29829 cycles after resetting the frame counter, even if supressing Frame Counter Interrupts.  
   L: The Frame Counter Interrupt flag should not have been set 29830 cycles after resetting the frame counter if supressing Frame Counter Interrupts.  
   M: Despite the Frame Counter Interrupt flag being set for those 2 CPU cycles, if suppressing Frame Counter Interrupts, an IRQ should not occur.  
+  N: The IRQ Occurs on the wrong CPU cycle.  
+  O: The IRQ Occurs on the wrong CPU cycle.  
 
 ### Frame Counter 4-step
   1: The first clock of the length counters was early.  

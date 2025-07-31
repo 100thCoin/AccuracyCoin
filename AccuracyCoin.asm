@@ -1130,7 +1130,7 @@ DMASyncWithA5:
 	LDA #0
 	STA $4011 ; minimum value of DMC
 	LDA #$BA
-	STA $4012 ; Sample address $EEC0.
+	STA $4012 ; Sample address $EE80.
 	LDA #0
 	STA $4013 ; 1 byte length.
 	LDA #$10
@@ -1164,7 +1164,7 @@ DMASyncWith68:
 	LDA #0
 	STA $4011 ; minimum value of DMC
 	LDA #$B9
-	STA $4012 ; Sample address $EEC0.
+	STA $4012 ; Sample address $EE40.
 	LDA #0
 	STA $4013 ; 1 byte length.
 	LDA #$10
@@ -1194,10 +1194,44 @@ VerifyReturnAddressesAreCorrect:
 	INX
 	LDA $100, X
 	; $02 is the correct value to read here. A value of $03 is wrong. $04 is right out.
-	; Anyway, subtract by 1.
+	; Anyway, subtract by 2.
 	SEC
 	SBC #02
 	STA <IncorrectReturnAddressOffset
+	RTS
+;;;;;;;
+	
+DMASyncWith90:
+	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
+	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
+	STA <Copy_A
+	LDA #$4F ; loop, max speed.
+	STA $4010
+	LDA #0
+	STA $4011 ; minimum value of DMC
+	LDA #$B7
+	STA $4012 ; Sample address $EDC0.
+	LDA #0
+	STA $4013 ; 1 byte length.
+	LDA #$10
+	STA $4015 ; Start the DMC DMA loop
+	NOP
+	NOP
+DMASync90_Loop:
+	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $48 from the DMA.
+	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
+	CMP #$90
+	BNE DMASync90_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
+	LDA #$0F ; don't loop, continue at max speed. +2 (9)
+	STA $4010 
+	LDA <$00  
+	LDA Copy_A
+	JSR Clockslide_100
+	JSR Clockslide_100
+	JSR Clockslide_100
+	JSR Clockslide_50
+	NOP
+	CMP <$C9
 	RTS
 ;;;;;;;
 	
@@ -7440,6 +7474,20 @@ TEST_IFlagLatency_IRQ:
 	LDA #0	
 	STA $4010	; disable the DMA IRQ
 	STA $4015	; This step should NOT be required, since I'm acknowledging the IRQ.
+	LDA $4015	; Achknowledge the APU Frame Counter IRQ as well, for good measure.
+	LDA #$40
+	STA $4017	; might as well play it extra safe.
+	PLA
+	STA <$51
+	PLA 
+	STA <$52
+	PLA
+	STA <$53
+	PHA
+	LDA <$52
+	PHA
+	LDA <$51
+	PHA	
 	RTI
 ;;;;;;;
 
@@ -7652,7 +7700,7 @@ TEST_IFlagLatency:
 	BNE FAIL_IFlagLatency1
 	LDA <$50 ; Did the second IRQ run before the second INX?
 	CMP #1
-	BNE FAIL_IFlagLatency
+	BNE FAIL_IFlagLatency2
 	INC <ErrorCode
 
 	;;; Test 6 [Interrupt Flag Latency]: RTI updates the I flag before the check for an interrupt ;;;
@@ -7678,7 +7726,7 @@ TEST_IFlagLatency_RTI:
 	INX	; Really not necessary, as the IRQ should not happen, so no matter what the value of X is, if $50 is overwritten, the test fails.
 	LDA <$50
 	CMP #$5A
-	BNE FAIL_IFlagLatency
+	BNE FAIL_IFlagLatency2
 	INC <ErrorCode
 
 	;;; Test 7 [Interrupt Flag Latency]: Does the IRQ happen immediately after PLP, or after the following instruction? ;;;
@@ -7694,7 +7742,7 @@ TEST_IFlagLatency_RTI:
 	INX ; If this happens before the IRQ, you fail the test.
 	LDA <$50
 	CMP #01
-	BNE FAIL_IFlagLatency
+	BNE FAIL_IFlagLatency2
 	INC <ErrorCode
 	
 	;;; Test 8 [Interrupt Flag Latency]: Does the IRQ happen at the correct CPU cycle? ;;;
@@ -7708,7 +7756,7 @@ TEST_IFlagLatency_RTI:
 	INX
 	LDA <$50	; the IRQ routine will overwrite this value, so it should be $00 instead of $5A
 	CMP #01
-	BNE FAIL_IFlagLatency
+	BNE FAIL_IFlagLatency2
 	INC <ErrorCode
 
 	;;; Test 9 [Interrupt Flag Latency]: Do branches poll for interrupts before cycle 2? (They should) ;;;
@@ -7724,7 +7772,7 @@ TEST_IFlagLatency_Branch1:
 	INX 
 	LDA <$50
 	CMP #$00
-	BNE FAIL_IFlagLatency
+	BNE FAIL_IFlagLatency2
 	INC <ErrorCode
 	
 	;;; Test A [Interrupt Flag Latency]: Do branches poll for interrupts before cycle 3? (They should not) ;;;
@@ -7739,14 +7787,90 @@ TEST_IFlagLatency_Branch2:
 	; IRQ should happen here.
 	LDA <$50
 	CMP #$01
-	BNE FAIL_IFlagLatency
+	BNE FAIL_IFlagLatency2
 	INC <ErrorCode
 	; And hey, if you pass this one, keep in mind that I only test with BNE here, but this applies to every branch, not just BNE.
 	
 	; This next test needs to occur at a known page boundary, so let's jump to approximately address $FE00.
 	; It doesn't return, so the end of the test just happens out there.
-	JMP TEST_IFlagLatency_PageBoundaryTest
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	JMP TEST_IFlagLatency_PageBoundaryTest ; TEST B Occurs HERE!
+
+FAIL_IFlagLatency2:
+	JMP FAIL_IFlagLatency
+
+TEST_IFlagLatency_Test_C:
+	;;; Test C [Interrupt Flag Latency]: What if the first poll detects an interrupt, but the flag is cleared before the second poll? ;;;
+	; The plan:
+	; At address $4013
+	; 1.) Read opcode $90
+	; - poll for interrupts, (an interrupt will occur)
+	; 2.) Read operand $90
+	; 3.) Dummy read $4015 (clearing IRQ flag), move PC
+	; - poll for interrupts, (an interrupt will not occur)
+	; 4.) Dummy read, update PCH.
+
+	; Does an IRQ occur after the branch? Let's find out!
+
+	JSR WaitForVBlank
+	LDA $4015 ; acknowledge all possible IRQ's
+	LDA #$40
+	STA $4017 ; acknowledge all possible IRQ's
+	CLI		  ; Clear the CPU's interrupt suppression flag.
+	
+	LDX #$5A
+	LDA #0
+	STA <$50
+	
+	JSR DMASyncWith90
+	LDA #$4F
+	STA $4010
+	; 50 CPU cycles until DMA.
+	JSR Clockslide_50
+	; [DMC DMA. This takes 4 cycles, next CPU cycle is a "put" cycle.]
+	; Run a 4-byte DMC DMA every 432 CPU cycles. Unless of course, it lands on a write cycle, in which case it is delayed and only lasts 3 cycles.
+	; We need to make sure a DMC DMA will occur somewhere between 0 and 5 CPU cycles before the Frame Counter IRQ Flag is set and polled.
+	JSR Clockslide_300
+	JSR Clockslide_50
+	JSR Clockslide_43
+	LDA #$00
+	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	JSR Clockslide_20000
+	JSR Clockslide_9000
+	JSR Clockslide_500
+	JSR Clockslide_41
+	LDA #$60
+	STA $2002 ; Set ppu read buffer to RTS
+	CLC
+	JSR $4013
+	;[DMC DMA. 4 cycles. Data bus = $90]
+	;(put cycle) Read Opcode: $90
+	; poll for interrupts, Interrupt *will* occur.
+	;(get cycle) Read Operand: $90
+	;(put cycle) Dummy read $4015.
+	; (transition from put to get: the Frame Counter Interrupt flag is cleared)
+	; poll for interrupts, interrupt will *not* occur.
+	;(get cycle) Dummy read.
+	
+	; Surprise! the IRQ *DOES* occur after the branch!
+		
+	LDA <$50
+	CMP #$5A
+	BNE FAIL_IFlagLatency ; Verify the IRQ occured by checking if $5A was written to address $50
+	LDA <$51
+	CMP #$20
+	BNE FAIL_IFlagLatency ; Verify the correct value of the status flags
+	LDA <$52
+	CMP #$A5
+	BNE FAIL_IFlagLatency ; Verify the IRQ occured from the correct address.
+	LDA <$53
+	CMP #$3F
+	BNE FAIL_IFlagLatency ; Verify the IRQ occured from the correct address.
+
+	;; END OF TEST ;;
+	LDA #1
+	RTS
+;;;;;;;
+
 FAIL_IFlagLatency:
 	SEI
 	LDA #0
@@ -7841,6 +7965,7 @@ TEST_NmiAndBrkAnswerLoop:
 	;; END OF TEST ;;
 	LDA #1
 	RTS
+;;;;;;;
 
 TEST_NmiAndBrk_TryKey2:
 	LDX #0
@@ -8643,12 +8768,61 @@ TEST_FrameCounterIRQ_Continue2:
 	BEQ FAIL_FrameCounterIRQ4
 	INC <ErrorCode
 
+	;;; Test N [APU Frame Counter IRQ]: If the CPU's I flag is clear, when exactly does the IRQ occur? ;;;
+	JSR WaitForVBlank
+	LDA #02
+	STA $4014 ; sync with "put" CPU cycle
+	LDA <$00  ; sync with "get" CPU cycle
+	LDA #$00
+	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	; the IRQ should occur in 29834 CPU cycles.
+	JSR Clockslide_29700
+	JSR Clockslide_100
+	JSR Clockslide_24
+	CLI
+	LDX #0
+	INX
+	INX
+	INX
+	INX
+	LDA <$50
+	CMP #3
+	BNE FAIL_FrameCounterIRQ4
+	INC <ErrorCode
+	BNE TEST_FrameCounterIRQ_Continue3
+	
+FAIL_FrameCounterIRQ4:
+	JMP FAIL_AndDisableAudioChannels
+
+TEST_FrameCounterIRQ_Continue3:
+	;;; Test O [APU Frame Counter IRQ]: If the CPU's I flag is clear, when exactly does the IRQ occur? ;;;
+	JSR WaitForVBlank
+	LDA #02
+	STA $4014 ; sync with "put" CPU cycle
+	LDA <$00  ; sync with "get" CPU cycle
+	LDA #$00
+	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	; the IRQ should occur in 29833 CPU cycles.
+	JSR Clockslide_29700
+	JSR Clockslide_100
+	JSR Clockslide_25
+	CLI
+	LDX #0
+	INX
+	INX
+	INX
+	INX
+	LDA <$50
+	CMP #2
+	BNE FAIL_FrameCounterIRQ4
+
+
 	;; END OF TEST ;;
+	SEI
 	LDA #1
 	RTS
 ;;;;;;;
 
-FAIL_FrameCounterIRQ4:
 FAIL_FrameCounter4Step:
 	JMP FAIL_AndDisableAudioChannels
 ;;;;;;;;;;;;;;;;;
@@ -10063,7 +10237,7 @@ TEST_ImpliedDummyRead_Continue2:
 	; [Read opcode from $4015. Hopefully, a JSR.]
 	;
 	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed3, which sets $60 and jumps to TEST_ImpliedDummyRead_PostPHP.
-	.org $D53D	; PHP should push $3C to the stack, so the RTS instruction would return here:
+	.org $D63D	; PHP should push $3C to the stack, so the RTS instruction would return here:
 TEST_ImpliedDummyRead_PostPHP:
 	LDA <$60
 	BEQ FAIL_ImpliedDummyRead4
@@ -11628,6 +11802,9 @@ TEST_ControllerClocking_SkipT2:
 ;;;;;;;
 
 
+	.bank 3
+	.org $E000
+
 Sync_ToPreRenderDot324:
 	; Syncing the CPU to dot 1 of Line 0 is not very easy, since there's the even/odd frame skipping dot 0 issue.
 	SEI
@@ -11967,8 +12144,6 @@ WriteFFToLowestPageBytes:
 ;;;;;;;
 
 
-	.bank 3
-	.org $E000
 FAIL_JSREdgeCases:
 	JMP TEST_Fail
 
@@ -12704,6 +12879,11 @@ TEST_PaletteRAMQuirksCont:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                ENGINE                   ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		
+	.org $EDC0	
+DPCM_Sample_90:
+	.byte $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90
+	.byte $90
 		
 	.org $EE00
 TEST_DMC_Conflicts_AnswerKey_Early_Famicom:
@@ -14943,14 +15123,12 @@ TEST_IFlagLatency_Branch3:
 	INX
 	LDA <$50
 	CMP #$00
-	BNE FAIL_IFlagLatency2
+	BNE FAIL_IFlagLatencyC
+	INC <ErrorCode
+	JMP TEST_IFlagLatency_Test_C
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-	;; END OF TEST ;;
-	SEI
-	LDA #1
-	RTS
-;;;;;;;
-FAIL_IFlagLatency2:
+FAIL_IFlagLatencyC:
 	SEI
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
