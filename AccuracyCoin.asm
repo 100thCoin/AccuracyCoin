@@ -7253,6 +7253,10 @@ TEST_InstructionTiming_Loop_Y2ind:
 	STA $4017
 
 	;;; Test F [Instruction Timing]: The Implied instructions take 2 cycles.;;;
+	; Make sure interrupts cannot happen:
+	LDA #$40
+	STA $4017
+	LDA $4015
 	LDX #0
 TEST_InstructionTiming_Loop_Implied:
 	LDA TEST_InstructionTiming_Implied, X
@@ -11122,9 +11126,9 @@ CycleClockBegin:
 	
 CycleClockEnd:
 	; 572-6 cycles to go until the next DMA.
+	SEI
 	JSR Clockslide_500
 	; 72-6 cycles to go. (We need to jump to CalculateDMADuration with 56 cycles remaining)
-	NOP
 	NOP
 	NOP
 	NOP
@@ -11154,9 +11158,11 @@ TEST_DMCDMAPlusOAMDMA:
 	;;; Test 1 [DMC DMA + OAM DMA]: This test relies on precise DMA timing in order to calculate how many cycles the DMA took. Let's test for that now. ;;;
 	; Let's confirm this DMA timing subroutine of mine works on this emulator.
 	JSR CheckDMATiming
+	STY <$50
 	CPY #4 ; 
 	BNE FAIL_DMCDMAPlusOAMDMA
-	
+	INC <ErrorCode
+
 	; Okay, so what is this test actually testing for?
 	; When the OAM DMA runs, the OAM DMA stalls the CPU.
 	; When the OAM DMA is running and a DMC DMA also occurs:
@@ -11238,7 +11244,6 @@ TEST_DMCDMAPlusOAMDMA_Loop2:
 	INX
 	CPX #$10
 	BNE TEST_DMCDMAPlusOAMDMA_Loop2
-	INC <ErrorCode
 
 	;;; Test 2 [DMC DMA + OAM DMA]: Compare results with answer key ;;;
 	LDX #0
@@ -15195,18 +15200,31 @@ DMASyncWithoutOpenBus:
 	; It doesn't rely on reading open bus, rather is just simply relies on perfectly timed DMAs, and the 2 or 3 cpu cycle delay after writing to $4015.
 	; It's worth noting that function *is* consistent on hardware, and it does work. However, despite this, a lot of emulators have incorrect timing for reads from $4015, and won't actually be in sync after this runs.
 	; Hence the existence of the open bus DMA Sync routine, but wouldn't you know it- even fewer emulators implement the DMC DMA updating the data bus, so... not much I can do about that.
+	STX <Copy_X
+	STY <Copy_Y
 	LDX #0
+	LDA #$FF
+	STA $4012 ; Sample address $FFC0.
     LDA #$80	; Slowest Speed
+	SEI
     STA $4010	; Also enable the DMC IRQ
     LDA #0
     STA $4013	; Length = 0 (+1)
     LDA $4015	; Disable DMC
       
+	LDA #$10
+    STA $4015 ; Enable DMC (clear the DMC buffer)
+	NOP
+	STA $4015 ; Enable DMC a second time.
+    ; verify the emulator will not infinitely loop during the coarse sync.
+	JSR Clockslide_10000
+	BIT $4015
+	BNE sync_dmc_fail
+	  
     LDA #$10
     STA $4015 ; Enable DMC (clear the DMC buffer)
 	NOP
 	STA $4015 ; Enable DMC a second time.
-      
     ; Coarse synchronize
 dma_sync_loop1:
     BIT $4015	; This only exits once bit 4 is cleared.
@@ -15244,18 +15262,16 @@ dma_sync_first:
     ; The DMA is now synced!
 
 	LDA #$0F
-	STA $4010
+	STA $4010 ; disable the DMC IRQ, set the speed to the fastest.
     JSR Clockslide_3380
 	NOP
 	LDA #$10
     STA $4015
 	LDA #$10
     STA $4015
+	LDX <Copy_X
+	LDY <Copy_Y
 	NOP
-	NOP
-	NOP
-	NOP
-	
 	RTS				  ; 412 -> 406
 	; the next DMA is at (432) cycles, so we have 406 cycles to go.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
