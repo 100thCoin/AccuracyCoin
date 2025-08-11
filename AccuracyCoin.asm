@@ -2285,10 +2285,11 @@ TEST_UnofficialInstructionsExist:
 	; Hi = ($1E+1) & A & X;
 	; 	 = $05
 	; $500 = A & X & H
-	;	   = $0D & $15 & $1F
-	;	   = 5
+	;	   = $1F & $FF & $1F
+	;	   = $1F
 	; H is the high byte of the target address +1.
-	; So we should write $05 to $0500
+	; I'm also specifically running a test here where X = $FF, due to this isntruction having a magic number, and I'd rather not worry about that in this specific test.
+	; So we should write $1F to $0500
 	LDA $0700
 	CMP #$1F
 	BNE TEST_Fail5
@@ -2352,7 +2353,7 @@ TEST_UnofficialInstructions_Continue:
 	; 	 = $05
 	; $500 = X & H
 	; H is the high byte of the target address before adding the Y offset.
-	; So we should write $05 to $0500
+	; So we should write $1F to $0500
 	; Before we check $0500, this instruction just destroyed the stack pointer.
 	TSX
 	CPX $0501
@@ -2383,10 +2384,10 @@ TEST_UnofficialInstructions_SHS_Continue:
 	; Hi = ($1E+1) & A & X;
 	; 	 = $05
 	; $500 = A & X & H
-	;	   = $0D & $15 & $1F
-	;	   = 5
+	;	   = $1F & $FF & $1F
+	;	   = $1F
 	; H is the high byte of the target address +1.
-	; So we should write $05 to $0500
+	; So we should write $1F to $0500
 	LDA $0700
 	CMP #$1F
 	BNE TEST_Fail5
@@ -3607,6 +3608,7 @@ TEST_SHA_9F_CorrectLength:
 	.byte $9F, $F0, $1E	; SHA $1EF0, Y
 	; Behavior 1: Hi = ($1E+1) & $55 & $AA = 0	:: write ($1E+1) & $55 & $AA = 0
 	; Behavior 2: Hi = ($1E+1) & $AA = 0A		:: ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
+	; Behavior 3: Hi = ??? more research needed
 	JSR CopyLowestPageBytesTo60
 	LDA $0A00
 	CMP #$FF
