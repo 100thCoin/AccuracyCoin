@@ -2289,7 +2289,7 @@ TEST_UnofficialInstructionsExist:
 	;	   = $1F
 	; H is the high byte of the target address +1.
 	; I'm also specifically running a test here where X = $FF, due to this isntruction having a magic number, and I'd rather not worry about that in this specific test.
-	; So we should write $1F to $0500
+	; So we should write $1F to $0700
 	LDA $0700
 	CMP #$1F
 	BNE TEST_Fail5
@@ -2353,8 +2353,8 @@ TEST_UnofficialInstructions_Continue:
 	; 	 = $05
 	; $500 = X & H
 	; H is the high byte of the target address before adding the Y offset.
-	; So we should write $1F to $0500
-	; Before we check $0500, this instruction just destroyed the stack pointer.
+	; So we should write $1F to $0700
+	; Before we check $0700, this instruction just destroyed the stack pointer.
 	TSX
 	CPX $0501
 	BNE TEST_UnofficialInstructions_SHS_Continue
@@ -2387,7 +2387,7 @@ TEST_UnofficialInstructions_SHS_Continue:
 	;	   = $1F & $FF & $1F
 	;	   = $1F
 	; H is the high byte of the target address +1.
-	; So we should write $1F to $0500
+	; So we should write $1F to $0700
 	LDA $0700
 	CMP #$1F
 	BNE TEST_Fail5
