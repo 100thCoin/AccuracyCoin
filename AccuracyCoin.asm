@@ -3635,7 +3635,7 @@ TEST_SHA_Behavior1_9F_JMP:
 	; The behavior here IS correlated to the other set of behaviors.
 	; 1. Hi = Hi & A & X
 	; 2. Hi = Hi & X
-TEST_SHA_Behavior1_93
+TEST_SHA_Behavior1_93:
 	LDA #$93
 	BNE TEST_SHA_Behavior1
 TEST_SHA_Behavior1_9F:
@@ -4269,7 +4269,7 @@ TEST_ARR_6B:
 	; Bitwise AND with A then Rotate A and check bits
 	; Negative flag = bit 7
 	; Carry flag = bit 6
-	; Overflow flag = bit 5
+	; Overflow flag = bit 5 XOR bit 6
 	; Zero flag = result is zero
 	JSR TEST_RunTest_ImmOperandAXYF
 	.byte $01
@@ -4360,6 +4360,11 @@ TEST_AXS_CB:
 	.byte $45
 	.byte $C5, $5F, $00, (flag_i | flag_n)
 	.byte $C5, $00, $00, (flag_i | flag_z | flag_c)
+	
+	JSR TEST_RunTest_ImmOperandAXYF
+	.byte $40
+	.byte $10, $50, $00, (flag_i | flag_n)
+	.byte $10, $D0, $00, (flag_i | flag_n)
 	
 	;; END OF TEST ;;
 	LDA #1
@@ -10904,12 +10909,13 @@ TEST_BFlag_BRK:
 	STA $601
 	LDA #HIGH(TEST_BFlag_BRK2)
 	STA $602
-	SEI
+	SEI ; Set the interrupt flag to make sure the IRQ does not happen yet.
 	LDA #0
-	STA $4017
-	JSR Clockslide_30000
-	CLI
+	STA $4017 ; Set up the APU Frame Counter so an IRQ occurs in approximately 30,000 CPU cycles.
+	JSR Clockslide_30000 ; stall for 30,000 CPU cycles.
+	CLI ; Clear the interrupt flag, triggering the IRQ (after the first NOP. See [Interrupt Polling])
 	NOP
+	; The IRQ occurs here.
 	NOP
 	NOP
 	SEI
@@ -14387,14 +14393,14 @@ RC_Loop:
 ;;;;;;;
 
 ReadControllerInto50_and_A:	; Reads controller port 1 8 times, storing the result in address 50, and also the A register.
-	LDX #8
+	LDX #8	; We're going to read from the controller port 8 times.
 ReadControllerInto50_Loop:
-	LDA $4016
-	LSR A
-	ROL <$50
-	DEX
+	LDA $4016	; This reads the controller port.
+	LSR A		; This shifts bit 0 into the carry flag.
+	ROL <$50	; and this rotates the carry flag into bit 0 of address $50.
+	DEX			; decrement X until X=0
 	BNE ReadControllerInto50_Loop
-	LDA <$50
+	LDA <$50	; And for good measure, let's load A with the result.
 	RTS
 ;;;;;;;
 
@@ -15219,9 +15225,9 @@ DMASyncWithoutOpenBus:
 	NOP
 	STA $4015 ; Enable DMC a second time.
     ; verify the emulator will not infinitely loop during the coarse sync.
-	JSR Clockslide_10000
+	JSR Clockslide_10000 ; Wait 10000 CPU cycles to verify the DMC DMA stops playing on its own.
 	BIT $4015
-	BNE sync_dmc_fail
+	BNE sync_dmc_fail ; If it's still playing, abort!
 	  
     LDA #$10
     STA $4015 ; Enable DMC (clear the DMC buffer)
