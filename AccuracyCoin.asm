@@ -6609,6 +6609,8 @@ TEST_APURegActivation_Eval_3:
 	CMP #$E3						; This should be E3
 	BEQ TEST_APURegActivation_Eval_3p6; If it's not $E3, check $E0
 	CMP #$E0
+	BEQ TEST_APURegActivation_Eval_3p6; If it's not $E0, you fail
+	CMP #$E1 						; And also check for $E1, which happens if you are holding A.
 	BNE FAIL_APURegActivation2		; If it's not $E0, you fail
 TEST_APURegActivation_Eval_3p6:
 	INX								; Increment X for the next one.	
