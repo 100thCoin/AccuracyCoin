@@ -179,7 +179,7 @@ result_UnOp_RLA_3B = $41E
 result_UnOp_RLA_3F = $41F
 
 result_UnOp_SRE_43 = $420
-result_UnOp_SRE_47 = $421
+result_UnOp_SRE_47 = $47F ; It's pretty funny, but I need address $421 to always be $00. (see Implied Dummy Reads where bit 5 of the opcode is set.)
 result_UnOp_SRE_4F = $422
 result_UnOp_SRE_53 = $423
 result_UnOp_SRE_57 = $424
@@ -293,6 +293,7 @@ result_JSREdgeCases = $47C
 result_AllNOPs = $47D
 
 result_PaletteRAMQuirks = $47E
+;	47F is used.If you add a new test, don't forget to skip that value.
 
 
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
@@ -2139,6 +2140,8 @@ TEST_PowerOnState_CPU_Registers:
 TEST_Fail4:
 	JMP TEST_Fail
 TEST_UnofficialInstructions_Prep:
+	LDA #0	; some of these tests write to address $700, other to address $500.
+	STA $700
 	LDA #$42
 	STA $500
 	STA <$50
@@ -10082,7 +10085,7 @@ TEST_ImpliedDummyRead_Loop:	; This loop tests the opcodes that don't have bit 5 
 	STA <$60	; address $60 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
 	JSR DMASyncWith48	; 50 cycles until DMA.
 	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag
-	JSR Clockslide_36	;19 cycles until DLA
+	JSR Clockslide_36	;19 cycles until DMA.
 	LDA #HIGH(TEST_ImpliedDummyRead_Post)
 	PHA
 	LDA #LOW(TEST_ImpliedDummyRead_Post)
@@ -10167,25 +10170,27 @@ TEST_ImpliedDummyRead_Loop2:	; This loop tests the opcodes that do have bit 5 se
 	STX <Copy_X
 	LDA TEST_ImpliedDummyRead_Bit5OpsToTest, X
 	STA <$A5
+	; The test: verify the dummy read exists on implied-addressed instructions.
 	; Current objective: move the PC to $4012 with the data bus set to $A5
 	; The plan: 
-	; JSR $4012, and then a DMC DMA occurs. (DMC DMA will have set the value $A5 to the data bus.)
-	; It's the simplest thing that could possibly work.
+	; JSR $4012, and then a DMC DMA occurs. (The DMC DMA will set the value $A5 to the data bus.)
+	; It's the simplest thing that could possibly work!
 	; 
 	; Here's how it will play out.
 	; JSR $4012
 	; DMC DMA (data bus = $A5)
 	; LDA <$A5 (Data bus = the contents of address $A5. This is where we store the opcode we want to test)
 	; The opcode in question runs. Dummy reads $4015, clearing the frame counter interrupt flag. (Except bit 5 will be set this time)
-	; Fetch opcode from $4015
-	; JSR $0021 if PASS, RTS if FAIL.
+	; The test passes if the dummy read clears the frame counter interrupt flag.
+	; Fetch opcode from $4015 (remember, bit 5 is open bus)
+	; JSR $0021 if the test passes, RTS if the test fails.
 	JSR ReadController1; We need controller 1 to be fully clocked, and controller 2 unclocked.
 
 	LDA #0
-	STA <$60	; address $60 will be a 1 if we executed a BRK, and a 0 if we executed an RTI
+	STA <$60	; after the test runs, address $60 will be a 1 if we executed a JSR, and a 0 if we executed an RTS
 	JSR DMASyncWithA5	; 50 cycles until DMA.
-	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag
-	JSR Clockslide_47; 95 cycles from clockslides. 8 cycles until DMA
+	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag ; wait for the APU frame counter IRQ flag to be set. 55 cycles until DMA.
+	JSR Clockslide_47; waste 47 cycles from clockslides. 8 cycles until DMA
 	LDA #$A5 ; 6 cycles until DMA
 	JSR $4012; [Read opcode] [Read operand] [Dummy Read] [Push PCH] [Push PCL] [Read operand] 
 	; [DMC DMA, data bus = $A5]
@@ -10195,16 +10200,17 @@ TEST_ImpliedDummyRead_Loop2:	; This loop tests the opcodes that do have bit 5 se
 	; And here's how the JSR instruction will work:
 	; [Read $4015: 20] [Read $4016: 21] [dummy read stack] [Push PCH: 40] [Push PHL: 16] [read $4017: 00]
 	; Keep in mind, the open bus value when reading controller 2 will be 16, which gets masked away, as only the upper 3 bits of controller 2 matter.
+	;	- Or if this is a top-loader console, bit 2 is also open bus, so the read from $4017 will return $04. Address $0421 is also $00.
 	;
-	; and hopefully the JSR takes you to $0021, a BRK to TEST_ImpliedDummyRead_BRKed2, which sets $60 and jumps to TEST_ImpliedDummyRead_Post2.
+	; and hopefully the JSR takes you to $0021, a BRK to TEST_ImpliedDummyRead_BRKed2, which sets address $60 and jumps to TEST_ImpliedDummyRead_Post2.
 TEST_ImpliedDummyRead_Post2:
 	LDA <$60
-	BEQ FAIL_ImpliedDummyRead3
+	BEQ FAIL_ImpliedDummyRead3 ; If address $0060 has the value $00, then the dummy read didn't poke the frame counter interrupt flag. Fail the test.
 	INC <ErrorCode	
 
 	LDX <Copy_X
 	INX
-	CPX #11	; this loops tests 11 opcodes.
+	CPX #11	; this loop tests 11 opcodes.
 	BNE TEST_ImpliedDummyRead_Loop2
 	BEQ TEST_ImpliedDummyRead_Continue2
 FAIL_ImpliedDummyRead3:
