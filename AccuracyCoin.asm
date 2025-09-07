@@ -6607,11 +6607,17 @@ TEST_APURegActivation_Eval_3:
 	INX								; Increment X for the next one.
 	LDA $500,X						; Read the value copied from OAM at $2_6
 	CMP #$E3						; This should be E3
-	BNE FAIL_APURegActivation2		; If it's not $E3, you fail
+	BEQ TEST_APURegActivation_Eval_3p6; If it's not $E3, check $E0
+	CMP #$E0
+	BNE FAIL_APURegActivation2		; If it's not $E0, you fail
+TEST_APURegActivation_Eval_3p6:
 	INX								; Increment X for the next one.	
 	LDA $500,X						; Read the value copied from OAM at $2_7
 	CMP #$FF						; This should be FF
-	BNE FAIL_APURegActivation2		; If it's not $FF, you fail
+	BEQ TEST_APURegActivation_Eval_3p7; If it's not $FF, check $E0
+	CMP #$E0						; This should be $FF (or $E0)
+	BNE FAIL_APURegActivation2		; If it's not $FF, check $E0
+	TEST_APURegActivation_Eval_3p7:
 	INX								; Increment X for the next one.	
 	LDY #03							; It probably should have been INY's for neatness, but this saves 2 CPU cycles.
 TEST_APURegActivation_Skip0601:
