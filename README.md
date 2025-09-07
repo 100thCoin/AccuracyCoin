@@ -199,7 +199,7 @@ For more information, I recommend reading the fully commented assembly code for 
   9: If the RDY line goes low 2 cycles before the write cycle, the Y register was not the correct Value after the test.  
   A: If the RDY line goes low 2 cycles before the write cycle, the CPU status flags were not correct after the test.  
 
- ### Unofficial Instructions: SHS
+### Unofficial Instructions: SHS
   F: The high byte corruption did not match either known behavior.  
   0: This instruction had the wrong number of operand bytes.  
   1: The target address of the instruction was not the correct value after the test.  
