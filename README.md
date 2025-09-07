@@ -247,7 +247,7 @@ For more information, I recommend reading the fully commented assembly code for 
   8: If the channel is set to play infinitely, the length counter should be left unchanged.  
 
 ### APU Length Table
-  1: Your emulator did not pass APU Length Counter.
+  1: Your emulator did not pass APU Length Counter.  
   2: When writing %00000--- to address $4003, the pulse 1 length counter should be set to 10.  
   3: When writing %00001--- to address $4003, the pulse 1 length counter should be set to 254.  
   4: When writing %00010--- to address $4003, the pulse 1 length counter should be set to 20.  
@@ -353,7 +353,7 @@ For more information, I recommend reading the fully commented assembly code for 
   2: The DMC DMA was either on the wrong cycle, or it did not update the data bus.  
 
 ### DMA + $2007 Read
-  1: The PPU Read Buffer is not working.
+  1: The PPU Read Buffer is not working.  
   2: The DMC DMA was either on the wrong cycle, or the halt/alignment cycles did not read from $2007.  
   3: The halt/alignment cycles did not increment the "v" register of the PPU enough times.  
 
@@ -534,11 +534,11 @@ For more information, I recommend reading the fully commented assembly code for 
   7: The indexed zero page addressing mode for read-modify-write instructions should take 6 cycles.  
   8: The absolute addressing mode for non-read-modify-write instructions should take 4 cycles.  
   9: The absolute addressing mode for read-modify-write instructions should take 6 cycles.  
-  A: The indexed absolute addressing mode for STA instructions should always take 5 cycles. 
+  A: The indexed absolute addressing mode for STA instructions should always take 5 cycles.  
   B: The indexed absolute addressing mode for many instructions should take an extra cycle if the page boundary was crossed.  
   C: The indexed absolute addressing mode for read-modify-write instructions should always take 7 cycles.  
   D: The indirect, X instructions should always take 6 cycles (well, except for the unofficial ones).  
-  E: The indirect, Y instructions should take an extra cycle if a page boundary is crossed.
+  E: The indirect, Y instructions should take an extra cycle if a page boundary is crossed.  
   F: The implied instructions should take 2 cycles.  
   G: PHP should take 3 cycles.  
   H: PHA should take 3 cycles.  
@@ -589,7 +589,7 @@ For more information, I recommend reading the fully commented assembly code for 
 ### JSR Edge Cases
   1: Your emulator pushed the wrong value for the return address.  
   2: Your emulator has incorrect open bus emulation.  
-  3: JSR should leave the value of the second operand on the data bus.
+  3: JSR should leave the value of the second operand on the data bus.  
 
 # Success Codes
 Some tests have multiple acceptable behaviors that are tested for in this ROM. The behavior used will either be printed on screen after running the test, or you'll see a "success code" on the all-test table.  
