@@ -613,9 +613,9 @@ Suite_UnofficialOps_DCP:
 	table "$C7   DCP zeropage",   $FF, result_UnOp_DCP_C7, TEST_DCP_C7
 	table "$CF   DCP absolute",   $FF, result_UnOp_DCP_CF, TEST_DCP_CF
 	table "$C3   DCP indirect,Y", $FF, result_UnOp_DCP_D3, TEST_DCP_D3
-	table "$B7   DCP zeropage,X", $FF, result_UnOp_DCP_D7, TEST_DCP_D7
-	table "$BB   DCP absolute,Y", $FF, result_UnOp_DCP_DB, TEST_DCP_DB
-	table "$BF   DCP absolute,X", $FF, result_UnOp_DCP_DF, TEST_DCP_DF
+	table "$D7   DCP zeropage,X", $FF, result_UnOp_DCP_D7, TEST_DCP_D7
+	table "$DB   DCP absolute,Y", $FF, result_UnOp_DCP_DB, TEST_DCP_DB
+	table "$DF   DCP absolute,X", $FF, result_UnOp_DCP_DF, TEST_DCP_DF
 	.byte $FF
 	
 	;; Unofficial Instructions: ISC ;;
