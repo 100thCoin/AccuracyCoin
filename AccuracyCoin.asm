@@ -1439,6 +1439,7 @@ TEST_OpenBus_ContinueTest4:    ; Anyway, that was the greatest crime against pro
 	LDA $3FFF,X
 	AND #$20 ; Again, only check bit 5.
 	CMP #$20 ; Bit 5 was set when reading from the PPU Bus, so bit 5 of $4015 should be set.
+TEST_Fail_1p5:
 	BNE TEST_Fail
 	INC <ErrorCode 
 	
@@ -1447,7 +1448,7 @@ TEST_OpenBus_ContinueTest4:    ; Anyway, that was the greatest crime against pro
 	LDA $4016
 	AND #$E0
 	CMP #$40 ; When running LDA $4016, bit 6 is likely to be set.
-	BNE TEST_Fail2
+	BNE TEST_Fail_1p5
 	LDA $4017
 	AND #$E0
 	CMP #$40 ; When running LDA $4017, bit 6 is likely to be set.
@@ -1492,6 +1493,7 @@ TEST_OpenBus_ContinueTest4:    ; Anyway, that was the greatest crime against pro
 	;
 	; The value read from $4015 will be zero, but that does NOT change the data bus!
 	; Therefore, the value read from $4115 will still be $40 from when the high byte was fetched.
+	LDX #$16
 	LDA $40FF,X
 	CMP #$40
 	BNE TEST_Fail2
