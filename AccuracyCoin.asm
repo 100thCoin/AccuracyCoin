@@ -1403,28 +1403,29 @@ TEST_OpenBus_PrepIRQLoop:
 	BNE TEST_Fail
 	INC <ErrorCode 
 	
-	;;; Test 5 [Open Bus]: Dummy Reads update the data bus, test by reading $4015 ;;;
+	;;; Test 5 [Open Bus]: Dummy Reads update the data bus, test by reading $4000 ;;;
 	; This doubles as a test of dummy read cycles, and the PPU data bus. Here's what happens.
-	; LDA $3FFF, X (X=$16)
+	; LDA $3FFF, X (X=$01)
 	; 1: fetch opcode 
 	; 2: fetch low byte
 	; 3: fetch high byte, add the X offset to the low byte
-	; 4: READ $3F15, then fix the high byte
-	; 5: READ $4015.
+	; 4: READ $3F00, then fix the high byte
+	; 5: READ $4000.
 	;
-	; $3F15 is a mirror of $2005, which when read returns PPU Open Bus.
+	; $3F00 is a mirror of $2000, which when read returns PPU Open Bus.
 	; So we need to set the PPU Bus to something first.
 	LDA #0
 	STA $2002
-	LDX #$16
+	LDX #$01
 	; let's run the test.
 	LDA $3FFF,X 
-	AND #$20 ; Let's only check bit 5, since that's the open bus bit of address $4015
-	CMP #$00 ; bit 5 is a zero, since that was what was read from $3F15
 	BNE TEST_Fail
 	; Let's set the PPU Bus to $FF and run it again!
 	LDA #$FF
+	STA $2002
+
 	NOP
+	NOP ; I need address $A0A0 to be something very specific (in order to prevent an incorrect emulation from crashing), so I'm adding some NOPs here.
 	; PrintCHR will return here. The .word $2400 and ,byte $F0, $FF don't get executed.
 	BNE TEST_OpenBus_ContinueTest4 ; Skip to TEST_OpenBus_ContinueTest4
 	;; If you are reading this for test 4, just ignore these next few lines. ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1435,10 +1436,8 @@ TEST_OpenBusA0A0:              ; This is a fail-safe for test 8. It needed to be
 TEST_OpenBus_ContinueTest4:    ; Anyway, that was the greatest crime against programming I've ever committed.;;
 	;; And now, back to your regularly scheduled program. ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	
-	STA $2002
 	LDA $3FFF,X
-	AND #$20 ; Again, only check bit 5.
-	CMP #$20 ; Bit 5 was set when reading from the PPU Bus, so bit 5 of $4015 should be set.
+	CMP #$FF ; Check if the dummy read set the data bus to $FF.
 TEST_Fail_1p5:
 	BNE TEST_Fail
 	INC <ErrorCode 
