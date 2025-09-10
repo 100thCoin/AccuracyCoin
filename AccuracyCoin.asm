@@ -9750,7 +9750,7 @@ TEST_DMC_Conflict_CheckEarlyFamicom:
 TEST_DMC_Conflict_AnswerLoop_EarlyFamicom:
 	LDA $500, X
 	CMP TEST_DMC_Conflicts_AnswerKey_Early_Famicom, X
-	BNE FAIL_DMC_Conflicts
+	BNE TEST_DMC_Conflict_CheckTopLoader
 	LDA #$00
 	STA $4017	; Keep the interrupt flag set, but refresh the timer.
 	INX
@@ -9758,6 +9758,21 @@ TEST_DMC_Conflict_AnswerLoop_EarlyFamicom:
 	BNE TEST_DMC_Conflict_AnswerLoop_EarlyFamicom
 	LDA #13
 	STA <$50	; pass code 3. (early famicom)
+	BNE TEST_DMC_Test3
+	
+TEST_DMC_Conflict_CheckTopLoader:
+	LDX #0
+TEST_DMC_Conflict_AnswerLoop_TopLoader:
+	LDA $500, X
+	CMP TEST_DMC_Conflicts_TopLoaderAnswerKey, X
+	BNE FAIL_DMC_Conflicts
+	LDA #$00
+	STA $4017	; Keep the interrupt flag set, but refresh the timer.
+	INX
+	CPX #$40
+	BNE TEST_DMC_Conflict_AnswerLoop_TopLoader
+	LDA #13
+	STA <$50	; pass code 4. (top loader NES)	
 	
 TEST_DMC_Test3:
 	INC <ErrorCode
@@ -12958,6 +12973,13 @@ TEST_PaletteRAMQuirksCont:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                ENGINE                   ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		
+	.org $ED80	
+TEST_DMC_Conflicts_TopLoaderAnswerKey:
+	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+	.byte $00, $00, $00, $00, $00, $00, $01, $00, $00, $00, $00, $00, $00, $00, $00, $00
+	.byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
+	.byte $FF, $FF, $FF, $FF, $FF, $FF, $E5, $E0, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
 		
 	.org $EDC0	
 DPCM_Sample_90:
