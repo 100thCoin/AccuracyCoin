@@ -3642,10 +3642,34 @@ TEST_SHA_Behavior1_9F_JMP:
 	; 2. Hi = Hi & X
 TEST_SHA_Behavior1_93:
 	LDA #$93
-	BNE TEST_SHA_Behavior1
+	PHA
+	LDA <RunningAllTests
+	BNE TEST_SHA_Behavior1_SkipPrints1
+	
+	LDA #0
+	STA <dontSetPointer
+	JSR PrintTextCentered
+	.word $22B0
+	.byte " SHA Behavior 1", $FF
+	JSR PrintTextCentered
+	.word $2330
+	.byte "SHA magic = $", $FF
+	LDA #$F0
+	STA <$60
+	LDA #$FE
+	STA <$61
+	LDA #$FF
+	LDX #$00
+	LDY #$60
+	.byte $93, $60 ; SHA ($0060), Y
+	LDA <$50
+	JSR PrintByte
+	
+	JSR ResetScrollAndWaitForVBlank
+TEST_SHA_Behavior1_SkipPrints1:
+	JMP TEST_SHA_Behavior1
 TEST_SHA_Behavior1_9F:
 	LDA #$9F
-TEST_SHA_Behavior1:
 	PHA
 	LDA <RunningAllTests
 	BNE TEST_SHA_Behavior1_SkipPrints
@@ -3667,6 +3691,8 @@ TEST_SHA_Behavior1:
 	
 	JSR ResetScrollAndWaitForVBlank
 TEST_SHA_Behavior1_SkipPrints:
+TEST_SHA_Behavior1:
+
 	PLA
 
 	JSR TEST_UnOp_Setup; Set the opcode
@@ -3748,10 +3774,34 @@ TEST_SHA_Behavior1_SkipPrints:
 	
 TEST_SHA_Behavior2_93
 	LDA #$93
-	BNE TEST_SHA_Behavior2
+	PHA	
+	LDA <RunningAllTests
+	BNE TEST_SHA_Behavior2_SkipPrints1
+	
+	LDA #0
+	STA <dontSetPointer
+	JSR PrintTextCentered
+	.word $22B0
+	.byte " SHA Behavior 2", $FF
+	JSR PrintTextCentered
+	.word $2330
+	.byte "SHA magic = $", $FF
+	LDA #$F0
+	STA <$60
+	LDA #$FE
+	STA <$61
+	LDA #$FF
+	LDX #$00
+	LDY #$60
+	.byte $93, $60; SHA ($0060), Y
+	LDA <$50
+	JSR PrintByte
+	
+	JSR ResetScrollAndWaitForVBlank
+TEST_SHA_Behavior2_SkipPrints1:
+	JMP TEST_SHA_Behavior2
 TEST_SHA_Behavior2_9F:
 	LDA #$9F
-TEST_SHA_Behavior2:
 	PHA	
 	LDA <RunningAllTests
 	BNE TEST_SHA_Behavior2_SkipPrints
@@ -3773,6 +3823,7 @@ TEST_SHA_Behavior2:
 	
 	JSR ResetScrollAndWaitForVBlank
 TEST_SHA_Behavior2_SkipPrints:
+TEST_SHA_Behavior2:
 	PLA
 	JSR TEST_UnOp_Setup; Set the opcode
 	; This test follows the behavior of many consoles I tested, though differs from the documentation.
