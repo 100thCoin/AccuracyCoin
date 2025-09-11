@@ -197,7 +197,7 @@ result_UnOp_RRA_7F = $42D
 result_UnOp_SAX_83 = $42E
 result_UnOp_SAX_87 = $42F
 result_UnOp_SAX_8F = $430
-result_UnOp_SAX_9F = $431
+result_UnOp_SAX_97 = $431
 result_UnOp_LAX_A3 = $432
 result_UnOp_LAX_A7 = $433
 result_UnOp_LAX_AF = $434
@@ -597,7 +597,7 @@ Suite_UnofficialOps__AX:
 	table "$83   SAX indirect,X", $FF, result_UnOp_SAX_83, TEST_SAX_83
 	table "$87   SAX zeropage",   $FF, result_UnOp_SAX_87, TEST_SAX_87
 	table "$8F   SAX absolute",   $FF, result_UnOp_SAX_8F, TEST_SAX_8F
-	table "$97   SAX zeropage,Y", $FF, result_UnOp_SAX_9F, TEST_SAX_97
+	table "$97   SAX zeropage,Y", $FF, result_UnOp_SAX_97, TEST_SAX_97
 	table "$A3   LAX indirect,X", $FF, result_UnOp_LAX_A3, TEST_LAX_A3
 	table "$A7   LAX zeropage",   $FF, result_UnOp_LAX_A7, TEST_LAX_A7
 	table "$AF   LAX absolute",   $FF, result_UnOp_LAX_AF, TEST_LAX_AF
@@ -612,7 +612,7 @@ Suite_UnofficialOps_DCP:
 	table "$C3   DCP indirect,X", $FF, result_UnOp_DCP_C3, TEST_DCP_C3
 	table "$C7   DCP zeropage",   $FF, result_UnOp_DCP_C7, TEST_DCP_C7
 	table "$CF   DCP absolute",   $FF, result_UnOp_DCP_CF, TEST_DCP_CF
-	table "$C3   DCP indirect,Y", $FF, result_UnOp_DCP_D3, TEST_DCP_D3
+	table "$D3   DCP indirect,Y", $FF, result_UnOp_DCP_D3, TEST_DCP_D3
 	table "$D7   DCP zeropage,X", $FF, result_UnOp_DCP_D7, TEST_DCP_D7
 	table "$DB   DCP absolute,Y", $FF, result_UnOp_DCP_DB, TEST_DCP_DB
 	table "$DF   DCP absolute,X", $FF, result_UnOp_DCP_DF, TEST_DCP_DF
