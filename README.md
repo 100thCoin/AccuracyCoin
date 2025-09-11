@@ -66,7 +66,7 @@ For more information, I recommend reading the fully commented assembly code for 
   7: Bit 5 of the 6502 processor flags should be set by BRK.  
   8: Bit 5 of the 6502 processor flags should be set by an IRQ.  
   9: Bit 5 of the 6502 processor flags should be set by an NMI.  
-  
+
 ### Dummy read cycles
   1: A mirror of PPU_STATUS ($2002) should be read twice by LDA $20F2, X (where X = $10).  
   2: The dummy read should not occur if a page boundary is not crossed.  
@@ -116,7 +116,7 @@ For more information, I recommend reading the fully commented assembly code for 
   I: Does "DCP Absolute" do vaguely what's expected of it?  
   J: Does "AXS Immediate" do vaguely what's expected of it?  
   K: Does "ISC Absolute" do vaguely what's expected of it?  
-  
+
 ### All NOP Instructions
   (See message printed on screen for more details)  
   1: Opcode $04 (NOP Zero Page) malfunctioned.  
@@ -152,16 +152,16 @@ For more information, I recommend reading the fully commented assembly code for 
   1: Absolute indexed addressing did not read from the correct address.  
   2: When indexing with X beyond address $FFFF, the instruction should read from the zero page.  
   3: When indexing with Y beyond address $FFFF, the instruction should read from the zero page.  
-  
+
 ### Zero Page Indexed Wraparound
   1: Zero Page indexed addressing did not read from the correct address.  
   2: When indexing with X beyond address $00FF, the instruction should still read from the zero page.  
   3: When indexing with Y beyond address $00FF, the instruction should still read from the zero page.  
-  
+
 ### Indirect Addressing Wraparound
   1: JMP (Indirect) did not move the program counter to the correct address.  
   2: The address bus should wrap around the page when reading the low and high bytes with indirect addressing.  
-  
+
 ### Indirect Addressing, X Wraparound
   1: Indirect, X addressing did not read from the correct address.  
   2: The indirect indexing should only occur on the zero page, even if X crosses a page boundary.  
@@ -171,7 +171,7 @@ For more information, I recommend reading the fully commented assembly code for 
   1: Indirect, Y addressing did not read from the correct address.  
   2: The Y indexing should be able to cross a page boundary, and the high byte should be updated.  
   3: The address bus should wrap around the page when reading the low and high bytes with indirect addressing.  
-  
+
 ### Relative Addressing Wraparound
   1: You should be able to branch from the Zero Page to page $FF.  
   2: You should be able to branch from page $FF to the Zero Page.  
@@ -199,7 +199,7 @@ For more information, I recommend reading the fully commented assembly code for 
   9: If the RDY line goes low 2 cycles before the write cycle, the Y register was not the correct Value after the test.  
   A: If the RDY line goes low 2 cycles before the write cycle, the CPU status flags were not correct after the test.  
 
- ### Unofficial Instructions: SHS
+### Unofficial Instructions: SHS
   F: The high byte corruption did not match either known behavior.  
   0: This instruction had the wrong number of operand bytes.  
   1: The target address of the instruction was not the correct value after the test.  
@@ -247,7 +247,7 @@ For more information, I recommend reading the fully commented assembly code for 
   8: If the channel is set to play infinitely, the length counter should be left unchanged.  
 
 ### APU Length Table
-  1: Your emulator did not pass APU Length Counter.
+  1: Your emulator did not pass APU Length Counter.  
   2: When writing %00000--- to address $4003, the pulse 1 length counter should be set to 10.  
   3: When writing %00001--- to address $4003, the pulse 1 length counter should be set to 254.  
   4: When writing %00010--- to address $4003, the pulse 1 length counter should be set to 20.  
@@ -353,7 +353,7 @@ For more information, I recommend reading the fully commented assembly code for 
   2: The DMC DMA was either on the wrong cycle, or it did not update the data bus.  
 
 ### DMA + $2007 Read
-  1: The PPU Read Buffer is not working.
+  1: The PPU Read Buffer is not working.  
   2: The DMC DMA was either on the wrong cycle, or the halt/alignment cycles did not read from $2007.  
   3: The halt/alignment cycles did not increment the "v" register of the PPU enough times.  
 
@@ -373,7 +373,7 @@ For more information, I recommend reading the fully commented assembly code for 
   2: Any value with bit 0 set written to $4016 should strobe the controllers.  
   3: Controllers should be strobed when the CPU transitions from a "get" cycle to a "put" cycle.  
   4: Controllers should not be strobed when the CPU transitions from a "put" cycle to a "get" cycle.  
-  
+
 ### Controller Clocking
   1: Reading $4016 more than 8 times should always result in bit 0 being set to 1.  
   2: Your emulator did not pass the SLO Absolute, X test.  
@@ -403,7 +403,7 @@ For more information, I recommend reading the fully commented assembly code for 
 ### Explicit DMA Abort
   1: The DMC DMA timing in your emulator is off.  
   2: The aborted DMAs did not spend the correct number of CPU cycles.  
-  
+
 ### Implicit DMA Abort
   1: The DMC DMA timing in your emulator is off.  
   2: The aborted DMAs did not spend the correct number of CPU cycles.  
@@ -518,7 +518,7 @@ For more information, I recommend reading the fully commented assembly code for 
   2: OAM Corruption should "corrupt" a row in OAM by copying the 8 values from row 0 to another row.  
   3: This corruption should not occur immediately after disabling rendering.  
   4: This corruption should now occur immediately after re-enabling rendering.  
-  
+
 ### RMW $2007 Extra Write
   1: A Read-Modify-Write instruction to address $2007 should perform an extra write where the low byte of the PPU address written is the result of the Read-Modify-Write instruction.  
   2: This extra write should not occur when "v" is pointing to Palette RAM. (An extra write still might occur, but that's not the one we're testing for.)  
@@ -534,11 +534,11 @@ For more information, I recommend reading the fully commented assembly code for 
   7: The indexed zero page addressing mode for read-modify-write instructions should take 6 cycles.  
   8: The absolute addressing mode for non-read-modify-write instructions should take 4 cycles.  
   9: The absolute addressing mode for read-modify-write instructions should take 6 cycles.  
-  A: The indexed absolute addressing mode for STA instructions should always take 5 cycles. 
+  A: The indexed absolute addressing mode for STA instructions should always take 5 cycles.  
   B: The indexed absolute addressing mode for many instructions should take an extra cycle if the page boundary was crossed.  
   C: The indexed absolute addressing mode for read-modify-write instructions should always take 7 cycles.  
   D: The indirect, X instructions should always take 6 cycles (well, except for the unofficial ones).  
-  E: The indirect, Y instructions should take an extra cycle if a page boundary is crossed.
+  E: The indirect, Y instructions should take an extra cycle if a page boundary is crossed.  
   F: The implied instructions should take 2 cycles.  
   G: PHP should take 3 cycles.  
   H: PHA should take 3 cycles.  
@@ -589,7 +589,7 @@ For more information, I recommend reading the fully commented assembly code for 
 ### JSR Edge Cases
   1: Your emulator pushed the wrong value for the return address.  
   2: Your emulator has incorrect open bus emulation.  
-  3: JSR should leave the value of the second operand on the data bus.
+  3: JSR should leave the value of the second operand on the data bus.  
 
 # Success Codes
 Some tests have multiple acceptable behaviors that are tested for in this ROM. The behavior used will either be printed on screen after running the test, or you'll see a "success code" on the all-test table.  
@@ -597,19 +597,19 @@ Some tests have multiple acceptable behaviors that are tested for in this ROM. T
 ### Unofficial Instructions: SHA, SHS
   1: The instruction behaved the way an old RP2A03G CPU or previous revision CPU would run this instruction.  
   2: The instruction behaved the way a new RP2A03G CPU or later revision CPU would run this instruction.  
-  
+
 ### DMA + $4016 Read
   1: The controller was read the way a US-released NES / AV Famicom should read controllers.  
   2: The controller was read the way a Famicom should read controllers.  
-  
+
 ### APU Register Activation
   1: The controllers were not clocked by the bus conflict with the OAM DMA.  
   2: The controllers were clocked by the bus conflict with the OAM DMA.  
-  
+
 ### DMC DMA Bus Conflicts
   1: The controller was read the way a US-released NES should read controllers.  
   2: The controller was read the way a Famicom should read controllers.  
-  
+
 ### Implicit DMA Abort
   1: The abort behaved the way a mid-1990 or later CPU would behave.  
   2: The abort behaved the way a pre-mid-1990 CPU would behave.  
