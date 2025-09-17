@@ -294,6 +294,7 @@ result_AllNOPs = $47D
 
 result_PaletteRAMQuirks = $47E
 ;	47F is used.If you add a new test, don't forget to skip that value.
+result_INC4014 = $480
 
 
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
@@ -731,6 +732,8 @@ Suite_SpriteZeroHits:
 	table "Misaligned OAM behavior", $FF, result_MisalignedOAM_Behavior, TEST_MisalignedOAM_Behavior
 	table "Address $2004 behavior", $FF, result_Address2004_Behavior, TEST_Address2004_Behavior
 	table "OAM Corruption", $FF, result_OAM_Corruption, TEST_OAM_Corruption
+	table "INC $4014", $FF, result_INC4014, TEST_INC4014
+
 
 	.byte $FF
 	
@@ -1219,10 +1222,44 @@ DMASyncWith90:
 	NOP
 	NOP
 DMASync90_Loop:
-	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $48 from the DMA.
+	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $90 from the DMA.
 	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
 	CMP #$90
 	BNE DMASync90_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
+	LDA #$0F ; don't loop, continue at max speed. +2 (9)
+	STA $4010 
+	LDA <$00  
+	LDA Copy_A
+	JSR Clockslide_100
+	JSR Clockslide_100
+	JSR Clockslide_100
+	JSR Clockslide_50
+	NOP
+	CMP <$C9
+	RTS
+;;;;;;;
+	
+DMASyncWith05:
+	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
+	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
+	STA <Copy_A
+	LDA #$4F ; loop, max speed.
+	STA $4010
+	LDA #0
+	STA $4011 ; minimum value of DMC
+	LDA #$B5
+	STA $4012 ; Sample address $EDC0.
+	LDA #0
+	STA $4013 ; 1 byte length.
+	LDA #$10
+	STA $4015 ; Start the DMC DMA loop
+	NOP
+	NOP
+DMASync05_Loop:
+	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $05 from the DMA.
+	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
+	CMP #$05
+	BNE DMASync05_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
 	LDA #$0F ; don't loop, continue at max speed. +2 (9)
 	STA $4010 
 	LDA <$00  
@@ -12968,11 +13005,95 @@ TEST_PaletteRAMQuirksCont:
 	RTS
 ;;;;;;;
 
+FAIL_INC4014:
+	JMP TEST_Fail
 
+TEST_INC4014:
+	;;; Test 1 [INC $4014]: The OAM DMA uses the second value written from the INC as the page number ;;;
+	
+	JSR DisableRendering
+	
+	; Put a tile on screen (in the overscan area) for sprite zero to collide with.
+	JSR PrintCHR
+	.word $200F
+	.byte $FE, $FF	
+	JSR ResetScroll
+
+	; Objective: INC $4014, where the data bus has the value 05. Then it can be INC'd to 06.
+	; So we're going to run INC $4014, and use a precisely timed DMC DMA to set the data bus to 5.
+	; Also since it'd be nice for this to work on all revisions, I'm using a sprite zero hit instead of reading from $2004
+	; prep page 6 with OAM data to trigger a sprite zero hit.
+	LDA #$10
+	STA $601
+	LDA #$78
+	STA $603	
+	
+	JSR DMASyncWith05
+	; 50 CPU cycles until the DMA
+	JSR Clockslide_46
+	INC $4014 
+	; [read opcode (EE)]
+	; [read operand: low byte (14)]
+	; [read operand: high byte (15)]
+	; [DMC DMA (05)]
+	; [read from $4014 (05)]
+	; [write (05) to $4014. Increment (05) to (06)]
+	; [write (06) to $4014]
+	
+	; Since DMAs cannot start on a CPU write cycle, it gets delayed until after the second write. Therefore the OAM DMA happens only once, using page 06.	
+	; I don't think OAM decay will affect this, but we're going to stall until VBlank, and then until the next vblank. Then check $2002 before VBlank ends.
+	
+	JSR WaitForVBlank
+	JSR EnableRendering
+	JSR WaitForVBlank
+	
+	JSR DisableRendering
+	
+	; clear that byte we added on the nametable for the sprite zero hit.
+	JSR PrintCHR
+	.word $200F
+	.byte $24, $FF	
+	JSR ResetScroll
+	
+	LDA $2002 ; read PPUSTATUS
+	AND #$40 ; filter for the Sprite Zero hit info.
+	BEQ FAIL_INC4014
+	INC ErrorCode
+	
+	;;; Test 2 [INC $4014]: Only a single DMC DMA occurs ;;;
+	JSR DisableRendering
+	LDA #$50
+	STA $701 ; INC <$50
+	LDA #$78
+	STA $702 ; RTI
+	
+	LDA #0
+	JSR VblSync_Plus_A
+	INC $4014 ; This takes approximately 519 CPU cycles.
+	LDA $2002
+	JSR EnableNMI
+	LDA #0
+	STA <$50 ; clear this value. (the NMI could have happened inside the Enable NMI routine with improper emulation)
+	; So the NMI is in about 29261 CPU cycles. (if the test passed)
+	; If it failed, the NMI is in about 28747 cycles.
+	JSR Clockslide_20000
+	JSR Clockslide_8000
+	JSR Clockslide_800
+	JSR DisableNMI ; If it failed, the NMI has already occured.
+	LDA <$50
+	BNE FAIL_INC4014	
+	LDA #1
+	RTS
+;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                ENGINE                   ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		
+	.org $ED40	
+DPCM_Sample_05:
+	.byte $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05
+	.byte $05
 		
 	.org $ED80	
 TEST_DMC_Conflicts_TopLoaderAnswerKey:
@@ -14551,7 +14672,7 @@ RunTest_AllTestSkipNMI:
 	JSR ResetScroll		          ; Reset the scroll before the test, since we just modified 'v' inside the previous subroutines.
 RunTest_AllTestSkipDrawing1:
 	LDA #1
-	STA <ErrorCode           ; set this to 1 before running any tests.
+	STA <ErrorCode                ; set this to 1 before running any tests.
 	STA <initialSubTest			  ; Some tests have multiple sets of tests to run, all using the same code. So writing here changes the test value.
 	LDA #$80
 	STA <Test_UnOp_SP			  ; Some tests might modify the stack pointer. The test will use a value of $80 just to be sure it's not overwriting other stack data.

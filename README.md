@@ -3,7 +3,7 @@ AccuracyCoin is a large collection of NES accuracy tests on a single NROM cartri
 
 This ROM was designed for the RP2A03G CPU and the RP2C02G PPU. Some tests might fail on hardware with a different revision.
 
-This ROM currently has 125 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
+This ROM currently has 126 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
 Here's an example of the menu in this ROM shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been run yet. (The cursor is currently next to the "RAM Mirroring" test.)
 
@@ -199,7 +199,7 @@ For more information, I recommend reading the fully commented assembly code for 
   9: If the RDY line goes low 2 cycles before the write cycle, the Y register was not the correct Value after the test.  
   A: If the RDY line goes low 2 cycles before the write cycle, the CPU status flags were not correct after the test.  
 
- ### Unofficial Instructions: SHS
+### Unofficial Instructions: SHS
   F: The high byte corruption did not match either known behavior.  
   0: This instruction had the wrong number of operand bytes.  
   1: The target address of the instruction was not the correct value after the test.  
@@ -519,6 +519,10 @@ For more information, I recommend reading the fully commented assembly code for 
   3: This corruption should not occur immediately after disabling rendering.  
   4: This corruption should now occur immediately after re-enabling rendering.  
   
+### INC $4014
+  1: The OAM DMA should use the value of the second write to $4014 as the page number. Requires precise DMC DMA timing, results are tested via a sprite zero hit.
+  2: Only a single OAM DMA should occur despite two writes to $4014.
+  
 ### RMW $2007 Extra Write
   1: A Read-Modify-Write instruction to address $2007 should perform an extra write where the low byte of the PPU address written is the result of the Read-Modify-Write instruction.  
   2: This extra write should not occur when "v" is pointing to Palette RAM. (An extra write still might occur, but that's not the one we're testing for.)  
@@ -534,11 +538,11 @@ For more information, I recommend reading the fully commented assembly code for 
   7: The indexed zero page addressing mode for read-modify-write instructions should take 6 cycles.  
   8: The absolute addressing mode for non-read-modify-write instructions should take 4 cycles.  
   9: The absolute addressing mode for read-modify-write instructions should take 6 cycles.  
-  A: The indexed absolute addressing mode for STA instructions should always take 5 cycles. 
+  A: The indexed absolute addressing mode for STA instructions should always take 5 cycles.  
   B: The indexed absolute addressing mode for many instructions should take an extra cycle if the page boundary was crossed.  
   C: The indexed absolute addressing mode for read-modify-write instructions should always take 7 cycles.  
   D: The indirect, X instructions should always take 6 cycles (well, except for the unofficial ones).  
-  E: The indirect, Y instructions should take an extra cycle if a page boundary is crossed.
+  E: The indirect, Y instructions should take an extra cycle if a page boundary is crossed.  
   F: The implied instructions should take 2 cycles.  
   G: PHP should take 3 cycles.  
   H: PHA should take 3 cycles.  
@@ -589,7 +593,7 @@ For more information, I recommend reading the fully commented assembly code for 
 ### JSR Edge Cases
   1: Your emulator pushed the wrong value for the return address.  
   2: Your emulator has incorrect open bus emulation.  
-  3: JSR should leave the value of the second operand on the data bus.
+  3: JSR should leave the value of the second operand on the data bus.  
 
 # Success Codes
 Some tests have multiple acceptable behaviors that are tested for in this ROM. The behavior used will either be printed on screen after running the test, or you'll see a "success code" on the all-test table.  
