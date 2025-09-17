@@ -13009,8 +13009,14 @@ FAIL_INC4014:
 	JMP TEST_Fail
 
 TEST_INC4014:
-	;;; Test 1 [INC $4014]: The OAM DMA uses the second value written from the INC as the page number ;;;
+	;;; Test 1 [INC $4014]: This test relies on the DMC DMA udpating the data bus ;;;
 	
+	LDA <result_DMADMASync_PreTest	; This is written before the main menu loads when resetting the ROM. If you aren't passing this test (and using savestates), you'll need to reboot the ROM to update this value.
+	CMP #1
+	BNE FAIL_INC4014 ; Fail if the DMC DMA doesn't update the data bus.
+
+	;;; Test 2 [INC $4014]: The OAM DMA uses the second value written from the INC as the page number ;;;
+		
 	JSR DisableRendering
 	
 	; Put a tile on screen (in the overscan area) for sprite zero to collide with.
@@ -13060,7 +13066,7 @@ TEST_INC4014:
 	BEQ FAIL_INC4014
 	INC ErrorCode
 	
-	;;; Test 2 [INC $4014]: Only a single DMC DMA occurs ;;;
+	;;; Test 3 [INC $4014]: Only a single DMC DMA occurs ;;;
 	JSR DisableRendering
 	LDA #$50
 	STA $701 ; INC <$50

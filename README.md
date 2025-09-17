@@ -520,8 +520,9 @@ For more information, I recommend reading the fully commented assembly code for 
   4: This corruption should now occur immediately after re-enabling rendering.  
   
 ### INC $4014
-  1: The OAM DMA should use the value of the second write to $4014 as the page number. Requires precise DMC DMA timing, results are tested via a sprite zero hit.
-  2: Only a single OAM DMA should occur despite two writes to $4014.
+  1: The DMC DMA should update the data bus.
+  2: The OAM DMA should use the value of the second write to $4014 as the page number. Requires precise DMC DMA timing, results are tested via a sprite zero hit.
+  3: Only a single OAM DMA should occur despite two writes to $4014.
   
 ### RMW $2007 Extra Write
   1: A Read-Modify-Write instruction to address $2007 should perform an extra write where the low byte of the PPU address written is the result of the Read-Modify-Write instruction.  
