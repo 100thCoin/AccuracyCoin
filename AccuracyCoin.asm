@@ -13014,6 +13014,7 @@ TEST_INC4014:
 	LDA <result_DMADMASync_PreTest	; This is written before the main menu loads when resetting the ROM. If you aren't passing this test (and using savestates), you'll need to reboot the ROM to update this value.
 	CMP #1
 	BNE FAIL_INC4014 ; Fail if the DMC DMA doesn't update the data bus.
+	INC <ErrorCode
 
 	;;; Test 2 [INC $4014]: The OAM DMA uses the second value written from the INC as the page number ;;;
 		
