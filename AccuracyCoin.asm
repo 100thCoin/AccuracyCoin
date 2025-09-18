@@ -13067,7 +13067,7 @@ TEST_INC4014:
 	BEQ FAIL_INC4014
 	INC ErrorCode
 	
-	;;; Test 3 [INC $4014]: Only a single DMC DMA occurs ;;;
+	;;; Test 3 [INC $4014]: Only a single OAM DMA occurs ;;;
 	JSR DisableRendering
 	LDA #$50
 	STA $701 ; INC <$50
