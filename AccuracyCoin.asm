@@ -13013,6 +13013,7 @@ TEST_INC4014:
 	
 	LDA <result_DMADMASync_PreTest	; This is written before the main menu loads when resetting the ROM. If you aren't passing this test (and using savestates), you'll need to reboot the ROM to update this value.
 	CMP #1
+TEST_INC4014_BNEFAIL: ; I ran out of bytes to branch from the bottom of this test to FAIL_INC4014, but since that branch is also a BNE, I'll just branch here if that one fails.
 	BNE FAIL_INC4014 ; Fail if the DMC DMA doesn't update the data bus.
 	INC <ErrorCode
 
@@ -13069,26 +13070,29 @@ TEST_INC4014:
 	
 	;;; Test 3 [INC $4014]: Only a single OAM DMA occurs ;;;
 	JSR DisableRendering
+	LDA #$E6
+	STA $700
 	LDA #$50
 	STA $701 ; INC <$50
-	LDA #$78
+	LDA #$40
 	STA $702 ; RTI
 	
 	LDA #0
 	JSR VblSync_Plus_A
+		
 	INC $4014 ; This takes approximately 519 CPU cycles.
-	LDA $2002
 	JSR EnableNMI
 	LDA #0
 	STA <$50 ; clear this value. (the NMI could have happened inside the Enable NMI routine with improper emulation)
 	; So the NMI is in about 29261 CPU cycles. (if the test passed)
 	; If it failed, the NMI is in about 28747 cycles.
+	
 	JSR Clockslide_20000
 	JSR Clockslide_8000
 	JSR Clockslide_800
 	JSR DisableNMI ; If it failed, the NMI has already occured.
 	LDA <$50
-	BNE FAIL_INC4014	
+	BNE TEST_INC4014_BNEFAIL	
 	LDA #1
 	RTS
 ;;;;;;;
