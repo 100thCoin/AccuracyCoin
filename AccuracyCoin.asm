@@ -13081,6 +13081,8 @@ TEST_INC4014_BNEFAIL: ; I ran out of bytes to branch from the bottom of this tes
 	JSR VblSync_Plus_A
 		
 	INC $4014 ; This takes approximately 519 CPU cycles.
+	
+	LDA $2002 ; Prevent the NMI from running inside the Enable NMI subroutine.
 	JSR EnableNMI
 	LDA #0
 	STA <$50 ; clear this value. (the NMI could have happened inside the Enable NMI routine with improper emulation)
