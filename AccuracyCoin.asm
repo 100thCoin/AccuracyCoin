@@ -11809,6 +11809,7 @@ TEST_ControllerClocking_ExitLoop1:
 	BMI FAIL_ControllerClocking ; This should loop a minimum of 6 times.
 	BEQ TEST_ControllerClocking_JMP_Famicom ; If it looped 6 times, it had famicom behavior.
 	; Otherwise, NES / AV Famicom behavior.
+	INC <ErrorCode
 	
 	;;; Test 4 [Controller Clocking]: The double-read will always read the same value as the first read. (on a NES / AV Famicom) ;;;
 	JSR TEST_ControllerClocking_Strobe
