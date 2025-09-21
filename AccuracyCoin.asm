@@ -86,6 +86,8 @@ PrintDecimalTensCheck = $39
 result_VblankSync_PreTest = $3A
 DebugMode = $3B
 IncorrectReturnAddressOffset = $3C
+AllTestMenuTestNameOffsetLo = $3D
+AllTestMenuTestNameOffsetHi = $3E
 
 Reserverd_41 = $41 ; Used in the Implied Dummy Reads. It's probably best we never actually use this.
 
@@ -787,7 +789,7 @@ AutomaticallyRunEntireROM_Loop2:  ; Run every test on page Y.
 	TAX
 	LDA <$00
 	CMP #3	; if the page used to store the results is page 3 instead of page 4, we skip this test.
-	BEQ AERROP_RT_Skip
+	BEQ AREROM_RT_Skip
 	STX <menuCursorYPos           ; The "menuCursorYPos" variable is used inside RunTest to determine what code to run.
 	JSR RunTest                   ; Run the test at index X of page Y.
 	JSR WaitForVBlank
@@ -800,10 +802,10 @@ AutomaticallyRunEntireROM_Loop2:  ; Run every test on page Y.
 	INC <PostAllTestTally
 	LDA <PostAllTestTally
 	JSR PrintByteDecimal_MinDigits
-	JSR ResetScroll
+	JSR PrintTestName
 	PLA
 	TAX
-AERROP_RT_Skip:
+AREROM_RT_Skip:
 	INX                           ; increment X until X=MenuHeight.
 	CPX <menuHeight
 	BNE AutomaticallyRunEntireROM_Loop2
@@ -1270,6 +1272,115 @@ DMASync05_Loop:
 	JSR Clockslide_50
 	NOP
 	CMP <$C9
+	RTS
+;;;;;;;
+	
+PrintTestName:
+	TYA
+	PHA
+	LDA #1
+	STA <dontSetPointer
+	LDA <menuCursorYPos
+	BNE PTNSkipSuiteName
+	LDY #0
+	JSR SetUpSuitePointer
+	LDA <suitePointer
+	STA <AllTestMenuTestNameOffsetLo
+	LDA <suitePointer+1
+	STA <AllTestMenuTestNameOffsetHi
+	JSR SkipSuiteName
+PTNSkipSuiteName:
+	LDA #$22
+	STA <$03
+	STA $2006
+	LDA #$50
+	STA <$04
+	LDA <AllTestMenuTestNameOffsetLo
+	STA <$0
+	LDA <AllTestMenuTestNameOffsetHi
+	STA <$1
+	LDA #$40
+	STA $2006	
+	LDA #$24
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007
+	STA $2007	
+	JSR PrintTextCentered
+	JSR ResetScroll
+	LDA <menuCursorYPos
+	TAX
+	INX
+	TXA
+	CMP <menuHeight
+	BEQ SkipFindingNextName
+FindNextName:
+	JSR AddYToNameOffset
+SkipFindingNextName:
+	LDA #0
+	STA <dontSetPointer
+	PLA
+	TAY
+	RTS
+;;;;;;;
+
+SkipSuiteName:
+	LDA [AllTestMenuTestNameOffsetLo],Y ; Read from the pointer
+	INY
+	CMP #$FF
+	BNE SkipSuiteName
+	TYA
+	CLC
+	ADC <AllTestMenuTestNameOffsetLo
+	STA <AllTestMenuTestNameOffsetLo
+	BCC SkipSuiteName0
+	INC <AllTestMenuTestNameOffsetHi ; If needed, INC the high byte
+SkipSuiteName0:
+	RTS
+;;;;;;;
+
+AddYToNameOffset: ; This function adds the A register to the word at $0000
+	TYA
+	CLC
+	ADC #4
+	BCC AddYToNameOffset0
+	INC <AllTestMenuTestNameOffsetHi ; If needed, INC the high byte
+AddYToNameOffset0:
+	CLC
+	ADC <AllTestMenuTestNameOffsetLo
+	STA <AllTestMenuTestNameOffsetLo
+	BCC AddYToNameOffset1
+	INC <AllTestMenuTestNameOffsetHi ; If needed, INC the high byte
+AddYToNameOffset1:
 	RTS
 ;;;;;;;
 	
