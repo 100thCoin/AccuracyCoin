@@ -774,10 +774,12 @@ AutomaticallyRunEveryTestInROM:   ; This function is used to run every test in t
 	LDY #0
 	STY <PostAllTestTally
 AutomaticallyRunEntireROM_Loop:
+	JSR ResetScroll
 	STY <menuTabXPos
 	JSR SetUpSuitePointer         ; Set up the suite pointer.
 	JSR LoadSuiteMenuNoRendering  ; Set up the menuHeight, and all the pointers for these tests and results.
 	LDX #0
+	JSR WaitForVBlank
 AutomaticallyRunEntireROM_Loop2:  ; Run every test on page Y.
 	TXA
 	PHA
@@ -791,9 +793,10 @@ AutomaticallyRunEntireROM_Loop2:  ; Run every test on page Y.
 	CMP #3	; if the page used to store the results is page 3 instead of page 4, we skip this test.
 	BEQ AREROM_RT_Skip
 	STX <menuCursorYPos           ; The "menuCursorYPos" variable is used inside RunTest to determine what code to run.
-	JSR RunTest                   ; Run the test at index X of page Y.
-	JSR WaitForVBlank
+	PHA
 	TXA
+	PHA
+	TYA
 	PHA
 	LDA #$21
 	STA $2006
@@ -804,7 +807,12 @@ AutomaticallyRunEntireROM_Loop2:  ; Run every test on page Y.
 	JSR PrintByteDecimal_MinDigits
 	JSR PrintTestName
 	PLA
+	TAY
+	PLA
 	TAX
+	PLA
+	JSR RunTest                   ; Run the test at index X of page Y.
+	JSR WaitForVBlank
 AREROM_RT_Skip:
 	INX                           ; increment X until X=MenuHeight.
 	CPX <menuHeight
@@ -1276,6 +1284,8 @@ DMASync05_Loop:
 ;;;;;;;
 	
 PrintTestName:
+	TXA
+	PHA
 	TYA
 	PHA
 	LDA #1
@@ -1338,9 +1348,6 @@ PTNSkipSuiteName:
 	JSR PrintTextCentered
 	JSR ResetScroll
 	LDA <menuCursorYPos
-	TAX
-	INX
-	TXA
 	CMP <menuHeight
 	BEQ SkipFindingNextName
 FindNextName:
@@ -1350,6 +1357,8 @@ SkipFindingNextName:
 	STA <dontSetPointer
 	PLA
 	TAY
+	PLA
+	TAX
 	RTS
 ;;;;;;;
 
@@ -1442,7 +1451,7 @@ TEST_Fail:
 	RTS
 ;;;;;;;
 
-TEST_OpenBus:	
+TEST_OpenBus:
 	;;; Test 1 [Open Bus]: Reading from open bus is not all zeroes. ;;;
 	; Alright. What is "Open Bus"?
 	; When reading from an address that isn't mapped to memory, the data pins are left "floating".
