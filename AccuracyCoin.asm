@@ -298,6 +298,7 @@ result_PaletteRAMQuirks = $47E
 ;	47F is used.If you add a new test, don't forget to skip that value.
 result_INC4014 = $480
 result_AttributesAsTiles = $481
+result_2005Before2006 = $482
 
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
 result_PowOn_CPUReg = $03FD ; page 3 omits the test from the all-test-result-table.
@@ -711,7 +712,6 @@ Suite_PPUBehavior:
 	table "PPU Register Open Bus",	 $FF, result_PPUOpenBus, TEST_PPU_Open_Bus
 	table "PPU Read Buffer", $FF, result_PPUReadBuffer, TEST_PPUReadBuffer
 	table "Palette RAM Quirks", $FF, result_PaletteRAMQuirks, TEST_PaletteRAMQuirks
-	table "Attributes As Tiles", $FF, result_AttributesAsTiles, TEST_AttributesAsTiles
 	.byte $FF
 	
 	;; PPU VBL Timing ;;
@@ -736,13 +736,13 @@ Suite_SpriteZeroHits:
 	table "Address $2004 behavior", $FF, result_Address2004_Behavior, TEST_Address2004_Behavior
 	table "OAM Corruption", $FF, result_OAM_Corruption, TEST_OAM_Corruption
 	table "INC $4014", $FF, result_INC4014, TEST_INC4014
-
-
 	.byte $FF
 	
 	;; PPU Misc ;;
 Suite_PPUMisc:
 	.byte "PPU Misc.", $FF
+	table "Attributes As Tiles", $FF, result_AttributesAsTiles, TEST_AttributesAsTiles
+	table "$2005 Before $2006", $FF, result_2005Before2006, TEST_2005Before2006
 	table "RMW $2007 Extra Write", $FF, result_RMW2007, TEST_RMW2007
 	;table "Palette Corruption", $FF, result_Unimplemented, DebugTest (I did not write a test for this, because it relies on a specific cpu/ppu clock alignment.)
 	.byte $FF
@@ -1415,6 +1415,37 @@ TEST_RMW2007_ClearNametable2Loop:
 	BNE TEST_RMW2007_ClearNametable2Loop
 	DEX
 	BNE TEST_RMW2007_ClearNametable2Loop
+	RTS
+;;;;;;;
+	
+SetUpSpriteZero:
+	JSR CopyReturnAddressToByte0
+	LDY #0
+SetUpSpriteZero_Loop:
+	LDA [$0000], Y
+	STA $200, Y
+	INY
+	CPY #$4
+	BNE SetUpSpriteZero_Loop
+	JSR FixRTS
+	RTS
+;;;;;;;
+
+SetPPUSCROLLFromWord:	; pretty much the same as SetPPUADDRFromWord, but it writes to $2005.
+	STA <$FF
+	STY <$FE
+	JSR CopyReturnAddressToByte0
+	LDA $2002
+	LDY #0
+	LDA [$0000],Y
+	STA $2005
+	INY
+	LDA [$0000],Y
+	STA $2005
+	INY
+	JSR FixRTS
+	LDY <$FE
+	LDA <$FF
 	RTS
 ;;;;;;;
 	
@@ -13272,11 +13303,8 @@ TEST_AttributesAsTiles_loop:
 	.byte $2F, $C8
 	LDA #$25
 	STA $2007 ; Write $25 to VRAM $2FC8.
-	STA $201  ; We're also using $25 as the sprite character.
-	LDA #0
-	STA $200  ; Y position of $00 (The '.' character is 2 px by 2 px, so only the top 2 pixels of the spirte collide with the bottom 2 pixels of the background.)
-	LDA #$40
-	STA $203  ; X position of $40.
+	JSR SetUpSpriteZero
+	.byte $00, $25, $FF, $40
 
 	JSR WaitForVBlank ; Let's wait for VBlank before the OAM DMA, and enabling rendering for the test.
 	LDA #2
@@ -13302,10 +13330,8 @@ TEST_AttributesAsTiles_loop:
 	.byte $2F, $C0	
 	JSR WaitForVBlank ; Wait a whole frame. The test results will be ready by then.
 	JSR EnableRendering ; Enable rendering both sprites and blackground.
-	LDA #$18
-	STA $200  ; Y position of $00 (The '.' character is 2 px by 2 px, so only the top 2 pixels of the spirte collide with the bottom 2 pixels of the background.)
-	LDA #$C0
-	STA $203
+	JSR SetUpSpriteZero
+	.byte $18, $25, $FF, $C0
 	LDA #2
 	STA $4014 ; OAM DMA with page 2.
 	JSR WaitForVBlank ; Wait a whole frame. The test results will be ready by then.
@@ -13320,8 +13346,68 @@ TEST_AttributesAsTiles_loop:
 ;;;;;;;
 
 FAIL_AttributesAsTiles:
+FAIL_2005Before2006:
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
+
+TEST_2005Before2006:
+	;;; Test 1 [$2005 Before $2006]: Verify the scroll is working when writing to $2006 first. ;;;
+	JSR DisableRendering
+	JSR ClearNametable2_With24 ; Nametable 2 is polluted from other tests. Since it gets drawn during this test, let's clear it first.
+	JSR ClearPage2
+	JSR PrintCHR
+	.word $2D84
+	.byte $C0, $FF ; Draw a single pixel on the second nametable.
+	JSR SetPPUADDRFromWord ; write $2C and $00 to $2006
+	.byte $2C, $00
+	JSR SetPPUSCROLLFromWord ; write $17 and $17 to $2005
+	.byte $17, $17
+	JSR SetUpSpriteZero
+	.byte $41, $C0, $FF, $02
+	JSR DoSpriteZeroHitTest ; This just renders a full screen and reads from $2002, AND #$40
+	BEQ FAIL_2005Before2006 ; Fail the test if the sprite zero hit did not occur.
+	INC <ErrorCode
+	
+	;;; Test 2 [$2005 Before $2006]: If you write to PPUSCROLL before writing to PPUADDR, the resulting scroll values are slightly incorrect ;;;
+	; the ppu's t register is 15 bits.
+	; yyy NN YYYYY XXXXX
+	; XXXXX = coarse X scroll
+	; YYYYY = coarse Y scroll
+	; NN = nametable select
+	; yyy = fine Y scroll.
+	
+	; writing to address $2006 will update all 15 bits.
+	; writing to address $2005 will update bits 0 to 4 on the first write, and on the second write, bits 5 to 9 as well as bits 12 to 14.
+	; (and tangentially related, writing to $2000 updates bits 10 and 11)
+	
+	; In other words, after writing to $2005, writing to $2006 will overwrite everything written except the fine X scroll.
+	
+	JSR DisableRendering
+	JSR SetPPUSCROLLFromWord ; write $17 and $17 to $2005
+	.byte $17, $17
+	JSR SetPPUADDRFromWord ; write $2C and $00 to $2006
+	.byte $2C, $00
+	JSR SetUpSpriteZero
+	.byte $56, $C0, $FF, $12
+	JSR DoSpriteZeroHitTest ; This just renders a full screen and reads from $2002, AND #$40
+	BEQ FAIL_2005Before2006 ; Fail the test if the sprite zero hit did not occur.
+	;;END OF TEST;;
+
+	LDA #1
+	RTS
+;;;;;;;
+
+DoSpriteZeroHitTest:
+	JSR WaitForVBlank	
+	JSR EnableRendering
+	LDA #2
+	STA $4014
+	JSR WaitForVBlank	
+	JSR DisableRendering_S
+	LDA $2002 ; Read from PPUSTATUS
+	AND #$40
+	RTS
+;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                ENGINE                   ;;

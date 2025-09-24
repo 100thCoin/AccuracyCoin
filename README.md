@@ -3,7 +3,7 @@ AccuracyCoin is a large collection of NES accuracy tests on a single NROM cartri
 
 This ROM was designed for the RP2A03G CPU and the RP2C02G PPU. Some tests might fail on hardware with a different revision.
 
-This ROM currently has 127 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
+This ROM currently has 128 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
 Here's an example of the menu in this ROM shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been run yet. (The cursor is currently next to the "RAM Mirroring" test.)
 
@@ -438,10 +438,6 @@ For more information, I recommend reading the fully commented assembly code for 
   4: The backdrop colors for sprites should be mirrors of the backdrop colors for backgrounds.  
   5: The values read from Palette RAM should only be 6-bit, with the upper 2 bits being PPU open bus.  
 
-### Attributes as Tiles
-  1: Moving the PPU t register to an attribute table should render the attribute bytes as tile data in scanlines 0 to 15.  
-  2: With the t register pointing to an attribute table, scanlines 16 to 239 should be from the same nametable as the attributes.
-
 ### VBlank Beginning
   1: The PPU Register $2002 VBlank flag was not set at the correct PPU cycle.  
 
@@ -524,9 +520,17 @@ For more information, I recommend reading the fully commented assembly code for 
   4: This corruption should now occur immediately after re-enabling rendering.  
   
 ### INC $4014
-  1: The DMC DMA should update the data bus.
-  2: The OAM DMA should use the value of the second write to $4014 as the page number. Requires precise DMC DMA timing, results are tested via a sprite zero hit.
+  1: The DMC DMA should update the data bus.  
+  2: The OAM DMA should use the value of the second write to $4014 as the page number. Requires precise DMC DMA timing, results are tested via a sprite zero hit.  
   3: Only a single OAM DMA should occur despite two writes to $4014.
+  
+### Attributes as Tiles
+  1: Moving the PPU t register to an attribute table should render the attribute bytes as tile data in scanlines 0 to 15. Results are tested via a sprite zero hit.  
+  2: With the t register pointing to an attribute table, scanlines 16 to 239 should be from the same nametable as the attributes.
+  
+### $2005 Before $2006
+  1: Sprite Zero Hits should be working.  
+  2: Writing to $2006 should overwrite some of the bits set up by writing to $2005.
   
 ### RMW $2007 Extra Write
   1: A Read-Modify-Write instruction to address $2007 should perform an extra write where the low byte of the PPU address written is the result of the Read-Modify-Write instruction.  
