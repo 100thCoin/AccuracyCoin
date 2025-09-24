@@ -439,7 +439,8 @@ For more information, I recommend reading the fully commented assembly code for 
   5: The values read from Palette RAM should only be 6-bit, with the upper 2 bits being PPU open bus.  
 
 ### Attributes as Tiles
-  1: Moving the PPU t register to an attribute table should render the attribute bytes as tile data in the top 16 scanlines.
+  1: Moving the PPU t register to an attribute table should render the attribute bytes as tile data in scanlines 0 to 15.  
+  2: With the t register pointing to an attribute table, scanlines 16 to 239 should be from the same nametable as the attributes.
 
 ### VBlank Beginning
   1: The PPU Register $2002 VBlank flag was not set at the correct PPU cycle.  

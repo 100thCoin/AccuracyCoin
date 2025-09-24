@@ -18,7 +18,7 @@
 	.inesprg 2  ; 2 banks
 	.ineschr 1  ; 
 	.inesmap 0  ; mapper 0 = NROM
-	.inesmir 1  ; background mirroring, vertical
+	.inesmir 0  ; background mirroring, horizontal
 	;;;; CONSTANTS ;;;;	
 
 flag_c = $1
@@ -1405,7 +1405,7 @@ ClearNametable2:
 	PHA
 ClearNametable2_s:
 	JSR SetPPUADDRFromWord
-	.byte $24, $00
+	.byte $2C, $00
 	PLA
 	LDY #0
 	LDX #4
@@ -1647,10 +1647,10 @@ TEST_Fail_1p5:
 	LDA #0
 	STA <dontSetPointer
 	JSR PrintCHR	; The PrintCHR function will read the 2 byte word, and following bytes up until it reads $FF (a terminator) and then fix the return address such that RTS returns to the byte after the terminator.
-	.word $2400
+	.word $2C00
 	.byte $F0, $FF
 	JSR SetPPUADDRFromWord
-	.byte $24, $00
+	.byte $2C, $00
 	; SetPPUADDRFromWord will return here.
 	LDA $2007 ; empty PPU buffer
 	LDA $3FFF, X ; dummy read $2007 (The data bus is now $F0) The offset moves the address bus to $4017, reading from controller 1 when the data bus was $F0.
@@ -2043,17 +2043,17 @@ TEST_DummyWritePrep_SetUpV:
 	RTS
 ;;;;;;;
 
-TEST_DummyWritePrep_PPUADDR25FA: ; This exists to save bytes
+TEST_DummyWritePrep_PPUADDR2DFA: ; This exists to save bytes
 	JSR SetPPUADDRFromWord
-	.byte $25, $FA
-	LDA #$25
-	STA $2002 ; Set the PPU Open bus value to 25
+	.byte $2D, $FA
+	LDA #$2D
+	STA $2002 ; Set the PPU Open bus value to 2D
 	RTS
 ;;;;;;;
 
-TEST_DummyWritePrep_26: ; This exists to save bytes
-	JSR TEST_DummyWritePrep_PPUADDR25FA ; just leech off this to save bytes.
-	LDA #$26
+TEST_DummyWritePrep_2E: ; This exists to save bytes
+	JSR TEST_DummyWritePrep_PPUADDR2DFA ; just leech off this to save bytes.
+	LDA #$2E
 	STA $2002 ; Set the PPU Open bus value to 26
 	RTS
 ;;;;;;;
@@ -2086,7 +2086,7 @@ TEST_DummyWrites:
 	INC <ErrorCode 
 	
 	; Here's how the test works.
-	; Prep the PPU data bus with a specific value, usually $25 or $26.
+	; Prep the PPU data bus with a specific value, usually $2D or $2E.
 	; RMW $2006. Read $2006 (PPU open bus), Dummy Write $2006 and modify value read, write $2006 again.
 	; If we know where the writes will take the 'v' register, then we can simply read $2007 twice after this test to verify the dummy writes occurred.
 	
@@ -2094,9 +2094,9 @@ TEST_DummyWrites:
 	; 1: fetch opcode 
 	; 2: fetch low byte
 	; 3: fetch high byte
-	; 4: Read $2006. (address $2006 is write-only, so we read the PPU data bus: #$25)
-	; 5: Write #$25 to $2006, then do the operation on this value. (INC #$25 = #$26)
-	; 6: Write #$26 to $2006. The VRAM address is now $2526	
+	; 4: Read $2006. (address $2006 is write-only, so we read the PPU data bus: #$2D)
+	; 5: Write #$2D to $2006, then do the operation on this value. (INC #$2D = #$2E)
+	; 6: Write #$2E to $2006. The VRAM address is now $2D26	
 	
 	; Let's make some preparations...
 	JSR ResetScrollAndWaitForVBlank
@@ -2106,58 +2106,58 @@ TEST_DummyWrites:
 	; Basically, WriteToPPUADDRWithByte will read the two bytes after it, and store them to $2006, then the third byte is stored at $2007.
 	; Then, if the following byte if $FF (the terminator), exit the subroutine. Otherwise, grab the next 3 bytes and do it again.
 	JSR WriteToPPUADDRWithByte
-	.byte $25, $4A, $5A ; VRAM[$254A] = $5A
-	.byte $25, $4B, $5C ; VRAM[$254B] = $5C
-	.byte $25, $12, $F1 ; VRAM[$2512] = $F1
-	.byte $25, $92, $7E ; VRAM[$2592] = $7E
-	.byte $25, $24, $11 ; VRAM[$2524] = $11
-	.byte $25, $26, $22 ; VRAM[$2526] = $22
+	.byte $2D, $5A, $60 ; VRAM[$2D5A] = $5A
+	.byte $2D, $5B, $5C ; VRAM[$2D5B] = $5C
+	.byte $2D, $16, $F1 ; VRAM[$2D16] = $F1
+	.byte $2D, $96, $7E ; VRAM[$2D96] = $7E
+	.byte $2D, $2C, $11 ; VRAM[$2D2C] = $11
+	.byte $2D, $2E, $22 ; VRAM[$2D2E] = $22
 	
-	.byte $26, $4C, $8D ; VRAM[$264C] = $8D
-	.byte $26, $4D, $A5 ; VRAM[$264D] = $A5
-	.byte $26, $13, $F0 ; VRAM[$2613] = $F0
-	.byte $26, $93, $36 ; VRAM[$2693] = $36
-	.byte $26, $25, $98 ; VRAM[$2625] = $98
-	.byte $26, $27, $4F ; VRAM[$2627] = $4F
+	.byte $2E, $5C, $8D ; VRAM[$2E5C] = $8D
+	.byte $2E, $5D, $A5 ; VRAM[$2E5D] = $A5
+	.byte $2E, $17, $F0 ; VRAM[$2E17] = $F0
+	.byte $2E, $97, $36 ; VRAM[$2E97] = $36
+	.byte $2E, $2D, $98 ; VRAM[$2E25] = $98
+	.byte $2E, $2F, $4F ; VRAM[$2E27] = $4F
 	.byte $FF ; Terminator.
 	; WriteToPPUADDRWithByte will return here:
 	JSR ResetScrollAndWaitForVBlank
 
 	;;; Test 2 [Dummy Write Cycles]: See if Read-Modify-Write instructions write to $2006 twice. ;;;
-	JSR TEST_DummyWritePrep_PPUADDR25FA ; v = 25FA, PpuBus = $25
-	ASL $2006							; v = 254A
+	JSR TEST_DummyWritePrep_PPUADDR2DFA ; v = 2DFA, PpuBus = $2D
+	ASL $2006							; v = 2D5A
 	JSR DoubleLDA2007 ; Read from VRAM
-	CMP #$5A
+	CMP #$60
 	BNE TEST_FailDummyWrites
 	
-	JSR TEST_DummyWritePrep_PPUADDR25FA ; v = 25FA, PpuBus = $25
+	JSR TEST_DummyWritePrep_PPUADDR2DFA ; v = 2DFA, PpuBus = $2D
 	SEC
-	ROL $2006							; v = 254B
+	ROL $2006							; v = 2D5B
 	JSR DoubleLDA2007 ; Read from VRAM
 	CMP #$5C
 	BNE TEST_FailDummyWrites
 	
-	JSR TEST_DummyWritePrep_PPUADDR25FA ; v = 25FA, PpuBus = $25
-	LSR $2006							; v = 2512
+	JSR TEST_DummyWritePrep_PPUADDR2DFA ; v = 2DFA, PpuBus = $2D
+	LSR $2006							; v = 2D16
 	JSR DoubleLDA2007 ; Read from VRAM
 	CMP #$F1
 	BNE TEST_FailDummyWrites
 	
-	JSR TEST_DummyWritePrep_PPUADDR25FA ; v = 25FA, PpuBus = $25
+	JSR TEST_DummyWritePrep_PPUADDR2DFA ; v = 2DFA, PpuBus = $2D
 	SEC
-	ROR $2006							; v = 2592
+	ROR $2006							; v = 2D96
 	JSR DoubleLDA2007 ; Read from VRAM
 	CMP #$7E
 	BNE TEST_FailDummyWrites
 	
-	JSR TEST_DummyWritePrep_PPUADDR25FA ; v = 25FA, PpuBus = $25
-	DEC $2006							; v = 2524
+	JSR TEST_DummyWritePrep_PPUADDR2DFA ; v = 2DFA, PpuBus = $2D
+	DEC $2006							; v = 2D2C
 	JSR DoubleLDA2007 ; Read from VRAM
 	CMP #$11 ;
 	BNE TEST_FailDummyWrites
 	
-	JSR TEST_DummyWritePrep_PPUADDR25FA ; v = 25FA, PpuBus = $25
-	INC $2006							; v = 2526
+	JSR TEST_DummyWritePrep_PPUADDR2DFA ; v = 2DFA, PpuBus = $2D
+	INC $2006							; v = 2D2E
 	JSR DoubleLDA2007 ; Read from VRAM
 	CMP #$22 ;
 	BNE TEST_FailDummyWrites
@@ -2171,40 +2171,40 @@ TEST_DummyWritesPt2:
 	JSR ResetScrollAndWaitForVBlank
 	;;; Test 3 [Dummy Write Cycles]: See if Read-Modify-Write instructions with X indexing write to $2006 twice. ;;;
 	LDX #6
-	JSR TEST_DummyWritePrep_26 ; v = 25FA, PpuBus = $26
-	ASL $2000,X			       ; v = 264C
+	JSR TEST_DummyWritePrep_2E ; v = 2DFA, PpuBus = $2E
+	ASL $2000,X			       ; v = 2E4C
 	JSR DoubleLDA2007 ; Read from VRAM
 	CMP #$8D
 	BNE TEST_FailDummyWrites
 	
-	JSR TEST_DummyWritePrep_26 ; v = 25FA, PpuBus = $26
+	JSR TEST_DummyWritePrep_2E ; v = 2DFA, PpuBus = $2E
 	SEC
-	ROL $2000,X			       ; v = 264D
+	ROL $2000,X			       ; v = 2E4D
 	JSR DoubleLDA2007 ; Read from VRAM
 	CMP #$A5
 	BNE TEST_FailDummyWrites
 	
-	JSR TEST_DummyWritePrep_26 ; v = 25FA, PpuBus = $26
-	LSR $2000,X			       ; v = 2613
+	JSR TEST_DummyWritePrep_2E ; v = 2DFA, PpuBus = $2E
+	LSR $2000,X			       ; v = 2E13
 	JSR DoubleLDA2007 ; Read from VRAM
 	CMP #$F0
 	BNE TEST_FailDummyWrites
 	
-	JSR TEST_DummyWritePrep_26 ; v = 25FA, PpuBus = $26
+	JSR TEST_DummyWritePrep_2E ; v = 2DFA, PpuBus = $2E
 	SEC
-	ROR $2000,X			       ; v = 2693
+	ROR $2000,X			       ; v = 2E93
 	JSR DoubleLDA2007 ; Read from VRAM
 	CMP #$36
 	BNE TEST_FailDummyWrites
 	
-	JSR TEST_DummyWritePrep_26 ; v = 25FA, PpuBus = $26
-	DEC $2000,X			       ; v = 2625
+	JSR TEST_DummyWritePrep_2E ; v = 2DFA, PpuBus = $2E
+	DEC $2000,X			       ; v = 2E25
 	JSR DoubleLDA2007 ; Read from VRAM
 	CMP #$98 ;
 	BNE TEST_FailDummyWrites
 	
-	JSR TEST_DummyWritePrep_26 ; v = 25FA, PpuBus = $26
-	INC $2000,X			       ; v = 2627
+	JSR TEST_DummyWritePrep_2E ; v = 2DFA, PpuBus = $2E
+	INC $2000,X			       ; v = 2E27
 	JSR DoubleLDA2007 ; Read from VRAM
 	CMP #$4F ;
 	BNE TEST_FailDummyWrites
@@ -4710,7 +4710,7 @@ FAIL_DMA_Plus_OpenBus:
 
 TEST_DMA_Plus_2007_Prep:
 	JSR DisableRendering ; let's disable rendering for this one.
-	LDX #$24
+	LDX #$2C
 	STX $2006
 	LDX #0
 	STX $2006
@@ -4723,10 +4723,10 @@ TEST_DMA_Plus_2007_Prep:
 	STX $2007 ; write 3 to VRAM $2803
 	INX
 	STX $2007 ; write 4 to VRAM $2804
-	LDX #$24
+	LDX #$2C
 	STX $2006
 	LDX #$01
-	STX $2006 ; and set 'v' back to $2400
+	STX $2006 ; and set 'v' back to $2C00
 	LDA $2007 ; read $2007 and prep the buffer.
 	RTS
 ;;;;;;;
@@ -4782,15 +4782,15 @@ TEST_DMA_Plus_2007W:
 	BNE TEST_Fail7
 	INC <ErrorCode
 
-	JSR TEST_DMA_Plus_2007_Prep	; the v register is now at 2401
+	JSR TEST_DMA_Plus_2007_Prep	; the v register is now at 2C01
 	JSR DMASync_50CyclesRemaining	; sync DMA
 	; We have 50 CPU cycles until the DMA occurs.
 	JSR Clockslide_45 ;+45 cycles
 	LDA #$5A		  ;+2 cycles
 	STA $2007 ; <------- [Opcode] [Operand1] [Operand2] [DMA attempts, but fails. Write] [Opcode (NOP)] [*DMA*]
 	NOP 	  ; The DMA occurs inside this NOP, if your emulator is timing it right.
-	NOP		  ; And the v register is now at $2402. It was not incremented extra times in the DMA, so LDA $2007 read the expected value.
-	;;; Test 2 [DMA + $2007 Write]: The v register should be at $2402 ;;;
+	NOP		  ; And the v register is now at $2C02. It was not incremented extra times in the DMA, so LDA $2007 read the expected value.
+	;;; Test 2 [DMA + $2007 Write]: The v register should be at $2C02 ;;;
 	JSR DoubleLDA2007
 	CMP #$03
 	BNE TEST_Fail7
@@ -6531,10 +6531,10 @@ TEST_APURegActivation:
 	INC <$50 ; for debugging.
 
 	JSR WriteToPPUADDRWithByte
-	.byte $24, $00
+	.byte $2C, $00
 	.byte $A5, $FF
 	JSR ReadPPUADDRFromWord
-	.byte $24, $00
+	.byte $2C, $00
 	CMP #$A5
 	BNE FAIL_APURegActivation_Pre ; Fail if the PPU read buffer isn't working.
 
@@ -6653,10 +6653,10 @@ TEST_APURegActivation:
 	JSR WaitForVBlank
 	JSR DisableRendering
 	JSR WriteToPPUADDRWithByte
-	.byte $24, $00
+	.byte $2C, $00
 	.byte $14, $FF
 	JSR SetPPUADDRFromWord
-	.byte $24, $00
+	.byte $2C, $00
 	LDA $2007 ; Prep the buffer with the value of $14 written to PPU $2400
 	JSR ResetScroll
 	; Step 5: Put $8D in the PPU data bus.
@@ -6806,10 +6806,10 @@ TEST_APURegActivation_Prep6Loop:
 	JSR WaitForVBlank
 	JSR DisableRendering
 	JSR WriteToPPUADDRWithByte
-	.byte $24, $00
+	.byte $2C, $00
 	.byte $14, $FF
 	JSR SetPPUADDRFromWord
-	.byte $24, $00
+	.byte $2C, $00
 	LDA $2007 ; Prep the buffer with the value of $14 written to PPU $2400
 	JSR ResetScroll
 	; Put $8D in the PPU data bus.
@@ -8384,7 +8384,7 @@ TEST_RMW2007:
 	; then just read the location of the second write, which should always be (v & $FF00) | (modified buffer value)
 	JSR DisableRendering
 	JSR SetPPUADDRFromWord
-	.byte $24, $00
+	.byte $2C, $00
 	LDA #0
 	TAY
 	LDX #4
@@ -8400,7 +8400,7 @@ TEST_RMW2007_ClearNametableLoop:
 	JSR SetPPUReadBufferToA
 	; the PPU read buffer is 5A.
 	JSR SetPPUADDRFromWord
-	.byte $25, $00
+	.byte $2D, $00
 	; For the first test here, "v" will be set to $2500
 	INC $2007
 	; And here's what happened.
@@ -8413,7 +8413,7 @@ TEST_RMW2007_ClearNametableLoop:
 	;
 	; Let's read address $255B
 	JSR ReadPPUADDRFromWord
-	.byte $25, $5B
+	.byte $2D, $5B
 	CMP #$5B
 	BNE FAIL_RMW2007
 	INC <ErrorCode
@@ -11254,14 +11254,14 @@ TEST_PPUReadBuffer:
 	;;; Test 1 [PPU Read Buffer]: Reading from the PPU register at $2007 should work. ;;;
 	; it is assumed that writing there works.
 	JSR SetPPUADDRFromWord
-	.byte $24, $00
+	.byte $2C, $00
 	LDA #$5A
 	STA $2007
 	STA $2007
 	STA $2007
 	
 	JSR SetPPUADDRFromWord
-	.byte $24, $00
+	.byte $2C, $00
 	LDA #0
 	LDA $2007
 	LDA $2007
@@ -11273,7 +11273,7 @@ TEST_PPUReadBuffer:
 	;;; Test 2 [PPU Read Buffer]: Reading address $2007 should increment the "v" register. ;;;
 	JSR ResetScrollAndWaitForVBlank
 	JSR SetPPUADDRFromWord
-	.byte $24, $00
+	.byte $2C, $00
 	LDA #$00	; write 00, 01, 02, and 03 to the nametable.
 	STA $2007	; ^
 	LDA #$01	; ^
@@ -11283,7 +11283,7 @@ TEST_PPUReadBuffer:
 	LDA #$03	; ^
 	STA $2007	; ^
 	JSR SetPPUADDRFromWord
-	.byte $24, $00
+	.byte $2C, $00
 	LDA $2007	; this should put 0 in the buffer
 	LDA $2007	; this should read 0 from the buffer, and put 1 in the buffer.
 	LDA $2007	; this should read 1 from the buffer, and put 2 in the buffer.
@@ -11319,7 +11319,7 @@ TEST_PPUReadBuffer:
 	;;; Test 6 [PPU Read Buffer]: Writing to $2006 does not modify the buffer value. ;;;
 	JSR ResetScrollAndWaitForVBlank
 	JSR SetPPUADDRFromWord
-	.byte $24, $00
+	.byte $2C, $00
 	LDA $2007 ; Prep buffer with 00
 	LDA $2007 ; Prep buffer with 01
 	LDA #$00
@@ -11333,11 +11333,11 @@ TEST_PPUReadBuffer:
 	;;; Test 7 [PPU Read Buffer]: The value on the nametable at $2700 through $27FF should be put in the buffer when reading from palette RAM at $3F00 through $3FFF. ;;;
 	JSR ResetScrollAndWaitForVBlank
 	JSR SetPPUADDRFromWord
-	.byte $27, $00
+	.byte $2F, $00
 	LDA #$5A
 	STA $2007	; VRAM $2700 = $5A
 	JSR SetPPUADDRFromWord
-	.byte $24, $00
+	.byte $2C, $00
 	LDA $2007 ; Prep buffer with 00
 	LDA $2007 ; Prep buffer with 01
 	LDA $2007 ; Prep buffer with 02
@@ -13247,9 +13247,6 @@ TEST_INC4014_BNEFAIL: ; I ran out of bytes to branch from the bottom of this tes
 	RTS
 ;;;;;;;
 
-FAIL_AttributesAsTiles:
-	JMP TEST_Fail
-
 TEST_AttributesAsTiles:
 	;;; Test 1 [Attributes as Tiles]: The attribute table bytes can be rendered as tile data if the VRAM Address is set to $23C0, or 2FC0 ;;;
 	; In this example, I'm moving the VRAM Address (the v register of the PPU) to $2FC0.
@@ -13288,15 +13285,43 @@ TEST_AttributesAsTiles_loop:
 	.byte $2F, $C0	
 	JSR EnableRendering ; Enable rendering both sprites and blackground.
 	JSR WaitForVBlank ; Wait a whole frame. The test results will be ready by then.
-	JSR DisableRendering_S ; Disable sprites, so they aren't polluting the menu screen after the test ends.
+	JSR DisableRendering ; Disable sprites, so they aren't polluting the menu screen after the test ends.
 	LDA $2002 ; Read from PPUSTATUS
 	AND #$40 ; Filter for the Sprite Zero Hit.
 	BEQ FAIL_AttributesAsTiles ; If sprite zero hit did not occur, fail the test.
+	INC <ErrorCode
+	
+	;;; Test 2 [Attributes as Tiles]: With a vertical nametable arrangement, which nametable is drawn when 't' points to the attribute tables? ;;;
+	; Surprise! It should render the same nametable as the attribute bytes we are looking at!
+	LDA #0
+	STA <dontSetPointer
+	JSR PrintCHR
+	.word $2C38
+	.byte $25, $FF
+	JSR SetPPUADDRFromWord ; Set the v and t registers to $2FC0 for the test.
+	.byte $2F, $C0	
+	JSR WaitForVBlank ; Wait a whole frame. The test results will be ready by then.
+	JSR EnableRendering ; Enable rendering both sprites and blackground.
+	LDA #$18
+	STA $200  ; Y position of $00 (The '.' character is 2 px by 2 px, so only the top 2 pixels of the spirte collide with the bottom 2 pixels of the background.)
+	LDA #$C0
+	STA $203
+	LDA #2
+	STA $4014 ; OAM DMA with page 2.
+	JSR WaitForVBlank ; Wait a whole frame. The test results will be ready by then.
+	JSR DisableRendering ; Disable sprites, so they aren't polluting the menu screen after the test ends.
+	LDA $2002 ; Read from PPUSTATUS
+	AND #$40 ; Filter for the Sprite Zero Hit.
+	BEQ FAIL_AttributesAsTiles ; If sprite zero hit did not occur, fail the test.	
 	;;END OF TEST;;
 
 	LDA #1
 	RTS
 ;;;;;;;
+
+FAIL_AttributesAsTiles:
+	JMP TEST_Fail
+;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                ENGINE                   ;;
@@ -14428,10 +14453,10 @@ DoubleLDA2007:	; There are a few tests that need to read the contents of a PPU a
 SetPPUReadBufferToA: ; Sets the value of the PPU Read buffer to A.
 	PHA
 	JSR SetPPUADDRFromWord
-	.byte $24, $00
+	.byte $2C, $00
 	STA $2007
 	JSR SetPPUADDRFromWord
-	.byte $24, $00
+	.byte $2C, $00
 	LDA $2007
 	PLA
 	RTS
@@ -14513,7 +14538,7 @@ NMI_EnterDebugMode:
 	JSR DisableNMI
 	JSR ClearNametable2
 	JSR SetPPUADDRFromWord
-	.byte $25, $00
+	.byte $2D, $00
 	LDX #0
 NMI_EnterDebugModeLoop:
 	LDA $500,X
@@ -14521,7 +14546,7 @@ NMI_EnterDebugModeLoop:
 	INX
 	BNE NMI_EnterDebugModeLoop
 	JSR SetPPUADDRFromWord
-	.byte $24, $A0
+	.byte $2C, $A0
 	LDX #0
 NMI_EnterDebugModeLoop2:
 	LDA <$50,X
@@ -14531,7 +14556,7 @@ NMI_EnterDebugModeLoop2:
 	BNE NMI_EnterDebugModeLoop2
 	BNE NMI_EnterDebugModeLoop
 	JSR SetPPUADDRFromWord
-	.byte $24, $80
+	.byte $2C, $80
 	LDX #0
 NMI_EnterDebugModeLoop3:
 	LDA <$20,X
@@ -14540,7 +14565,7 @@ NMI_EnterDebugModeLoop3:
 	CPX #$10
 	BNE NMI_EnterDebugModeLoop3
 	JSR SetPPUADDRFromWord
-	.byte $27, $C0
+	.byte $2F, $C0
 	; set up attribute bytes.
 	LDX #0
 	LDA #$FF
@@ -14577,7 +14602,7 @@ NMI_EnterDebugModeLoop7:
 	STA $2001
 	JSR EnableNMI
 	JSR SetPPUADDRFromWord
-	.byte $24, $00
+	.byte $2C, $00
 	
 	
 NMI_NotPressingSelect:
