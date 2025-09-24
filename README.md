@@ -3,7 +3,7 @@ AccuracyCoin is a large collection of NES accuracy tests on a single NROM cartri
 
 This ROM was designed for the RP2A03G CPU and the RP2C02G PPU. Some tests might fail on hardware with a different revision.
 
-This ROM currently has 126 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
+This ROM currently has 127 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
 Here's an example of the menu in this ROM shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been run yet. (The cursor is currently next to the "RAM Mirroring" test.)
 
@@ -215,7 +215,7 @@ For more information, I recommend reading the fully commented assembly code for 
   B: If the RDY line goes low 2 cycles before the write cycle, the CPU status flags were not correct after the test.  
   C: If the RDY line goes low 2 cycles before the write cycle, the stack pointer was not the correct value after the test.  
 
-### Interrupt flag latency
+### Interrupt Flag Latency
   1: An IRQ should occur when a DMC sample ends, the DMC IRQ is enabled, and the CPU's I flag is clear.  
   2: The IRQ should occur 2 instructions after the CLI instruction. (The CLI instruction polls for interrupts before cycle 2.)  
   3: An IRQ should be able to occur 1 cycle after the final cycle of an SEI instruction. (The SEI instruction polls for interrupts before cycle 2.)  
@@ -463,13 +463,13 @@ For more information, I recommend reading the fully commented assembly code for 
 ### NMI Suppression
   1: The NMI did not occur on the correct PPU cycle, or the NMI was not suppressed by a precisely timed read of address $2002.  
 
-### NMI at VBlank end
+### NMI at VBlank End
   1: The NMI could occur too late or was disabled too early.  
 
-### NMI disabled at VBlank
+### NMI Disabled at VBlank
   1: The NMI could occur too late or was disabled too early.  
 
-### Sprite 0 Hit behavior
+### Sprite 0 Hit Behavior
   1: A Sprite zero hit did not occur.  
   2: Sprite zero hits should not happen if background rendering is disabled.  
   3: Sprite zero hits should not happen if sprite rendering is disabled.  
@@ -485,17 +485,17 @@ For more information, I recommend reading the fully commented assembly code for 
   D: Your sprites are being rendered one scanline higher than they should be, or your sprite zero hit detection isn't actually checking for "solid pixels" overlapping.  
   E: The sprite zero hit flag was set too early.  
 
-### Arbitrary Sprite zero
+### Arbitrary Sprite Zero
   1: Sprite 0 should trigger a sprite zero hit. No other sprite should.  
   2: The first processed sprite of a scanline should be treated as "sprite zero".  
   3: Misaligned OAM should be able to trigger a sprite zero hit.  
 
-### Sprite overflow behavior
+### Sprite Overflow Behavior
   1: Evaluating 9 sprites in a single scanline should set the Sprite Overflow Flag.  
   2: The Sprite Overflow Flag should not be the same thing as the CPU's Overflow flag.  
   3: Evaluating only 8 sprites in a single scanline should not set the Sprite Overflow Flag.  
 
-### Misaligned OAM behavior
+### Misaligned OAM Behavior
   1: Misaligned OAM should be able to trigger a sprite zero hit.  
   2: Misaligned OAM should stay misaligned until an object's Y position is out of the range of this scanline, at which point the OAM address is incremented by 4 and bitwise ANDed with $FC.  
   3: If Secondary OAM is full when the Y position is out of range, instead of incrementing the OAM Address by 4 and bitwise ANDing with $FC, you should instead only increment the OAM address by 5.  
@@ -504,7 +504,7 @@ For more information, I recommend reading the fully commented assembly code for 
   6: The same as test 4, but the initial OAM address was $02 instead of $01. If you see this error code, you might have a false positive on test 4.  
   7: The same as test 5, but the initial OAM address was $03 instead of $01. If you see this error code, you might have a false positive on test 5.  
 
-### Address $2004 behavior
+### Address $2004 Behavior
   1: Writes to $2004 should update OAM and increment the OAM address by 1.  
   2: Reads from $2004 should give you a value in OAM, but do not increment the OAM address.  
   3: Reads from the attribute bytes should be missing bits 2 through 5.  
