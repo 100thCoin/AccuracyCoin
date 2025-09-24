@@ -297,7 +297,7 @@ result_AllNOPs = $47D
 result_PaletteRAMQuirks = $47E
 ;	47F is used.If you add a new test, don't forget to skip that value.
 result_INC4014 = $480
-
+result_AttributesAsTiles = $481
 
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
 result_PowOn_CPUReg = $03FD ; page 3 omits the test from the all-test-result-table.
@@ -711,6 +711,7 @@ Suite_PPUBehavior:
 	table "PPU Register Open Bus",	 $FF, result_PPUOpenBus, TEST_PPU_Open_Bus
 	table "PPU Read Buffer", $FF, result_PPUReadBuffer, TEST_PPUReadBuffer
 	table "Palette RAM Quirks", $FF, result_PaletteRAMQuirks, TEST_PaletteRAMQuirks
+	table "Attributes As Tiles", $FF, result_AttributesAsTiles, TEST_AttributesAsTiles
 	.byte $FF
 	
 	;; PPU VBL Timing ;;
@@ -822,6 +823,8 @@ AREROM_RT_Skip:
 	CPY #((EndTableTable - TableTable)/2) ; Compare Y with the total page count.
 	BNE AutomaticallyRunEntireROM_Loop    ; And loop if there are more pages to run.
 	; All tests are complete!
+	LDA #0
+	STA $4015
 	JSR WaitForVBlank             ; Wait for VBland for the PPU register writes.
 	LDA #0
 	STA <RunningAllTests          ; Clear the "RunningAllTests" variable
@@ -1065,7 +1068,7 @@ PressStartToContinue_End:
 	RTI
 ;;;;;;;
 
-	.org $9200
+	.org $9300
 	
 DMASyncWith48:
 	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
@@ -1390,6 +1393,28 @@ AddYToNameOffset0:
 	BCC AddYToNameOffset1
 	INC <AllTestMenuTestNameOffsetHi ; If needed, INC the high byte
 AddYToNameOffset1:
+	RTS
+;;;;;;;
+	
+ClearNametable2_With24:
+	LDA #$24
+	PHA
+	BNE ClearNametable2_s
+ClearNametable2:
+	LDA #0
+	PHA
+ClearNametable2_s:
+	JSR SetPPUADDRFromWord
+	.byte $24, $00
+	PLA
+	LDY #0
+	LDX #4
+TEST_RMW2007_ClearNametable2Loop:
+	STA $2007
+	DEY
+	BNE TEST_RMW2007_ClearNametable2Loop
+	DEX
+	BNE TEST_RMW2007_ClearNametable2Loop
 	RTS
 ;;;;;;;
 	
@@ -13216,6 +13241,59 @@ TEST_INC4014_BNEFAIL: ; I ran out of bytes to branch from the bottom of this tes
 	JSR DisableNMI ; If it failed, the NMI has already occured.
 	LDA <$50
 	BNE TEST_INC4014_BNEFAIL	
+	;;END OF TEST;;
+
+	LDA #1
+	RTS
+;;;;;;;
+
+FAIL_AttributesAsTiles:
+	JMP TEST_Fail
+
+TEST_AttributesAsTiles:
+	;;; Test 1 [Attributes as Tiles]: The attribute table bytes can be rendered as tile data if the VRAM Address is set to $23C0, or 2FC0 ;;;
+	; In this example, I'm moving the VRAM Address (the v register of the PPU) to $2FC0.
+	; This results in the top 16 scanlines on the screen reading from $2FC0 through $2FFF as tile data!
+	; In this test, I write the value $24 to all of these bytes, (an empty tile) except for a single tile, where I write $25 (a '.' symbol.)
+	; This test relies on a sprite zero hit with the attribute tiles being rendered.
+
+	JSR DisableRendering
+	JSR ClearNametable2_With24 ; Nametable 2 is polluted from other tests. Since it gets drawn during this test, let's clear it first.
+
+	JSR SetPPUADDRFromWord ; move the v register to $2FC0
+	.byte $2F, $C0
+
+	LDA #$24
+	LDX #$40
+TEST_AttributesAsTiles_loop:
+	STA $2007	; Write $24 to the following $40 bytes. (everything from $2FC0 to $2FFF)
+	DEX
+	BNE TEST_AttributesAsTiles_loop
+	JSR ClearPage2	; Clear OAM.
+
+	JSR SetPPUADDRFromWord ; move the v register to $2FC8
+	.byte $2F, $C8
+	LDA #$25
+	STA $2007 ; Write $25 to VRAM $2FC8.
+	STA $201  ; We're also using $25 as the sprite character.
+	LDA #0
+	STA $200  ; Y position of $00 (The '.' character is 2 px by 2 px, so only the top 2 pixels of the spirte collide with the bottom 2 pixels of the background.)
+	LDA #$40
+	STA $203  ; X position of $40.
+
+	JSR WaitForVBlank ; Let's wait for VBlank before the OAM DMA, and enabling rendering for the test.
+	LDA #2
+	STA $4014 ; OAM DMA with page 2.
+	JSR SetPPUADDRFromWord ; Set the v and t registers to $2FC0 for the test.
+	.byte $2F, $C0	
+	JSR EnableRendering ; Enable rendering both sprites and blackground.
+	JSR WaitForVBlank ; Wait a whole frame. The test results will be ready by then.
+	JSR DisableRendering_S ; Disable sprites, so they aren't polluting the menu screen after the test ends.
+	LDA $2002 ; Read from PPUSTATUS
+	AND #$40 ; Filter for the Sprite Zero Hit.
+	BEQ FAIL_AttributesAsTiles ; If sprite zero hit did not occur, fail the test.
+	;;END OF TEST;;
+
 	LDA #1
 	RTS
 ;;;;;;;
@@ -14682,21 +14760,6 @@ DNST_DontAdjustV:
 	JSR PrintByteDecimal_MinDigits
 	LDA #0
 	STA <HighlightTextPrinted
-	RTS
-;;;;;;;
-	
-ClearNametable2:
-	JSR SetPPUADDRFromWord
-	.byte $24, $00
-	LDA #0
-	TAY
-	LDX #4
-TEST_RMW2007_ClearNametable2Loop:
-	STA $2007
-	DEY
-	BNE TEST_RMW2007_ClearNametable2Loop
-	DEX
-	BNE TEST_RMW2007_ClearNametable2Loop
 	RTS
 ;;;;;;;
 	

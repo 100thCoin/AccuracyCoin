@@ -438,10 +438,13 @@ For more information, I recommend reading the fully commented assembly code for 
   4: The backdrop colors for sprites should be mirrors of the backdrop colors for backgrounds.  
   5: The values read from Palette RAM should only be 6-bit, with the upper 2 bits being PPU open bus.  
 
-### VBlank beginning
+### Attributes as Tiles
+  1: Moving the PPU t register to an attribute table should render the attribute bytes as tile data in the top 16 scanlines.
+
+### VBlank Beginning
   1: The PPU Register $2002 VBlank flag was not set at the correct PPU cycle.  
 
-### VBlank end
+### VBlank End
   1: The PPU Register $2002 VBlank flag was not cleared at the correct PPU cycle.  
 
 ### NMI Control
