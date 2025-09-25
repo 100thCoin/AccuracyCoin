@@ -1,13 +1,13 @@
 # AccuracyCoin
 AccuracyCoin is a large collection of NES accuracy tests on a single NROM cartridge.
 
-This ROM was designed for the RP2A03G CPU and the RP2C02G PPU. Some tests might fail on hardware with a different revision.
+This ROM was designed for an NTSC console with an RP2A03G CPU and RP2C02G PPU. Some tests might fail on hardware with a different revision.
 
 This ROM currently has 128 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
 Here's an example of the menu in this ROM shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been run yet. (The cursor is currently next to the "RAM Mirroring" test.)
 
-![AccuracyCoin_Page1](https://github.com/user-attachments/assets/ad0cb426-cd84-4784-8b7c-f7dcfecc882a)
+![AccuracyCoin_Page1](https://github.com/user-attachments/assets/2c17ad97-d702-43d1-9650-e185036d95c8)
 
 # Navigating the menus
 Use the D-Pad to move the cursor up or down.  
@@ -17,7 +17,7 @@ If the cursor is at the top of the page (highlighting the current page index), p
 
 Examples:
 
-![Result_Table](https://github.com/user-attachments/assets/2288e997-fca5-494e-a53d-03cbe7525353)
+![Result_Table](https://github.com/user-attachments/assets/3244bd9c-1ea1-42ac-8687-49bcc697adcf)
 
 Any test with multiple acceptable passing behaviors will be drawn with a light blue number over it.
 
