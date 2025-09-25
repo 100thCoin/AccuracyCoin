@@ -298,7 +298,7 @@ result_PaletteRAMQuirks = $47E
 ;	47F is used.If you add a new test, don't forget to skip that value.
 result_INC4014 = $480
 result_AttributesAsTiles = $481
-result_2005Before2006 = $482
+result_tRegisterQuirks = $482
 
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
 result_PowOn_CPUReg = $03FD ; page 3 omits the test from the all-test-result-table.
@@ -742,7 +742,7 @@ Suite_SpriteZeroHits:
 Suite_PPUMisc:
 	.byte "PPU Misc.", $FF
 	table "Attributes As Tiles", $FF, result_AttributesAsTiles, TEST_AttributesAsTiles
-	table "$2005 Before $2006", $FF, result_2005Before2006, TEST_2005Before2006
+	table "t Register Quirks", $FF, result_tRegisterQuirks, TEST_tRegisterQuirks
 	table "RMW $2007 Extra Write", $FF, result_RMW2007, TEST_RMW2007
 	;table "Palette Corruption", $FF, result_Unimplemented, DebugTest (I did not write a test for this, because it relies on a specific cpu/ppu clock alignment.)
 	.byte $FF
@@ -13346,12 +13346,12 @@ TEST_AttributesAsTiles_loop:
 ;;;;;;;
 
 FAIL_AttributesAsTiles:
-FAIL_2005Before2006:
+FAIL_TEST_tRegisterQuirks:
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
 
-TEST_2005Before2006:
-	;;; Test 1 [$2005 Before $2006]: Verify the scroll is working when writing to $2006 first. ;;;
+TEST_tRegisterQuirks:
+	;;; Test 1 [t Register Quirks]: Verify the scroll is working when writing to $2006 first. ;;;
 	JSR DisableRendering
 	JSR ClearNametable2_With24 ; Nametable 2 is polluted from other tests. Since it gets drawn during this test, let's clear it first.
 	JSR ClearPage2
@@ -13365,10 +13365,15 @@ TEST_2005Before2006:
 	JSR SetUpSpriteZero
 	.byte $41, $C0, $FF, $02
 	JSR DoSpriteZeroHitTest ; This just renders a full screen and reads from $2002, AND #$40
-	BEQ FAIL_2005Before2006 ; Fail the test if the sprite zero hit did not occur.
+	BEQ FAIL_TEST_tRegisterQuirks ; Fail the test if the sprite zero hit did not occur.
+	; and for test integrity, let's intentionally miss a sprite zero hit.
+	JSR SetUpSpriteZero
+	.byte $40, $C0, $FF, $02
+	JSR DoSpriteZeroHitTest ; This just renders a full screen and reads from $2002, AND #$40
+	BNE FAIL_TEST_tRegisterQuirks ; Fail the test if the sprite zero hit did not occur.
 	INC <ErrorCode
 	
-	;;; Test 2 [$2005 Before $2006]: If you write to PPUSCROLL before writing to PPUADDR, the resulting scroll values are slightly incorrect ;;;
+	;;; Test 2 [t Register Quirks]: If you write to PPUSCROLL before writing to PPUADDR, the resulting scroll values are slightly incorrect ;;;
 	; the ppu's t register is 15 bits.
 	; yyy NN YYYYY XXXXX
 	; XXXXX = coarse X scroll
@@ -13390,12 +13395,73 @@ TEST_2005Before2006:
 	JSR SetUpSpriteZero
 	.byte $56, $C0, $FF, $12
 	JSR DoSpriteZeroHitTest ; This just renders a full screen and reads from $2002, AND #$40
-	BEQ FAIL_2005Before2006 ; Fail the test if the sprite zero hit did not occur.
+	BEQ FAIL_TEST_tRegisterQuirks ; Fail the test if the sprite zero hit did not occur.
+	INC <ErrorCode
+	;;; Test 3 [t Register Quirks]: Writes to $2005 and $2006 rely on the PPU's `w` register, or "Write Latch". What happens if you alternate writes between $2006 and $2005? ;;;
+	; Instead of performing two writes to $2006 then two writes to $2005, let's write once to $2006, twice to $2005, then once to $2006.
+	
+	JSR DisableRendering
+	LDA #$2C
+	STA $2006
+	; w is now set.
+	LDA #$17
+	STA $2005
+	; w is cleared
+	STA $2005
+	; w is set again
+	LDA #$00
+	STA $2006
+	
+	JSR SetUpSpriteZero
+	.byte $51, $C0, $FF, $12
+	JSR DoSpriteZeroHitTest ; This just renders a full screen and reads from $2002, AND #$40
+	BEQ FAIL_TEST_tRegisterQuirks2 ; Fail the test if the sprite zero hit did not occur.
+	INC <ErrorCode
+	
+	;;; Test 4 [t Register Quirks]: Reversing the order, so we start by writing to $2005, then twice to $2006, ending with another write to $2005 ;;;
+	JSR DisableRendering
+	LDA #$17
+	STA $2005
+	; w is now set.
+	LDA #$00
+	STA $2006
+	; w is cleared
+	LDA #$2C
+	STA $2006
+	; w is set again
+	LDA #$17
+	STA $2005
+	
+	JSR SetUpSpriteZero
+	.byte $41, $C0, $FF, $12
+	JSR DoSpriteZeroHitTest ; This just renders a full screen and reads from $2002, AND #$40
+	BEQ FAIL_TEST_tRegisterQuirks2 ; Fail the test if the sprite zero hit did not occur.
+	INC <ErrorCode
+	
+	;;; Test 5 [t Register Quirks]: Writing to $2000 also changes the t register, so let's do that between writes to $2006 ;;;
+
+
+	JSR DisableRendering
+	LDA #$20
+	STA $2006
+	LDA #3
+	STA $2000
+	LDA #0
+	STA $2006
+	
+	JSR SetUpSpriteZero
+	.byte $56, $C0, $FF, $12
+	JSR DoSpriteZeroHitTest ; This just renders a full screen and reads from $2002, AND #$40
+	BEQ FAIL_TEST_tRegisterQuirks2 ; Fail the test if the sprite zero hit did not occur.
+	INC <ErrorCode
 	;;END OF TEST;;
 
 	LDA #1
 	RTS
 ;;;;;;;
+
+FAIL_TEST_tRegisterQuirks2:
+	JMP TEST_Fail
 
 DoSpriteZeroHitTest:
 	JSR WaitForVBlank	

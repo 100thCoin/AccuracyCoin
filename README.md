@@ -528,9 +528,12 @@ For more information, I recommend reading the fully commented assembly code for 
   1: Moving the PPU t register to an attribute table should render the attribute bytes as tile data in scanlines 0 to 15. Results are tested via a sprite zero hit.  
   2: With the t register pointing to an attribute table, scanlines 16 to 239 should be from the same nametable as the attributes.
   
-### $2005 Before $2006
+### t Register Quirks
   1: Sprite Zero Hits should be working.  
-  2: Writing to $2006 should overwrite some of the bits set up by writing to $2005.
+  2: Writing to $2006 should overwrite some of the bits set up by writing to $2005.  
+  3: Writes to $2005 and $2006 should use the same "write latch". Tested by performing a single write to $2006 and then writing to $2005.  
+  4: Writes to $2005 and $2006 should use the same "write latch". Tested by performing a single write to $2005 and then writing to $2006.  
+  5: Writing to $2000 between writes to $2006 should still properly set the "nametable select" bits of the t register.
   
 ### RMW $2007 Extra Write
   1: A Read-Modify-Write instruction to address $2007 should perform an extra write where the low byte of the PPU address written is the result of the Read-Modify-Write instruction.  
