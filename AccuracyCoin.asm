@@ -10542,7 +10542,7 @@ TEST_ImpliedDummyRead_Continue2:
 	; [Read opcode from $4015. Hopefully, a JSR.]
 	;
 	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed3, which sets $60 and jumps to TEST_ImpliedDummyRead_PostPHP.
-	.org $D63D	; PHP should push $3C to the stack, so the RTS instruction would return here:
+	.org $D73D	; PHP should push $3C to the stack, so the RTS instruction would return here:
 TEST_ImpliedDummyRead_PostPHP:
 	LDA <$60
 	BEQ FAIL_ImpliedDummyRead4
@@ -11933,6 +11933,9 @@ TEST_ControllerClocking_Strobe:
 	RTS
 ;;;;;;;
 
+	.bank 3
+	.org $E000
+
 TEST_ControllerClocking_JMP_Famicom:
 	JMP TEST_ControllerClocking_FamicomBehavior
 
@@ -12109,9 +12112,6 @@ TEST_ControllerClocking_SkipT2:
 	RTS
 ;;;;;;;
 
-
-	.bank 3
-	.org $E000
 
 Sync_ToPreRenderDot324:
 	; Syncing the CPU to dot 1 of Line 0 is not very easy, since there's the even/odd frame skipping dot 0 issue.
