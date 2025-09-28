@@ -13306,17 +13306,15 @@ TEST_AttributesAsTiles_loop:
 	JSR SetUpSpriteZero
 	.byte $00, $25, $FF, $40
 
-	JSR WaitForVBlank ; Let's wait for VBlank before the OAM DMA, and enabling rendering for the test.
-	LDA #2
-	STA $4014 ; OAM DMA with page 2.
 	JSR SetPPUADDRFromWord ; Set the v and t registers to $2FC0 for the test.
 	.byte $2F, $C0	
-	JSR EnableRendering ; Enable rendering both sprites and blackground.
-	JSR WaitForVBlank ; Wait a whole frame. The test results will be ready by then.
-	JSR DisableRendering ; Disable sprites, so they aren't polluting the menu screen after the test ends.
-	LDA $2002 ; Read from PPUSTATUS
-	AND #$40 ; Filter for the Sprite Zero Hit.
+	JSR DoSpriteZeroHitTest ; This just renders a full screen and reads from $2002, AND #$40
 	BEQ FAIL_AttributesAsTiles ; If sprite zero hit did not occur, fail the test.
+	; Let's also verify the sprite zero hits are properly working by intentionally missing this sprite zero hit.
+	JSR SetUpSpriteZero
+	.byte $00, $25, $FF, $42
+	JSR DoSpriteZeroHitTest ; This just renders a full screen and reads from $2002, AND #$40
+	BNE FAIL_AttributesAsTiles ; If sprite zero hit did not occur, fail the test.
 	INC <ErrorCode
 	
 	;;; Test 2 [Attributes as Tiles]: With a vertical nametable arrangement, which nametable is drawn when 't' points to the attribute tables? ;;;
@@ -13328,16 +13326,10 @@ TEST_AttributesAsTiles_loop:
 	.byte $25, $FF
 	JSR SetPPUADDRFromWord ; Set the v and t registers to $2FC0 for the test.
 	.byte $2F, $C0	
-	JSR WaitForVBlank ; Wait a whole frame. The test results will be ready by then.
-	JSR EnableRendering ; Enable rendering both sprites and blackground.
 	JSR SetUpSpriteZero
 	.byte $18, $25, $FF, $C0
-	LDA #2
-	STA $4014 ; OAM DMA with page 2.
-	JSR WaitForVBlank ; Wait a whole frame. The test results will be ready by then.
-	JSR DisableRendering ; Disable sprites, so they aren't polluting the menu screen after the test ends.
-	LDA $2002 ; Read from PPUSTATUS
-	AND #$40 ; Filter for the Sprite Zero Hit.
+	JSR DoSpriteZeroHitTest ; This just renders a full screen and reads from $2002, AND #$40
+
 	BEQ FAIL_AttributesAsTiles ; If sprite zero hit did not occur, fail the test.	
 	;;END OF TEST;;
 
