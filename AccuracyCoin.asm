@@ -2305,10 +2305,12 @@ TEST_PowerOnState_PPU_Palette:
 TEST_PowerOnState_PPU_ResetFlag:
 	;;; Test 1 [PPU Reset Flag]: Print the value recorded at power on ;;;
 	JSR RTS_If_Running_All_Tests ; If running all tests automatically, skip drawing stuff on screen. This isn't actually testing anything anyway.
+	JSR ClearNametableFrom2240
+
 	LDA PowerOnTest_PPUReset
 	CMP #1
 	BNE TEST_PowerOnState_PPU_Res_No
-	
+
 	JSR PrintTextCentered
 	.word $2252
 	.byte "Reset Flag Detected!", $FF
