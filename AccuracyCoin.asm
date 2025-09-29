@@ -299,6 +299,7 @@ result_PaletteRAMQuirks = $47E
 result_INC4014 = $480
 result_AttributesAsTiles = $481
 result_tRegisterQuirks = $482
+result_StaleShiftRegisters = $483
 
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
 result_PowOn_CPUReg = $03FD ; page 3 omits the test from the all-test-result-table.
@@ -743,7 +744,9 @@ Suite_PPUMisc:
 	.byte "PPU Misc.", $FF
 	table "Attributes As Tiles", $FF, result_AttributesAsTiles, TEST_AttributesAsTiles
 	table "t Register Quirks", $FF, result_tRegisterQuirks, TEST_tRegisterQuirks
-	table "RMW $2007 Extra Write", $FF, result_RMW2007, TEST_RMW2007
+	;table "RMW $2007 Extra Write", $FF, result_RMW2007, TEST_RMW2007 ; Commented out for now. More research required.
+	table "Stale Shift Registers", $FF, result_StaleShiftRegisters, TEST_StaleShiftRegisters
+
 	;table "Palette Corruption", $FF, result_Unimplemented, DebugTest (I did not write a test for this, because it relies on a specific cpu/ppu clock alignment.)
 	.byte $FF
 	
@@ -13338,7 +13341,7 @@ TEST_AttributesAsTiles_loop:
 ;;;;;;;
 
 FAIL_AttributesAsTiles:
-FAIL_TEST_tRegisterQuirks:
+FAIL_tRegisterQuirks:
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
 
@@ -13357,12 +13360,12 @@ TEST_tRegisterQuirks:
 	JSR SetUpSpriteZero
 	.byte $41, $C0, $FF, $02
 	JSR DoSpriteZeroHitTest ; This just renders a full screen and reads from $2002, AND #$40
-	BEQ FAIL_TEST_tRegisterQuirks ; Fail the test if the sprite zero hit did not occur.
+	BEQ FAIL_tRegisterQuirks ; Fail the test if the sprite zero hit did not occur.
 	; and for test integrity, let's intentionally miss a sprite zero hit.
 	JSR SetUpSpriteZero
 	.byte $40, $C0, $FF, $02
 	JSR DoSpriteZeroHitTest ; This just renders a full screen and reads from $2002, AND #$40
-	BNE FAIL_TEST_tRegisterQuirks ; Fail the test if the sprite zero hit did not occur.
+	BNE FAIL_tRegisterQuirks ; Fail the test if the sprite zero hit did not occur.
 	INC <ErrorCode
 	
 	;;; Test 2 [t Register Quirks]: If you write to PPUSCROLL before writing to PPUADDR, the resulting scroll values are slightly incorrect ;;;
@@ -13387,7 +13390,7 @@ TEST_tRegisterQuirks:
 	JSR SetUpSpriteZero
 	.byte $56, $C0, $FF, $12
 	JSR DoSpriteZeroHitTest ; This just renders a full screen and reads from $2002, AND #$40
-	BEQ FAIL_TEST_tRegisterQuirks ; Fail the test if the sprite zero hit did not occur.
+	BEQ FAIL_tRegisterQuirks ; Fail the test if the sprite zero hit did not occur.
 	INC <ErrorCode
 	;;; Test 3 [t Register Quirks]: Writes to $2005 and $2006 rely on the PPU's `w` register, or "Write Latch". What happens if you alternate writes between $2006 and $2005? ;;;
 	; Instead of performing two writes to $2006 then two writes to $2005, let's write once to $2006, twice to $2005, then once to $2006.
@@ -13407,7 +13410,7 @@ TEST_tRegisterQuirks:
 	JSR SetUpSpriteZero
 	.byte $51, $C0, $FF, $12
 	JSR DoSpriteZeroHitTest ; This just renders a full screen and reads from $2002, AND #$40
-	BEQ FAIL_TEST_tRegisterQuirks2 ; Fail the test if the sprite zero hit did not occur.
+	BEQ FAIL_tRegisterQuirks2 ; Fail the test if the sprite zero hit did not occur.
 	INC <ErrorCode
 	
 	;;; Test 4 [t Register Quirks]: Reversing the order, so we start by writing to $2005, then twice to $2006, ending with another write to $2005 ;;;
@@ -13427,7 +13430,7 @@ TEST_tRegisterQuirks:
 	JSR SetUpSpriteZero
 	.byte $41, $C0, $FF, $12
 	JSR DoSpriteZeroHitTest ; This just renders a full screen and reads from $2002, AND #$40
-	BEQ FAIL_TEST_tRegisterQuirks2 ; Fail the test if the sprite zero hit did not occur.
+	BEQ FAIL_tRegisterQuirks2 ; Fail the test if the sprite zero hit did not occur.
 	INC <ErrorCode
 	
 	;;; Test 5 [t Register Quirks]: Writing to $2000 also changes the t register, so let's do that between writes to $2006 ;;;
@@ -13444,7 +13447,7 @@ TEST_tRegisterQuirks:
 	JSR SetUpSpriteZero
 	.byte $56, $C0, $FF, $12
 	JSR DoSpriteZeroHitTest ; This just renders a full screen and reads from $2002, AND #$40
-	BEQ FAIL_TEST_tRegisterQuirks2 ; Fail the test if the sprite zero hit did not occur.
+	BEQ FAIL_tRegisterQuirks2 ; Fail the test if the sprite zero hit did not occur.
 	INC <ErrorCode
 	;;END OF TEST;;
 
@@ -13452,7 +13455,8 @@ TEST_tRegisterQuirks:
 	RTS
 ;;;;;;;
 
-FAIL_TEST_tRegisterQuirks2:
+FAIL_tRegisterQuirks2:
+FAIL_StaleShiftRegisters:
 	JMP TEST_Fail
 
 DoSpriteZeroHitTest:
@@ -13466,6 +13470,71 @@ DoSpriteZeroHitTest:
 	AND #$40
 	RTS
 ;;;;;;;
+
+TEST_StaleShiftRegisters:
+	JSR DisableRendering
+
+	;;; Test 1 [Stale Shift Registers]: Set things up, and verify Sprite Zero Hits are working ;;;
+
+
+	JSR ClearNametable2_With24 ; Nametable 2 is polluted from other tests. Since it gets drawn during this test, let's clear it first.
+	JSR PrintCHR
+	.word $2C00
+	.byte $FE, $FF
+	JSR ClearPage2
+	JSR SetUpSpriteZero
+	.byte $05, $C0, $00, $00 
+	JSR SetPPUADDRFromWord
+	.byte $2C, $00
+	JSR SetPPUSCROLLFromWord
+	.byte $00, $00
+	LDA #6
+	STA <PPUMASK_COPY ; show the leftmost 8 pixels.
+	JSR DoSpriteZeroHitTest
+	BEQ FAIL_StaleShiftRegisters ; Fail the test if the sprite zero hit did not occur.
+	INC <ErrorCode
+	;;; Test 2 [Stale Shift Registers]: The shift registers are not clocked when rendering is disabled, so when re-enabled, the old data is drawn ;;;
+
+	LDA #0
+	STA <PPUMASK_COPY ; show the leftmost 8 pixels.
+	
+	; This test does the following:
+	; Place a solid white tile at $2C00
+	; Render scanline 6.
+	; Somewhere during HBlank, after evaluating that sprite zero is on the next scanline, (somewhere after dot 285), disable rendering.
+	; Since the shift registers for the background are not clocked during H-Blank, and the "unused nametable read" from cycles 241 to 248 should read from $2C00...
+	; The shift registers for the background should be set up with "11111111 00000000"
+	; Since sprite zero is evaluated on the next scanline, somewhere during the next scanline, re-enable rendering.
+	; Sprite zero has an X position of 0, which means it will be drawn 0 pixels after rendering is re-enabled.
+	; Since the background shift registers are also still set up with "11111111 00000000" the sprite WILL overlap the background, triggering a sprite zero hit.
+	
+	JSR SetUpSpriteZero
+	.byte $06, $C0, $00, $00 
+	JSR Sync_ToLine0Dot1 ; This also runs the OAM DMA
+	; The PPU is now synced wit hthe CPU.
+	; The following instruction will begin on dot 1 of scanline 0.
+	
+	JSR Clockslide_700 ; And we stall until HBlank of scanline 6.
+	JSR Clockslide_50
+	JSR Clockslide_17
+	LDA #0
+	STA $2001 ; Disable rendering. (sprite zero SHOULD be evaluated, such that it will occur next scanline.)
+
+	JSR Clockslide_50 ; wait until HBlank is over.
+	JSR Clockslide_20 ; And wait a little more for good measure.
+	LDA #$18
+	STA $2001 ; Enable rendering.
+	; The sprite zero hit should occur before the LDA reads from $2002.
+	LDA $2002
+	AND #$40
+	BEQ FAIL_StaleShiftRegisters
+	
+	LDA #1
+	RTS
+;;;;;;;
+
+FAIL_StaleShiftRegisters2:
+	JMP TEST_Fail
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                ENGINE                   ;;

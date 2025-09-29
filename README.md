@@ -534,11 +534,10 @@ For more information, I recommend reading the fully commented assembly code for 
   3: Writes to $2005 and $2006 should use the same "write latch". Tested by performing a single write to $2006 and then writing to $2005.  
   4: Writes to $2005 and $2006 should use the same "write latch". Tested by performing a single write to $2005 and then writing to $2006.  
   5: Writing to $2000 between writes to $2006 should still properly set the "nametable select" bits of the t register.
-  
-### RMW $2007 Extra Write
-  1: A Read-Modify-Write instruction to address $2007 should perform an extra write where the low byte of the PPU address written is the result of the Read-Modify-Write instruction.  
-  2: This extra write should not occur when "v" is pointing to Palette RAM. (An extra write still might occur, but that's not the one we're testing for.)  
-  3: If "v" is pointing to Palette RAM, this extra write should not get written to the nametable.  
+
+### Stale Shift Registers
+  1: Sprite Zero Hits should be working.  
+  2: The Shift Registers should not be clocked during H-Blank or F-Blank. After re-enabling rendering, a sprite zero hit should be able to occur entirely on stale shift register data.
 
 ### Instruction Timing
   1: The DMA should update the data bus.  
@@ -633,3 +632,12 @@ Some tests have multiple acceptable behaviors that are tested for in this ROM. T
 ### Controller Clocking
   1: The controller was read the way a US-released NES / AV Famicom should read controllers.  
   2: The controller was read the way a Famicom should read controllers.  
+
+# Removed Tests
+In case you are running an old version of this ROM and are still looking for an explanation of the error codes:
+
+### RMW $2007 Extra Write
+  (Removed due to several revision G PPUs failing this test. More research is needed.)  
+  1: A Read-Modify-Write instruction to address $2007 should perform an extra write where the low byte of the PPU address written is the result of the Read-Modify-Write instruction.  
+  2: This extra write should not occur when "v" is pointing to Palette RAM. (An extra write still might occur, but that's not the one we're testing for.)  
+  3: If "v" is pointing to Palette RAM, this extra write should not get written to the nametable.
