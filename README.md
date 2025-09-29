@@ -410,8 +410,12 @@ For more information, I recommend reading the fully commented assembly code for 
   3: The 1-cycle DMA should not get delayed by a write cycle, rather it just shouldn't occur in that case.  
   4: If the sample was set to keep looping, the DMC DMA timing in your emulator is off.  
 
-### PPU Reset Flag
-  1: The PPU registers shouldn't be usable before the end of the first VBlank.  
+### CPU Registers Power On State
+  1: The A Register should be $00 at power on.  
+  2: The X Register should be $00 at power on.  
+  3: The Y Register should be $00 at power on.  
+  4: The Stack Pointer should be $FD at power on.  
+  5: The Interrupt Flag should be set at power on.
 
 ### PPU Register Mirroring
   1: PPU registers should be mirrored through $3FFF.  

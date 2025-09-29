@@ -302,10 +302,10 @@ result_tRegisterQuirks = $482
 result_StaleShiftRegisters = $483
 
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
-result_PowOn_CPUReg = $03FD ; page 3 omits the test from the all-test-result-table.
+result_PowOn_CPUReg = $0418 
 result_PowOn_PPURAM = $03FE ; page 3 omits the test from the all-test-result-table.
 result_PowOn_PPUPal = $03FF ; page 3 omits the test from the all-test-result-table.
-result_PowOn_PPUReset = $0418
+result_PowOn_PPUReset = $03FD ; page 3 omits the test from the all-test-result-table.
 
 ;$500 is dedicated to RAM needed for tests.
 ;$600 is dedicated to the IRQ routine
@@ -2304,13 +2304,31 @@ TEST_PowerOnState_PPU_Palette:
 
 TEST_PowerOnState_PPU_ResetFlag:
 	;;; Test 1 [PPU Reset Flag]: Print the value recorded at power on ;;;
+	JSR RTS_If_Running_All_Tests ; If running all tests automatically, skip drawing stuff on screen. This isn't actually testing anything anyway.
 	LDA PowerOnTest_PPUReset
+	CMP #1
+	BNE TEST_PowerOnState_PPU_Res_No
+	
+	JSR PrintTextCentered
+	.word $2252
+	.byte "Reset Flag Detected!", $FF
+	JSR ResetScroll
+	RTS
+	
+TEST_PowerOnState_PPU_Res_No:
+	JSR PrintTextCentered
+	.word $2252
+	.byte "No Reset Flag Detected!", $FF
+	JSR ResetScroll
 	RTS
 ;;;;;;;
 
 TEST_PowerOnState_CPU_Registers:
 	;;; Test 1 [CPU Registers Power On State]: Print the values recorded at power on ;;;
-	JSR RTS_If_Running_All_Tests ; If running all tests automatically, skip drawing stuff on screen. This isn't actually testing anything anyway.
+	
+	LDA <RunningAllTests
+	BNE TEST_PowerOnState_CPU_Reg_Skip
+	
 	JSR ClearNametableFrom2240
 	JSR ResetScrollAndWaitForVBlank
 	LDA #0
@@ -2347,8 +2365,31 @@ TEST_PowerOnState_CPU_Registers:
 	.byte "Processor flags ", $FF
 	LDA PowerOn_P
 	JSR PrintByte
-	;; END OF TEST ;;
 	JSR ResetScroll
+
+TEST_PowerOnState_CPU_Reg_Skip:
+	LDA PowerOn_A
+	BNE TEST_Fail4
+	INC <ErrorCode
+	
+	LDA PowerOn_X
+	BNE TEST_Fail4
+	INC <ErrorCode
+	
+	LDA PowerOn_Y
+	BNE TEST_Fail4
+	INC <ErrorCode
+	
+	LDA PowerOn_SP
+	CMP #$FD
+	BNE TEST_Fail4
+	INC <ErrorCode
+	
+	LDA PowerOn_P
+	CMP #4
+	BNE TEST_Fail4
+	
+	;; END OF TEST ;;
 	LDA #1
 	STA <dontSetPointer
 	RTS
@@ -6952,6 +6993,9 @@ FAIL_DMA_Timing:
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
 
+	.bank 2	; If I don't do this, the ROM won't compile.
+	.org $C000
+
 TEST_DMA_Plus_4015R:
 	;;; Test 1 [DMA + $4015 Read]: Does the frame interrupt flag ever get set? ;;;
 	SEI
@@ -6985,8 +7029,7 @@ TEST_DMA_Plus_4015R:
 	RTS
 ;;;;;;;
 
-	.bank 2	; If I don't do this, the ROM won't compile.
-	.org $C000
+
 	
 	; and 33 00s in a row for a nice and neat silent DPCM sample.
 	.byte $00,  $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
@@ -13495,9 +13538,6 @@ TEST_StaleShiftRegisters:
 	INC <ErrorCode
 	;;; Test 2 [Stale Shift Registers]: The shift registers are not clocked when rendering is disabled, so when re-enabled, the old data is drawn ;;;
 
-	LDA #0
-	STA <PPUMASK_COPY ; show the leftmost 8 pixels.
-	
 	; This test does the following:
 	; Place a solid white tile at $2C00
 	; Render scanline 6.
@@ -13518,6 +13558,7 @@ TEST_StaleShiftRegisters:
 	JSR Clockslide_50
 	JSR Clockslide_17
 	LDA #0
+	NOP
 	STA $2001 ; Disable rendering. (sprite zero SHOULD be evaluated, such that it will occur next scanline.)
 
 	JSR Clockslide_50 ; wait until HBlank is over.
@@ -13525,6 +13566,7 @@ TEST_StaleShiftRegisters:
 	LDA #$18
 	STA $2001 ; Enable rendering.
 	; The sprite zero hit should occur before the LDA reads from $2002.
+	JSR DisableRendering_S
 	LDA $2002
 	AND #$40
 	BEQ FAIL_StaleShiftRegisters
