@@ -1599,6 +1599,8 @@ TEST_OpenBus:
 	; 4: Push PC High to the stack.
 	; 5: Push PC Low to the stack.
 	; 6: Read the second operand.
+	;
+	; See [JSR Edge Cases] test 3.
 
 	LDX #0
 TEST_OpenBus_PrepIRQLoop:

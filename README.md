@@ -353,7 +353,7 @@ For more information, I recommend reading the fully commented assembly code for 
   2: The DMC DMA was either on the wrong cycle, or it did not update the data bus.  
 
 ### DMA + $2007 Read
-  1: The PPU Read Buffer is not working.
+  1: The PPU Read Buffer is not working.  
   2: The DMC DMA was either on the wrong cycle, or the halt/alignment cycles did not read from $2007.  
   3: The halt/alignment cycles did not increment the "v" register of the PPU enough times.  
 
