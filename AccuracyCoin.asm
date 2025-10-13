@@ -13525,7 +13525,6 @@ TEST_StaleShiftRegisters:
 
 	;;; Test 1 [Stale Shift Registers]: Set things up, and verify Sprite Zero Hits are working ;;;
 
-
 	JSR ClearNametable2_With24 ; Nametable 2 is polluted from other tests. Since it gets drawn during this test, let's clear it first.
 	JSR PrintCHR
 	.word $2C00
@@ -13656,11 +13655,7 @@ FAIL_Scanline0Sprites1:
 
 TEST_Scanline0Sprites:
 	;;; Test 1 [Sprites On Scanline 0]: Sprites at Y=0 aren't actually drawn at Y=0. ;;;
-	; Well, as it turns out, sprites *can* be drawn on scanline 0.
-	; See https://forums.nesdev.org/viewtopic.php?t=26291
-	
-	; In summary, OAM data can be drawn on scanline 0, since the pre-render line is treated as scanline 5 for the in-range checks occuring during dots 256 to 319
-	; (evaluated as line (261 & 256) = scanline 5)
+	; This is just a test to weed out false positives.
 	
 	JSR DisableRendering
 	LDA #0
@@ -13688,15 +13683,19 @@ TEST_Scanline0Sprites_ClearPg2:
 	AND #$40
 	BNE FAIL_Scanline0Sprites1
 	INC <ErrorCode
+	
 	;;; Test 2 [Sprites On Scanline 0]: Under specific circumstances, a sprite can be drawn on scanline 0 ;;;
-
+	; Well, as it turns out, sprites *can* be drawn on scanline 0.
+	; See https://forums.nesdev.org/viewtopic.php?t=26291
+	
+	; In summary, OAM data can be drawn on scanline 0, since the pre-render line is treated as scanline 5 for the in-range checks occuring during dots 256 to 319
+	; (evaluated as line (261 & 256) = scanline 5)
 
 	JSR Sync_ToLine0Dot1 ; This also runs the OAM DMA
-
 	JSR RunScanline0SpriteTest
 	
 	LDA #2
-	STA <$50 ; this is used to keep these test results in a different address tha nthe previous two results.
+	STA <$50 ; this is used to keep these test results in a different address than the previous two results.
 	
 	JSR PrintCHR ; Using this function to update the backdrop color.
 	.word $2010
@@ -13706,6 +13705,11 @@ TEST_Scanline0Sprites_ClearPg2:
 	.byte $C0, $FF
 
 	JSR ResetScroll
+
+	; The pre-render line skips the last dot, resulting in an interesting side effect.
+	; The background jitters, and the first pixel of the sprite shift registers gets drawn at x=0 instead of the intended x position. 
+	; The 7 remaining pixels are drawn as normal, but shifted left by 1 pixel.
+	; In other words, we're going to test for sprite zero hits at X=0 now.
 
 	JSR Sync_ToLine0Dot1 ; This also runs the OAM DMA
 	JSR RunScanline0SpriteTest
