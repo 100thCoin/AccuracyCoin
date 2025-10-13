@@ -3,7 +3,7 @@ AccuracyCoin is a large collection of NES accuracy tests on a single NROM cartri
 
 This ROM was designed for an NTSC console with an RP2A03G CPU and RP2C02G PPU. Some tests might fail on hardware with a different revision.
 
-This ROM currently has 128 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
+This ROM currently has 129 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
 Here's an example of the menu in this ROM shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been run yet. (The cursor is currently next to the "RAM Mirroring" test.)
 
@@ -543,6 +543,13 @@ For more information, I recommend reading the fully commented assembly code for 
   1: Sprite Zero Hits should be working.  
   2: The Shift Registers should not be clocked during H-Blank or F-Blank. After re-enabling rendering, a sprite zero hit should be able to occur entirely on stale shift register data.
 
+### Sprites On Scanline 0
+  1: Sprites at Y=0 should actually be drawn at Y=1.  
+  2: A sprite should be able to be drawn at Y=0 via the pre-render scanline's sprite evaluation with stale secondary OAM data.  
+  3: (Composite PPU Only) Consecutive frames should shift the background on scanline 0, causing the sprite zero hit to miss on every other frame. (Tested at X=$80)  
+  3: (RGB PPU Only) Sprite zero hits should not occur at X=$00 during this test on an RGB PPU.  
+  4: (Composite PPU Only) Consecutive frames should shift the background on scanline 0, causing the sprite zero hit to miss on every other frame. (Tested at X=$00)  
+
 ### Instruction Timing
   1: The DMA should update the data bus.  
   2: The DMA timing is not accurate enough to test this.  
@@ -636,6 +643,10 @@ Some tests have multiple acceptable behaviors that are tested for in this ROM. T
 ### Controller Clocking
   1: The controller was read the way a US-released NES / AV Famicom should read controllers.  
   2: The controller was read the way a Famicom should read controllers.  
+
+### Sprites on Scanline 0
+  1: This test was ran on a composite PPU.  
+  2: This test was ran on an RGB PPU.  
 
 # Removed Tests
 In case you are running an old version of this ROM and are still looking for an explanation of the error codes:

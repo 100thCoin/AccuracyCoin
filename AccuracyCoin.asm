@@ -300,6 +300,7 @@ result_INC4014 = $480
 result_AttributesAsTiles = $481
 result_tRegisterQuirks = $482
 result_StaleShiftRegisters = $483
+result_Scanline0Sprites = $484
 
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
 result_PowOn_CPUReg = $0418 
@@ -746,6 +747,7 @@ Suite_PPUMisc:
 	table "t Register Quirks", $FF, result_tRegisterQuirks, TEST_tRegisterQuirks
 	;table "RMW $2007 Extra Write", $FF, result_RMW2007, TEST_RMW2007 ; Commented out for now. More research required.
 	table "Stale Shift Registers", $FF, result_StaleShiftRegisters, TEST_StaleShiftRegisters
+	table "Sprites On Scanline 0", $FF, result_Scanline0Sprites, TEST_Scanline0Sprites
 
 	;table "Palette Corruption", $FF, result_Unimplemented, DebugTest (I did not write a test for this, because it relies on a specific cpu/ppu clock alignment.)
 	.byte $FF
@@ -5425,7 +5427,7 @@ TEST_Sprite0Hit_Behavior:
 	JSR EnableRendering  ; enable the background and sprites.
 	JSR InitializeSpriteZero ; Init sprite zero with a completely transparent sprite. (All pixels are background-color)
 	;    YPos, CHR, Att, XPos
-	.byte $00, $FF, $00, $08
+	.byte $00, $24, $00, $08
 	STX $4014 ; OAM DMA (we want to keep OAM refreshed for these tests)
 	JSR Clockslide_3000 ; Wait long enough for VBlank to be over, and a few scanlines to render. (Sprite Zero hit should not occur, for sprite zero as no solid pixels.)
 	LDA $2002	; Bit 6 should NOT be set, since the sprite zero hit should not have occurred.
@@ -13555,7 +13557,7 @@ TEST_StaleShiftRegisters:
 	JSR SetUpSpriteZero
 	.byte $06, $C0, $00, $00 
 	JSR Sync_ToLine0Dot1 ; This also runs the OAM DMA
-	; The PPU is now synced wit hthe CPU.
+	; The PPU is now synced with the CPU.
 	; The following instruction will begin on dot 1 of scanline 0.
 	
 	JSR Clockslide_700 ; And we stall until HBlank of scanline 6.
@@ -13581,6 +13583,204 @@ TEST_StaleShiftRegisters:
 
 FAIL_StaleShiftRegisters2:
 	JMP TEST_Fail
+;;;;;;;;;;;;;;;;;
+
+RunScanline0SpriteTest:
+	JSR Clockslide_200 ; wait long enough for OAM2 to finish this line
+	NOP
+	NOP
+	NOP
+	LDA #0
+	STA $2003 ; write to OAMADDR
+	STA $2001 ; disable rendering.
+
+	; OAM DMA repeatedly.
+	
+	LDA #$2
+	LDX #56
+	
+TEST_Scanline0Sprites_DMALoop:
+	STA $4014
+	DEX
+	BNE TEST_Scanline0Sprites_DMALoop
+	
+	JSR Clockslide_200
+	JSR Clockslide_30
+
+	LDA #$1E
+	STA $2001 ; Briefly after dot 66 on the pre-render line.
+	
+	; wait until HBlank after scanline 0
+	
+	JSR Clockslide_100
+	JSR Clockslide_50
+	JSR Clockslide_20
+	NOP
+	LDX <$50
+	LDA $2002
+	AND #$40
+	STA $500, X
+	
+	LDA #0
+	STA $2003 ; write to OAMADDR
+	STA $2001 ; disable rendering.
+
+	; OAM DMA repeatedly.
+	
+	LDA #$2
+	LDX #56
+	
+TEST_Scanline0Sprites_DMALoop2:
+	STA $4014
+	DEX
+	BNE TEST_Scanline0Sprites_DMALoop2
+	
+	JSR Clockslide_300
+	JSR Clockslide_50
+	JSR Clockslide_37
+
+	LDA #$1E
+	STA $2001 ; Briefly after dot 66 on the pre-render line.
+			
+	JSR WaitForVBlank
+	
+	LDX <$50
+	LDA $2002
+	AND #$40
+	STA $501, X
+	RTS
+;;;;;;;
+
+FAIL_Scanline0Sprites1:
+	JMP TEST_Fail
+
+TEST_Scanline0Sprites:
+	;;; Test 1 [Sprites On Scanline 0]: Sprites at Y=0 aren't actually drawn at Y=0. ;;;
+	; Well, as it turns out, sprites *can* be drawn on scanline 0.
+	; See https://forums.nesdev.org/viewtopic.php?t=26291
+	
+	; In summary, OAM data can be drawn on scanline 0, since the pre-render line is treated as scanline 5 for the in-range checks occuring during dots 256 to 319
+	; (evaluated as line (261 & 256) = scanline 5)
+	
+	JSR DisableRendering
+	LDA #0
+	TAX
+TEST_Scanline0Sprites_ClearPg2:
+	STA $200, X
+	INX
+	BNE TEST_Scanline0Sprites_ClearPg2
+
+	JSR SetUpSpriteZero
+	.byte $00, $C6, $00, $80
+
+	JSR PrintCHR ; Using this function to update the backdrop color.
+	.word $2000
+	.byte $24, $FF
+	JSR PrintCHR ; Using this function to update the backdrop color.
+	.word $2010
+	.byte $C0, $FF
+	
+	JSR ResetScroll
+	
+	JSR WaitForVBlank
+	JSR WaitForVBlank
+	LDA $2002
+	AND #$40
+	BNE FAIL_Scanline0Sprites1
+	INC <ErrorCode
+	;;; Test 2 [Sprites On Scanline 0]: Under specific circumstances, a sprite can be drawn on scanline 0 ;;;
+
+
+	JSR Sync_ToLine0Dot1 ; This also runs the OAM DMA
+
+	JSR RunScanline0SpriteTest
+	
+	LDA #2
+	STA <$50 ; this is used to keep these test results in a different address tha nthe previous two results.
+	
+	JSR PrintCHR ; Using this function to update the backdrop color.
+	.word $2010
+	.byte $24, $FF
+	JSR PrintCHR ; Using this function to update the backdrop color.
+	.word $2000
+	.byte $C0, $FF
+
+	JSR ResetScroll
+
+	JSR Sync_ToLine0Dot1 ; This also runs the OAM DMA
+	JSR RunScanline0SpriteTest
+
+	JSR WaitForVBlank
+
+	JSR PrintCHR ; Using this function to update the backdrop color.
+	.word $2000
+	.byte $24, $FF
+	JSR ResetScroll
+	JSR DisableRendering_S
+
+	; And now we evaluate the results!!!
+	; $500 and $501 are the first test results, where X=$80
+	; $502 and $503 are the second test results, where X=$00
+	; On an RP2C02, there should be one passing test from each set, and one failing test from each set. (50% chance split for which one passes.)
+	; On an RP2C03, there should be two passing from the first set, and two failing from the second set.
+
+	LDA $500
+	ORA $501
+	BEQ FAIL_Scanline0Sprites ; if neither test passed, that's a fail!
+	INC <ErrorCode
+	
+	LDA $500
+	EOR $501 ; Did any of these fail?
+	BEQ Scanline0Sprites_RGB
+	; non-RGB detected. Check the second set of tests.
+	;;; Test 3 (Composite) [Sprites On Scanline 0]: On a composite PPU, you should also have a sprite zero hit at x=0 ;;;	
+	
+	LDA $502
+	ORA $503
+	BEQ FAIL_Scanline0Sprites ; if neither test passed, that's a fail!
+	INC <ErrorCode
+	; And verify that only 1 from this set passed.
+	;;; Test 4 (Composite) [Sprites On Scanline 0]: You should have only 1 sprite zero hit at x=0 ;;;	
+	
+	LDA $502
+	EOR $503 ; Did any of these fail?
+	BEQ FAIL_Scanline0Sprites
+	; GG, that's a verified composite PPU
+	LDA RunningAllTests
+	BNE Scanline0Sprites_SkipComp
+	LDA #0
+	STA <dontSetPointer
+	JSR WaitForVBlank						; Wait for VBlank so we're not updating the nametable out of VBlank.
+	JSR PrintTextCentered 					; And write the following message to address $2370.
+	.word $2370
+	.byte "Composite PPU Detected", $FF
+Scanline0Sprites_SkipComp:
+	LDA #5
+	RTS
+;;;;;;;
+
+FAIL_Scanline0Sprites:
+	JMP TEST_Fail
+
+Scanline0Sprites_RGB:
+	;;; Test 3 (RGB) [Sprites On Scanline 0]: On an RGB PPU, no sprite zero htis should occur at x=0 ;;;
+
+	LDA $502
+	ORA $503
+	BNE FAIL_Scanline0Sprites ; if either test passed, that's a fail!
+	; GG, that's a verified RGB PPU
+	LDA RunningAllTests
+	BNE Scanline0Sprites_SkipRGB
+	LDA #0
+	STA <dontSetPointer
+	JSR WaitForVBlank						; Wait for VBlank so we're not updating the nametable out of VBlank.
+	JSR PrintTextCentered 					; And write the following message to address $2370.
+	.word $2370
+	.byte "RGB PPU Detected", $FF
+Scanline0Sprites_SkipRGB:
+	LDA #9
+	RTS
+;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                ENGINE                   ;;
