@@ -13758,6 +13758,7 @@ TEST_Scanline0Sprites_ClearPg2:
 	JSR PrintTextCentered 					; And write the following message to address $2370.
 	.word $2370
 	.byte "Composite PPU Detected", $FF
+	JSR ResetScroll
 Scanline0Sprites_SkipComp:
 	LDA #5
 	RTS
@@ -13781,6 +13782,7 @@ Scanline0Sprites_RGB:
 	JSR PrintTextCentered 					; And write the following message to address $2370.
 	.word $2370
 	.byte "RGB PPU Detected", $FF
+	JSR ResetScroll
 Scanline0Sprites_SkipRGB:
 	LDA #9
 	RTS
