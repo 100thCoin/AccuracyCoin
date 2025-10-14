@@ -13668,10 +13668,10 @@ TEST_Scanline0Sprites_ClearPg2:
 	JSR SetUpSpriteZero
 	.byte $00, $C6, $00, $80
 
-	JSR PrintCHR ; Using this function to update the backdrop color.
+	JSR PrintCHR
 	.word $2000
 	.byte $24, $FF
-	JSR PrintCHR ; Using this function to update the backdrop color.
+	JSR PrintCHR
 	.word $2010
 	.byte $C0, $FF
 	
@@ -13697,10 +13697,10 @@ TEST_Scanline0Sprites_ClearPg2:
 	LDA #2
 	STA <$50 ; this is used to keep these test results in a different address than the previous two results.
 	
-	JSR PrintCHR ; Using this function to update the backdrop color.
+	JSR PrintCHR
 	.word $2010
 	.byte $24, $FF
-	JSR PrintCHR ; Using this function to update the backdrop color.
+	JSR PrintCHR
 	.word $2000
 	.byte $C0, $FF
 
