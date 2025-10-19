@@ -1453,6 +1453,293 @@ SetPPUSCROLLFromWord:	; pretty much the same as SetPPUADDRFromWord, but it write
 	LDA <$FF
 	RTS
 ;;;;;;;
+
+TEST_RunSHASHS_AddrInitAXYFS:
+	;.word TargetAddress
+	;.byte Initial, A, X, Y, Flags, StackPointer
+	;.word ResultAddress
+	;.byte result, r_A, r_X, r_Y, r_Flags, r_StackPointer
+	STA <$FF
+	JSR CopyReturnAddressToByte0
+	LDY #0
+	LDX #0
+TEST_RunSHASHS_PreLoop:
+	LDA [$0000],Y
+	STA <Test_UnOp_OperandTargetAddrLo,X
+	INY
+	INX
+	CPX #16 ; Set up $28 through $2F
+	BNE TEST_RunSHASHS_PreLoop
+	; With the variables all set up, let's prep the test:
+	JSR FixRTS
+	LDX <Test_UnOp_ExpectedResultAddrLo
+	JSR WriteFFOnEachPageOffsetX
+	JSR TEST_UnOpRunTest
+	; Evaluating the test.
+	LDA <initialSubTest
+	STA <ErrorCode
+	JSR Test_UnOpSHASHS_Behavior3
+	; If you made it this far, we passed this test!
+	; (not necessarily the entire suite, but this specific test, at least)
+	LDA UnOpTest_Opcode ; reset this value before the next test, assuming another one follows
+	RTS
+;;;;;;;
+
+Test_UnOpSHASHS_Behavior3:
+	LDX <Test_UnOp_ExpectedResultAddrLo
+	JSR ANDByteOnEachPageOffsetX
+	CMP <Test_UnOp_ValueAtAddressResult
+	BNE FAIL_SHASHS3_Test ; Error code 1: The result at the expected address was incorrect
+	INC <ErrorCode
+	LDA <Copy_A
+	CMP <Test_UnOp_CMP
+	BNE FAIL_SHASHS3_Test ; Error code 2: The result of the A register was incorrect
+	INC <ErrorCode
+	LDX <Copy_X
+	CPX <Test_UnOp_CPX
+	BNE FAIL_SHASHS3_Test ; Error code 3: The result of the X register was incorrect
+	INC <ErrorCode
+	LDY <Copy_Y
+	CPY <Test_UnOp_CPY
+	BNE FAIL_SHASHS3_Test ; Error code 4: The result of the Y register was incorrect
+	INC <ErrorCode
+	LDA <Copy_Flags
+	CMP <Test_UnOp_CM_Flags
+	BNE FAIL_SHASHS3_Test ; Error code 5: The result of the flags were incorrect
+	INC <ErrorCode
+	LDA <Copy_SP2
+	CMP <Test_UnOp_CPS
+	BNE FAIL_SHASHS3_Test ; Error code 6: The result of the stack pointer was incorrect
+	RTS ; Pass!
+FAIL_SHASHS3_Test:
+	PLA	; Pull of the Return Address
+	PLA	;
+	PLA
+	PLA
+	JMP TEST_Fail ; and fail the test.
+
+ANDByteOnEachPageOffsetX:
+	; The idea here is that all of these except for one have the value $FF.
+	; Therefore, by the time we hit RTS, we read the value we're looking for in A.
+	LDA #$FF
+	AND <$00, X
+	AND $100, X
+	AND $200, X
+	AND $300, X
+	AND $400, X
+	AND $500, X
+	AND $600, X
+	AND $700, X
+	RTS
+;;;;;;;
+
+WriteFFOnEachPageOffsetX:
+	; Initialize stuff fro these "behavior 3" tests.
+	LDA #$FF
+	STA <$00, X
+	STA $100, X
+	STA $200, X
+	STA $300, X
+	STA $400, X
+	STA $500, X
+	STA $600, X
+	STA $700, X
+	RTS
+;;;;;;;
+
+
+TEST_SHS_Behavior3_9B
+	PHA ; just used to prevent issues with the PLA in ErrorCodeF
+	LDX #0
+	JSR ANDByteOnEachPageOffsetX
+	CMP #$FF
+	BEQ FAIL_SHA_SHS_ErrorCodeF
+	JMP TEST_SHS_Behavior3
+
+
+
+TEST_SHA_Behavior3_93:
+	LDA #$93
+	PHA ; push the opcode. This just lets me re-use the upcoming code.
+	
+	LDA <RunningAllTests
+	BNE TEST_SHA_JMPto_Behavior3
+	
+	LDA #0
+	STA <dontSetPointer
+	LDX #$50
+	JSR WriteFFOnEachPageOffsetX
+	JSR PrintTextCentered
+	.word $22B0
+	.byte " SHA Behavior 3", $FF
+	JSR ResetScrollAndWaitForVBlank
+TEST_SHA_JMPto_Behavior3:
+	JMP TEST_SHA_Behavior3
+	
+FAIL_SHA_SHS_ErrorCodeF:
+	PLA ; pull off the opcode of the test.
+	LDA #$3E ; (Error code F) 
+	RTS	
+	
+TEST_SHA_Behavior3_9F:
+	LDA #$9F
+	PHA ; push the opcode. This just lets me re-use the upcoming code.
+	LDA <RunningAllTests
+	BNE TEST_SHA_Behavior3
+	
+	LDA #0
+	STA <dontSetPointer
+	LDX #$50
+	JSR WriteFFOnEachPageOffsetX
+	JSR PrintTextCentered
+	.word $22B0
+	.byte " SHA Behavior 3", $FF
+	JSR ResetScrollAndWaitForVBlank
+	
+TEST_SHA_Behavior3:
+	; Okay, so your CPU decided to make this as difficult as possible by introducing a magic number into the ABH corruption.
+	; When the SHA instruction's indexing crosses a page boundary, the typical result is `ABH = (ABH+1) & A`, or perhaps `ABH = (ABH+1) & A & X`.
+	; However, it would appear this console's (or emulator's) result is actually `ABH = (ABH+1) & (A | MAGIC)`. Or maybe there's an X in there too, I have no idea.
+	; and since it's impossible on an NROM cartridge to actually know exactly what address / mirror was specifically written to, we cannot know, nor make assumptions.
+	; therefore, all we know is the low byte of the target address.
+	; We're not actually able to calculate this "MAGIC" value, because we cannot actually know which address / mirror gets written to.
+	; in other words, we're going to simply check $0xx, $1xx, $2xx, $3xx, $4xx, $5xx, $6xx, and $7xx after every test.
+
+	; Final checks. If every one of these addresses ($000, $100, $200...) is still $FF, then fail the test.
+	LDX #0
+	JSR ANDByteOnEachPageOffsetX
+	CMP #$FF
+	BEQ FAIL_SHA_SHS_ErrorCodeF
+	
+	; The worst part about all of this is the magic number could cancel out the bitwise AND entirely, nullifying the ABH corruption, but *oh well*.
+	; I guess if you didn't even implement the ABH corruption into your emulator you get to pass the SHA and SHS instructions, but I will judge you. Heh.
+	PLA
+	JSR TEST_UnOp_Setup; Set the opcode
+	; This test for "behavior 3" differes from all know documentation, and is honestly annoying to work with, and was a nightmare to reserach.
+	; Special thanks to SNS_Dominic for their Verilog reserach allowing us to discover there's a magic number affecting ABH.
+	; Write: A & (X | Magic) & H
+	; Hi = Hi & (X | Magic) ; NOTE: this magic number is not the same magic number used in the value written
+	
+	; We can not make any assumptions on what "magic" is. Therefore, X needs to always be FF.
+	JSR TEST_RunSHASHS_AddrInitAXYFS
+	.word $0555
+	.byte $FF
+	.byte $FF, $FF, $00, (flag_i), $80
+	.word $0555
+	.byte $06
+	.byte $FF, $FF, $00, (flag_i), $80
+	
+	JSR TEST_RunSHASHS_AddrInitAXYFS
+	.word $1D60
+	.byte $FF
+	.byte $03, $FF, $00, (flag_i), $80
+	.word $0560
+	.byte $02
+	.byte $03, $FF, $00, (flag_i), $80
+	
+	; Now to make the high byte go unstable.
+	JSR TEST_RunSHASHS_AddrInitAXYFS
+	.word $1F50 ; $1E90 will be the operand.
+	.byte $FF
+	.byte $0A, $FF, $80, (flag_i | flag_c | flag_z | flag_v), $80
+	.word $0750
+	.byte $0A
+	.byte $0A, $FF, $80, (flag_i | flag_c | flag_z | flag_v), $80
+	; the high byte will only be ANDed with X (FF in this case)
+	
+	; And now to test if the value written is still ANDed with H if the cycle before the write had a DMA.
+	PHA
+	LDA #$20
+	STA $0580
+	LDA #Low(DMASync_50MinusACyclesRemaining)
+	STA $0581
+	LDA #High(DMASync_50MinusACyclesRemaining)
+	STA $0582	
+	LDA #$7
+	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 6 is probably the only one that will show up.
+	PLA
+	
+	JSR TEST_RunSHASHS_AddrInitAXYFS
+	.word $0568
+	.byte $5A
+	.byte $8F, $FF, $00, (flag_i), $80
+	.word $0568
+	.byte $8F	; H isn't part of the equation anymore.
+	.byte $8F, $FF, $00, (flag_i), $80
+	
+	;; END OF TEST ;;
+	LDA #13	; Pass, "code 3"
+	RTS
+;;;;;;;
+
+TEST_SHS_Behavior3:
+	PLA
+	LDA <RunningAllTests
+	BNE TEST_SHS_Behavior3_Skip
+	LDA #0
+	STA <dontSetPointer
+	LDX #$50
+	JSR WriteFFOnEachPageOffsetX
+	JSR PrintTextCentered
+	.word $22D0
+	.byte " SHS Behavior 3", $FF
+	JSR ResetScrollAndWaitForVBlank
+TEST_SHS_Behavior3_Skip:
+	
+	LDA #$9B
+	JSR TEST_UnOp_Setup; Set the opcode
+	JSR TEST_RunSHASHS_AddrInitAXYFS
+	.word $0555
+	.byte $FF
+	.byte $FF, $FF, $00, (flag_i), $FF
+	.word $0555
+	.byte $06
+	.byte $FF, $FF, $00, (flag_i), $FF
+	
+	JSR TEST_RunSHASHS_AddrInitAXYFS
+	.word $1D00
+	.byte $FF
+	.byte $03, $FF, $00, (flag_i), $03
+	.word $0500
+	.byte $02
+	.byte $03, $FF, $00, (flag_i), $03
+	
+	JSR TEST_RunSHASHS_AddrInitAXYFS
+	.word $1F60 ; $1E90 will be the operand.
+	.byte $FF
+	.byte $0A, $FF, $80, (flag_i | flag_c | flag_z | flag_v), $0A
+	.word $0760
+	.byte $0A
+	.byte $0A, $FF, $80, (flag_i | flag_c | flag_z | flag_v), $0A
+
+	PHA
+	LDA #$20
+	STA $0580
+	LDA #Low(DMASync_50MinusACyclesRemaining)
+	STA $0581
+	LDA #High(DMASync_50MinusACyclesRemaining)
+	STA $0582	
+	LDA #$7
+	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 7 is probably the only one that will show up.
+	PLA
+	
+	JSR TEST_RunSHASHS_AddrInitAXYFS
+	.word $0568
+	.byte $5A
+	.byte $8F, $FF, $00, (flag_i), $8F
+	.word $0568
+	.byte $8F
+	.byte $8F, $FF, $00, (flag_i), $8F
+
+;; END OF TEST ;;
+	LDA #13	; Pass "code 2"
+	RTS
+;;;;;;;
+	
+	
+	
+	
+	
 	
 	.bank 1
 	.org $A000	; This next line of code is located at address $A000 in the ROM.
@@ -3842,8 +4129,7 @@ TEST_SHA_93_CorrectLength:
 	LDA <$00
 	CMP #$FF
 	BNE TEST_SHA_Behavior1_93_JMP ; if address $0000 was updated, this is behavior 1.
-	LDA #$3E ; (Error code F) And if address $1F00 was changed, or if nothing happened at all, this failed.
-	RTS		 ; (If address $1F00 ($700) was updated, that value gets fixed before the NMI occurs.)
+	JMP TEST_SHA_Behavior3_93 ; If neither known behavior occured, we need to do some annoying extra checks.
 ;;;;;;;
 	
 TEST_SHA_Behavior2_93_JMP:
@@ -3883,8 +4169,7 @@ TEST_SHA_9F_CorrectLength:
 	LDA <$00
 	CMP #$FF
 	BNE TEST_SHA_Behavior1_9F_JMP ; if address $0000 was updated, this is behavior 1.
-	LDA #$3E ; (Error code F) And if address $1F00 was changed, ir of nothing happened at all, this failed.
-	RTS 	 ; (If address $1F00 ($700) was updated, that value gets fixed before the NMI occurs.)
+	JMP TEST_SHA_Behavior3_9F ; If neither known behavior occured, we need to do some annoying extra checks.
 ;;;;;;;
 	
 TEST_SHA_Behavior2_9F_JMP:
@@ -4017,8 +4302,8 @@ TEST_SHA_Behavior1:
 	STA $0581
 	LDA #High(DMASync_50MinusACyclesRemaining)
 	STA $0582	
-	LDA #$6
-	STA <initialSubTest	; The following test will give error codes, 6, 7, 8, 9, and A. Error code 6 is probably the only one that will show up.
+	LDA #$7
+	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 6 is probably the only one that will show up.
 	PLA
 	
 	JSR TEST_RunTest_AddrInitAXYF
@@ -4128,8 +4413,8 @@ TEST_SHA_Behavior2:
 	STA $0581
 	LDA #High(DMASync_50MinusACyclesRemaining)
 	STA $0582	
-	LDA #$6
-	STA <initialSubTest	; The following test will give error codes, 6, 7, 8, 9, and A. Error code 6 is probably the only one that will show up.
+	LDA #$7
+	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 6 is probably the only one that will show up.
 	PLA
 	
 	JSR TEST_RunTest_AddrInitAXYF
@@ -4186,8 +4471,7 @@ TEST_SHS_9B_CorrectLength:
 	LDA <$00
 	CMP #$FF
 	BNE TEST_SHS_Behavior1_9B ; if address $0000 was updated, this is behavior 1.
-	LDA #$3E ; (Error code F) And if address $1F00 was changed, or if nothing happened at all, this failed.
-	RTS		 ; (If address $1F00 ($700) was updated, that value gets fixed before the NMI occurs.)
+	JMP TEST_SHS_Behavior3_9B ; If neither known behavior occured, we need to do some annoying extra checks.
 ;;;;;;;
 	
 TEST_SHS_Behavior2_9B_JMP:
@@ -4405,8 +4689,8 @@ TEST_SHY_9C:
 	STA $0581
 	LDA #High(DMASync_50MinusACyclesRemaining)
 	STA $0582	
-	LDA #$6
-	STA <initialSubTest	; The following test will give error codes, 6, 7, 8, 9, and A. Error code 6 is probably the only one that will show up.
+	LDA #$7
+	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 6 is probably the only one that will show up.
 	PLA
 	
 	; SHY just becomes STY if a DMA occurs on the right cpu cycle.
@@ -4461,8 +4745,8 @@ TEST_SHX_9E:
 	STA $0581
 	LDA #High(DMASync_50MinusACyclesRemaining)
 	STA $0582	
-	LDA #$6
-	STA <initialSubTest	; The following test will give error codes, 6, 7, 8, 9, and A. Error code 6 is probably the only one that will show up.
+	LDA #$7
+	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 6 is probably the only one that will show up.
 	PLA
 	
 	; SHX just becomes STX if a DMA occurs on the right cpu cycle.

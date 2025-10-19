@@ -185,35 +185,21 @@ For more information, I recommend reading the fully commented assembly code for 
   5: The CPU status flags were not correct after the test.  
   6: The stack pointer was not the correct value after the test. (Only applicable to LAE)  
 
-### Unofficial Instructions: SHA, SHX, SHY
-  F: The high byte corruption did not match either known behavior. (Only applicable to SHA. Corruption with SHX and SHY is consistent across revisions.)  
-  0: This instruction had the wrong number of operand bytes.  
-  1: The target address of the instruction was not the correct value after the test.  
-  2: The A register was not the correct value after the test.  
-  3: The X register was not the correct value after the test.  
-  4: The Y register was not the correct Value after the test.  
-  5: The CPU status flags were not correct after the test.  
-  6: If the RDY line goes low 2 cycles before the write cycle, the target address of the instruction was not the correct value after the test.  
-  7: If the RDY line goes low 2 cycles before the write cycle, the A register was not the correct value after the test.  
-  8: If the RDY line goes low 2 cycles before the write cycle, the X register was not the correct value after the test.  
-  9: If the RDY line goes low 2 cycles before the write cycle, the Y register was not the correct Value after the test.  
-  A: If the RDY line goes low 2 cycles before the write cycle, the CPU status flags were not correct after the test.  
-
-### Unofficial Instructions: SHS
-  F: The high byte corruption did not match either known behavior.  
+### Unofficial Instructions: SHA, SHX, SHY, SHS
+  F: The high byte corruption did not match either known behavior. (Only applicable to SHA and SHS. Corruption with SHX and SHY is consistent across revisions.)  
   0: This instruction had the wrong number of operand bytes.  
   1: The target address of the instruction was not the correct value after the test.  
   2: The A register was not the correct value after the test.  
   3: The X register was not the correct value after the test.  
   4: The Y register was not the correct value after the test.  
   5: The CPU status flags were not correct after the test.  
-  6: The stack pointer was not the correct value after the test.  
+  6: The stack pointer was not the correct value after the test.  (Only applicable to SHS)
   7: If the RDY line goes low 2 cycles before the write cycle, the target address of the instruction was not the correct value after the test.  
   8: If the RDY line goes low 2 cycles before the write cycle, the A register was not the correct value after the test.  
   9: If the RDY line goes low 2 cycles before the write cycle, the X register was not the correct value after the test.  
   A: If the RDY line goes low 2 cycles before the write cycle, the Y register was not the correct Value after the test.  
   B: If the RDY line goes low 2 cycles before the write cycle, the CPU status flags were not correct after the test.  
-  C: If the RDY line goes low 2 cycles before the write cycle, the stack pointer was not the correct value after the test.  
+  C: If the RDY line goes low 2 cycles before the write cycle, the stack pointer was not the correct value after the test.  (Only applicable to SHS)
 
 ### Interrupt Flag Latency
   1: An IRQ should occur when a DMC sample ends, the DMC IRQ is enabled, and the CPU's I flag is clear.  
@@ -621,9 +607,10 @@ For more information, I recommend reading the fully commented assembly code for 
 Some tests have multiple acceptable behaviors that are tested for in this ROM. The behavior used will either be printed on screen after running the test, or you'll see a "success code" on the all-test table.  
 
 ### Unofficial Instructions: SHA, SHS
-  1: The instruction behaved the way an old RP2A03G CPU or previous revision CPU would run this instruction.  
-  2: The instruction behaved the way a new RP2A03G CPU or later revision CPU would run this instruction.  
-  
+  1: The Address-Bus-High-Byte-Corruption performed a bitwise AND upon ABH with both X and A.  
+  2: The Address-Bus-High-Byte-Corruption performed a bitwise AND upon ABH with only X.   
+  3: The Address-Bus-High-Byte-Corruption included a magic number to be bitwise ORed with ABH, or did not occur at all.  
+
 ### DMA + $4016 Read
   1: The controller was read the way a US-released NES / AV Famicom should read controllers.  
   2: The controller was read the way a Famicom should read controllers.  
