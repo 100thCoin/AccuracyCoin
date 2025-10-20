@@ -13868,14 +13868,9 @@ FAIL_StaleShiftRegisters2:
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
 
-RunScanline0SpriteTest:
-	JSR Clockslide_200 ; wait long enough for OAM2 to finish this line
-	NOP
-	NOP
-	NOP
+TEST_Scanline0Sprites_TimeItRight:
 	LDA #0
-	STA $2003 ; write to OAMADDR
-	STA $2001 ; disable rendering.
+	STA $3E01 ; disable rendering.
 
 	; OAM DMA repeatedly.
 	
@@ -13887,8 +13882,10 @@ TEST_Scanline0Sprites_DMALoop:
 	DEX
 	BNE TEST_Scanline0Sprites_DMALoop
 	
-	JSR Clockslide_200
-	JSR Clockslide_30
+	JSR Clockslide_300
+	JSR Clockslide_50
+	NOP
+	NOP
 
 	LDA #$1E
 	STA $2001 ; Briefly after dot 66 on the pre-render line.
@@ -13897,39 +13894,40 @@ TEST_Scanline0Sprites_DMALoop:
 	
 	JSR Clockslide_100
 	JSR Clockslide_50
-	JSR Clockslide_20
+	NOP
+	NOP
+	NOP
 	NOP
 	LDX <$50
 	LDA $2002
 	AND #$40
-	STA $500, X
+	RTS
+;;;;;;;
+
+RunScanline0SpriteTest:
+	LDA #$80
+	STA $2000
+RunScanline0Sprite_WaitForNMI:
+	JMP RunScanline0Sprite_WaitForNMI
 	
+RunScanline0Sprite_NMI:
+	PLA
+	PLA
+	PLA
 	LDA #0
-	STA $2003 ; write to OAMADDR
-	STA $2001 ; disable rendering.
-
-	; OAM DMA repeatedly.
-	
-	LDA #$2
-	LDX #56
-	
-TEST_Scanline0Sprites_DMALoop2:
-	STA $4014
-	DEX
-	BNE TEST_Scanline0Sprites_DMALoop2
-	
-	JSR Clockslide_300
-	JSR Clockslide_50
-	JSR Clockslide_37
-
+	STA $2000		
+	STA $2003
 	LDA #$1E
-	STA $2001 ; Briefly after dot 66 on the pre-render line.
-			
-	JSR WaitForVBlank
+	STA $2001
+	LDA #2
+	STA $4014
+	JSR Clockslide_1000
+	JSR Clockslide_900
+	JSR Clockslide_18
 	
-	LDX <$50
-	LDA $2002
-	AND #$40
+	JSR TEST_Scanline0Sprites_TimeItRight
+	STA $500, X	
+	JSR TEST_Scanline0Sprites_TimeItRight
 	STA $501, X
 	RTS
 ;;;;;;;
@@ -13973,20 +13971,33 @@ TEST_Scanline0Sprites_ClearPg2:
 	; See https://forums.nesdev.org/viewtopic.php?t=26291
 	
 	; In summary, OAM data can be drawn on scanline 0, since the pre-render line is treated as scanline 5 for the in-range checks occuring during dots 256 to 319
-	; (evaluated as line (261 & 256) = scanline 5)
+	; (evaluated as line (261 & 255) = scanline 5)
 
-	JSR Sync_ToLine0Dot1 ; This also runs the OAM DMA
+	LDA #$4C
+	STA $700
+	LDA #Low(RunScanline0Sprite_NMI)
+	STA $701
+	LDA #HIGH(RunScanline0Sprite_NMI)
+	STA $702
+
 	JSR RunScanline0SpriteTest
 	
 	LDA #2
 	STA <$50 ; this is used to keep these test results in a different address than the previous two results.
+
+	LDA #$20
+	STA $2006
+	LSR A
+	STA $2006
+	LDA #$24
+	STA $2007
 	
-	JSR PrintCHR
-	.word $2010
-	.byte $24, $FF
-	JSR PrintCHR
-	.word $2000
-	.byte $C0, $FF
+	LDA #$20
+	STA $2006
+	LDA #0
+	STA $2006
+	LDA #$C0
+	STA $2007
 
 	JSR ResetScroll
 
@@ -13995,7 +14006,6 @@ TEST_Scanline0Sprites_ClearPg2:
 	; The 7 remaining pixels are drawn as normal, but shifted left by 1 pixel.
 	; In other words, we're going to test for sprite zero hits at X=0 now.
 
-	JSR Sync_ToLine0Dot1 ; This also runs the OAM DMA
 	JSR RunScanline0SpriteTest
 
 	JSR WaitForVBlank
@@ -14033,6 +14043,17 @@ TEST_Scanline0Sprites_ClearPg2:
 	LDA $502
 	EOR $503 ; Did any of these fail?
 	BEQ FAIL_Scanline0Sprites
+	; Final confirmation. The results MUST either be 40 00 00 40, or 00 40 40 00
+	LDA $500
+	EOR $502
+	BEQ FAIL_Scanline0Sprites
+	LDA $500
+	CMP $503
+	BNE FAIL_Scanline0Sprites
+	LDA $501
+	CMP $502
+	BNE FAIL_Scanline0Sprites
+	
 	; GG, that's a verified composite PPU
 	LDA RunningAllTests
 	BNE Scanline0Sprites_SkipComp
