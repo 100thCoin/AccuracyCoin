@@ -8982,11 +8982,12 @@ TEST_APULengthTable:
 	;;; Test 1 [APU Length Table]: What value was the length counter when we write 'n' to address $4003? ;;;
 	
 	JSR TEST_APULengthCounter
-	LDX #0
+	LDX #1
 	STX <ErrorCode
 	CMP #1
 	BNE FAIL_APULengthTable
-	
+	INC <ErrorCode
+
 	;;; Test 2 [APU Length Table]: What value was the length counter when we write 'n' to address $4003? ;;;
 	; Just for clarification, this is actually "Test 2" through "Test X". They all use the same routine, but the error code is adjusted accordingly.
 	LDX #0
