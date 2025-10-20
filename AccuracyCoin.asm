@@ -13984,8 +13984,8 @@ TEST_Scanline0Sprites_ClearPg2:
 	
 	LDA #2
 	STA <$50 ; this is used to keep these test results in a different address than the previous two results.
-	JSR WaitForVBlank
-	JSR WaitForVBlank
+	JSR DisableRendering
+
 	JSR PrintCHR
 	.word $2010
 	.byte $24, $FF
@@ -13994,7 +13994,7 @@ TEST_Scanline0Sprites_ClearPg2:
 	.byte $C0, $FF
 
 	JSR ResetScroll
-	JSR WaitForVBlank
+	JSR Clockslide_29780
 
 	; The pre-render line skips the last dot, resulting in an interesting side effect.
 	; The background jitters, and the first pixel of the sprite shift registers gets drawn at x=0 instead of the intended x position. 
