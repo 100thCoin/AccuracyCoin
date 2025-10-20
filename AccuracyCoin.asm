@@ -13984,22 +13984,17 @@ TEST_Scanline0Sprites_ClearPg2:
 	
 	LDA #2
 	STA <$50 ; this is used to keep these test results in a different address than the previous two results.
-
-	LDA #$20
-	STA $2006
-	LSR A
-	STA $2006
-	LDA #$24
-	STA $2007
-	
-	LDA #$20
-	STA $2006
-	LDA #0
-	STA $2006
-	LDA #$C0
-	STA $2007
+	JSR WaitForVBlank
+	JSR WaitForVBlank
+	JSR PrintCHR
+	.word $2010
+	.byte $24, $FF
+	JSR PrintCHR
+	.word $2000
+	.byte $C0, $FF
 
 	JSR ResetScroll
+	JSR WaitForVBlank
 
 	; The pre-render line skips the last dot, resulting in an interesting side effect.
 	; The background jitters, and the first pixel of the sprite shift registers gets drawn at x=0 instead of the intended x position. 
