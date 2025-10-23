@@ -301,6 +301,8 @@ result_AttributesAsTiles = $481
 result_tRegisterQuirks = $482
 result_StaleBGShiftRegisters = $483
 result_Scanline0Sprites = $484
+result_CHRROMIsNotWritable = $485
+result_RenderingFlagBehavior = $486
 
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
 result_PowOn_CPUReg = $0418 
@@ -743,12 +745,14 @@ Suite_SpriteZeroHits:
 	;; PPU Misc ;;
 Suite_PPUMisc:
 	.byte "PPU Misc.", $FF
+	table "CHR ROM is not writable", $FF, result_CHRROMIsNotWritable, TEST_CHRROMIsNotWritable
 	table "Attributes As Tiles", $FF, result_AttributesAsTiles, TEST_AttributesAsTiles
 	table "t Register Quirks", $FF, result_tRegisterQuirks, TEST_tRegisterQuirks
-	;table "RMW $2007 Extra Write", $FF, result_RMW2007, TEST_RMW2007 ; Commented out for now. More research required.
+	table "Rendering Flag Behavior", $FF, result_RenderingFlagBehavior, TEST_RenderingFlagBehavior
 	table "Stale BG Shift Registers", $FF, result_StaleBGShiftRegisters, TEST_StaleBGShiftRegisters
 	table "Sprites On Scanline 0", $FF, result_Scanline0Sprites, TEST_Scanline0Sprites
 
+	;table "RMW $2007 Extra Write", $FF, result_RMW2007, TEST_RMW2007 ; Commented out for now. More research required.
 	;table "Palette Corruption", $FF, result_Unimplemented, DebugTest (I did not write a test for this, because it relies on a specific cpu/ppu clock alignment.)
 	.byte $FF
 	
@@ -13863,6 +13867,7 @@ TEST_StaleBGShiftRegisters:
 	JSR Test_StaleShiftRegisters_Run
 	BEQ FAIL_StaleShiftRegisters
 
+	;;END OF TEST;;
 	LDA #1
 	RTS
 ;;;;;;;
@@ -14034,7 +14039,7 @@ TEST_Scanline0Sprites_ClearPg2: ; clear page 2 (used for OAM DMA) with all zeroe
 
 	JSR WaitForVBlank
 
-	JSR PrintCHR ; Using this function to update the backdrop color.
+	JSR PrintCHR
 	.word $2000
 	.byte $24, $FF
 	JSR ResetScroll
@@ -14089,6 +14094,8 @@ TEST_Scanline0Sprites_ClearPg2: ; clear page 2 (used for OAM DMA) with all zeroe
 	.byte "Composite PPU Detected", $FF
 	JSR ResetScroll
 Scanline0Sprites_SkipComp:
+
+	;;END OF TEST;;
 	LDA #5
 	RTS
 ;;;;;;;
@@ -14113,8 +14120,102 @@ Scanline0Sprites_RGB:
 	.byte "RGB PPU Detected", $FF
 	JSR ResetScroll
 Scanline0Sprites_SkipRGB:
+
+	;;END OF TEST;;
 	LDA #9
 	RTS
+;;;;;;;
+
+TEST_CHRROMIsNotWritable:
+	;;; Test 1 [CHR ROM is not Writable]: If this cartridge has CHR ROM (instead of CHR RAM) writing to the ppu address range of $0000 to $1FFF does nothing. ;;;
+	JSR DisableRendering         ; Just to make sure I don't take too long to perform writes to the PPU, let's disable rendering.
+	JSR PrintCHR                 ; I've used this function a lot in this ROM, but just so we're clear on what happens
+	.word $0000	                 ; It's essentially going to run: LDA #$00, STA $2006, LDA #$00, STA $2006
+	.byte $5A, $FF               ; And then run LDA #$5A, STA $2007. This function cannot draw tile $FF, as that is used as the terminator.
+	                             ; In other words, we attempt to write #$5A to CHR ROM at address $0000.
+	JSR ReadPPUADDRFromWord      ; And this subroutine will essentially run:
+	.byte $00, $00               ; LDA #$00, STA $2006, LDA #$00, STA $2006
+	                             ; But most importantly, using these functions saves bytes. It costs a ton of cpu cycles, but that's not a concern here.
+	STA $500                     ; Store the result for later.
+	JSR PrintCHR                 ; Just in case your emulator fails this test, let's write the correct value back to address $0000
+	.word $0000	                 ; Otherwise you might have visual bugs after the test. It also might break one of the sprite zero hit tests? I hope not though.
+	.byte $00, $FF               ; The correct value being $00.
+	                             ; And now let's evaluate the test results.
+	LDA $500                     ; We stored the results at $500.
+	BNE FAIL_CHRROMIsNotWritable ; If the value read wasn't $00, fail the test.
+	;;END OF TEST;;
+	LDA #1                       ; A value of 1 means the test passed.
+	RTS                          ; And the test is complete. (Rendering will automatically be re-enabled.)
+;;;;;;;
+
+FAIL_CHRROMIsNotWritable:
+FAIL_RenderingFlagBehavior:
+	JMP TEST_Fail
+;;;;;;;;;;;;;;;;;
+
+TEST_RenderingFlagBehavior:
+	;;; Test 1 [Rendering Flag Behavior]: If you are rendering exclusively sprites, the background shift registers are still advancing, and being populated. ;;;
+	; Test 1, disable rendering during h-blank where it's safe, after the shift registers would be set up with [00000000 00000000]
+	; then, somewhere in the middle of the scanline, enable rendering within 16 dots of a sprite zero hit.
+	; This sprite zero hit will miss, since the shift registers never had a chance to be populated. That's our control group to weed-out false positives.
+	; We repeat this experiment, but we only disable rendering the background, keeping sprites active. This time, the sprite zero hit will occur!
+
+	JSR DisableRendering
+	JSR PrintCHR
+	.word $200F
+	.byte $FE, $FE, $FF ; two solid white boxes at X= $78
+	JSR SetUpSpriteZero 
+	.byte $00, $C0, $00, $80 ; Single dot on scanline 1, X = 80
+	JSR ResetScroll
+	
+	LDA #$00 ; Disable rendering entirely
+	STA <$50
+	JSR TEST_RenderingFlagBehavior1
+	BNE FAIL_RenderingFlagBehavior ; The sprite zero hit should not have occured.
+	INC <ErrorCode
+
+	;;; Test 2 [Rendering Flag Behavior]: And now we confirm the theory by only disabling the background in the exact same situation, causing the sprite zero hit to occur. ;;;
+
+	LDA #$10 ; only render sprites
+	STA <$50
+	JSR TEST_RenderingFlagBehavior1
+	BEQ FAIL_RenderingFlagBehavior ; The sprite zero hit should have occured.
+	INC <ErrorCode
+	
+	;;; Test 3 [Rendering Flag Behavior]: Likewise, sprite evaluation will occur even if only the background is enabled. ;;;
+	
+	LDA #$08 ; only render background
+	STA <$50
+	JSR TEST_RenderingFlagBehavior3
+	BEQ FAIL_RenderingFlagBehavior ; The sprite zero hit should have occured.
+
+	;;END OF TEST;;
+	LDA #1
+	RTS
+;;;;;;;
+
+TEST_RenderingFlagBehavior1:
+	JSR Sync_ToLine0Dot1
+	JSR Clockslide_100
+TEST_RenderingFlagBehaviorMerged:
+	LDA $0050         ; This address holds the value we want to write to $2001 for this test. (Intentionally using absolute addressing to waste 1 CPU cycle.)
+	STA $3E01         ; This write occurs at ppu dot 322 of scanline 0.
+	JSR Clockslide_41 ; The sprite zero hit will occur in about 48 CPU cycles, so we need to enable rendering *just* before that.
+	LDA #$1E          ; Enable the background and sprites
+	STA $3E01         ; Using a mirror of $2001.
+	NOP               ; Stall for a few CPU cycles for good measure
+	LDA $2002         ; And read from $2002
+	AND #$40          ; bitwise AND to jsut keep the sprite zero hit info.
+	RTS
+;;;;;;;
+
+TEST_RenderingFlagBehavior3:
+	JSR Sync_ToPreRenderDot324 ; It's actually syncing to (scanline 0, dot 1) - 18 ppu cycles.
+	LDA #$08 ; only render the background.
+	STA $2001; This should get written on (scanline 0, dot 1) - 3 ppu cycles.
+	JSR Clockslide_50
+	JSR Clockslide_47
+	JMP TEST_RenderingFlagBehaviorMerged
 ;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

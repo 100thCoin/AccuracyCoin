@@ -3,7 +3,7 @@ AccuracyCoin is a large collection of NES accuracy tests on a single NROM cartri
 
 This ROM was designed for an NTSC console with an RP2A03G CPU and RP2C02G PPU. Some tests might fail on hardware with a different revision.
 
-This ROM currently has 129 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
+This ROM currently has 131 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
 Here's an example of the menu in this ROM shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been run yet. (The cursor is currently next to the "RAM Mirroring" test.)
 
@@ -514,6 +514,9 @@ For more information, I recommend reading the fully commented assembly code for 
   2: The OAM DMA should use the value of the second write to $4014 as the page number. Requires precise DMC DMA timing, results are tested via a sprite zero hit.  
   3: Only a single OAM DMA should occur despite two writes to $4014.
   
+### CHR ROM is not Writable
+  1: Writes to the PPU Address space from the range $0000 through $1FFF should not overwrite teh CHR data if the cartridge has CHR ROM instead of CHR RAM.
+  
 ### Attributes as Tiles
   1: Moving the PPU t register to an attribute table should render the attribute bytes as tile data in scanlines 0 to 15. Results are tested via a sprite zero hit.  
   2: With the t register pointing to an attribute table, scanlines 16 to 239 should be from the same nametable as the attributes.
@@ -530,6 +533,11 @@ For more information, I recommend reading the fully commented assembly code for 
   2: Sprite Zero hits shouldn't occur if sprite zero isn't overlapping a solid pixel.  
   3: The background shift registers should not be clocked during H-Blank or F-Blank. After re-enabling rendering, a sprite zero hit should be able to occur entirely on stale background shift register data.  
   4: The sprite shifters should treat all sprites X positions as 0 if rendering was disabled on dot 339.
+
+### Rendering Flag Behavior
+  1: Background shift registers should not be initialized or clocked when rendering is entirely disabled.  
+  2: Background shift registers should be initialized and clocked when only rendering sprites.  
+  3: Sprite Evaluation should still occur when only rendering the background.  
 
 ### Sprites On Scanline 0
   1: Sprites at Y=0 should actually be drawn at Y=1.  
