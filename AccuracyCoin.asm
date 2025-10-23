@@ -15828,7 +15828,8 @@ RunTest_SkipHighlightResult:
 	JSR SetUpNMIRoutineForMainMenu; Recreate the NMI routine JMP, since some tests need their own NMI routine.
 	JSR EnableNMI			      ; With the test over, re-enable the NMI
 RunTest_AllTestSkipDrawing2:	  ; If we're running all tests, we don't need the NMI to run.
-	JSR EnableRendering_BG	      ; and enable rendering too. This should still occur during Vblank.
+	JSR DisableRendering_S        ; disable rendering sprites.
+	JSR EnableRendering_BG	      ; and enable rendering teh background. This should still occur during Vblank.
 	LDA #0
 	STA <dontSetPointer
 	LDY <Copy_Y2			      ; Restore the Y register
