@@ -525,10 +525,10 @@ For more information, I recommend reading the fully commented assembly code for 
   4: Writes to $2005 and $2006 should use the same "write latch". Tested by performing a single write to $2005 and then writing to $2006.  
   5: Writing to $2000 between writes to $2006 should still properly set the "nametable select" bits of the t register.
 
-### Stale Shift Registers
+### Stale BG Shift Registers
   1: Sprite Zero Hits should be working.  
   2: Sprite Zero hits shouldn't occur if sprite zero isn't overlapping a solid pixel.  
-  3: The shift registers should not be clocked during H-Blank or F-Blank. After re-enabling rendering, a sprite zero hit should be able to occur entirely on stale shift register data.  
+  3: The background shift registers should not be clocked during H-Blank or F-Blank. After re-enabling rendering, a sprite zero hit should be able to occur entirely on stale background shift register data.  
   4: The sprite shifters should treat all sprites X positions as 0 if rendering was disabled on dot 339.
 
 ### Sprites On Scanline 0

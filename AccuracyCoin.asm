@@ -299,7 +299,7 @@ result_PaletteRAMQuirks = $47E
 result_INC4014 = $480
 result_AttributesAsTiles = $481
 result_tRegisterQuirks = $482
-result_StaleShiftRegisters = $483
+result_StaleBGShiftRegisters = $483
 result_Scanline0Sprites = $484
 
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
@@ -746,7 +746,7 @@ Suite_PPUMisc:
 	table "Attributes As Tiles", $FF, result_AttributesAsTiles, TEST_AttributesAsTiles
 	table "t Register Quirks", $FF, result_tRegisterQuirks, TEST_tRegisterQuirks
 	;table "RMW $2007 Extra Write", $FF, result_RMW2007, TEST_RMW2007 ; Commented out for now. More research required.
-	table "Stale Shift Registers", $FF, result_StaleShiftRegisters, TEST_StaleShiftRegisters
+	table "Stale BG Shift Registers", $FF, result_StaleBGShiftRegisters, TEST_StaleBGShiftRegisters
 	table "Sprites On Scanline 0", $FF, result_Scanline0Sprites, TEST_Scanline0Sprites
 
 	;table "Palette Corruption", $FF, result_Unimplemented, DebugTest (I did not write a test for this, because it relies on a specific cpu/ppu clock alignment.)
@@ -13804,10 +13804,10 @@ DoSpriteZeroHitTest:
 	RTS
 ;;;;;;;
 
-TEST_StaleShiftRegisters:
+TEST_StaleBGShiftRegisters:
 	JSR DisableRendering
 
-	;;; Test 1 [Stale Shift Registers]: Set things up, and verify Sprite Zero Hits are working ;;;
+	;;; Test 1 [Stale BG Shift Registers]: Set things up, and verify Sprite Zero Hits are working ;;;
 
 	JSR ClearNametable2_With24 ; Nametable 2 is polluted from other tests. Since it gets drawn during this test, let's clear it first.
 	JSR PrintCHR
@@ -13825,7 +13825,7 @@ TEST_StaleShiftRegisters:
 	JSR DoSpriteZeroHitTest
 	BEQ FAIL_StaleShiftRegisters ; Fail the test if the sprite zero hit did not occur.
 	INC <ErrorCode
-	;;; Test 2 [Stale Shift Registers]: Weed-out false positives. ;;;
+	;;; Test 2 [Stale BG Shift Registers]: Weed-out false positives. ;;;
 	
 	JSR SetUpSpriteZero
 	.byte $06, $C6, $00, $00 ; This is a specific character that will miss this particular sprite zero hit.
@@ -13835,7 +13835,7 @@ TEST_StaleShiftRegisters:
 	BNE FAIL_StaleShiftRegisters
 	INC <ErrorCode
 
-	;;; Test 3 [Stale Shift Registers]: The shift registers are not clocked when rendering is disabled, so when re-enabled, the old data is drawn ;;;
+	;;; Test 3 [Stale BG Shift Registers]: The background shift registers are not clocked when rendering is disabled, so when re-enabled, the old data is drawn ;;;
 
 	; This test does the following:
 	; Place a solid white tile at $2C00
@@ -13855,7 +13855,7 @@ TEST_StaleShiftRegisters:
 	BEQ FAIL_StaleShiftRegisters
 	INC <ErrorCode
 
-	;;; Test 4 [Stale Shift Registers]: This is just testing a quirk of the sprite shifters, and how if rendering was disabled on dot 339, all sprites are treated as X = 0 ;;;
+	;;; Test 4 [Stale BG Shift Registers]: This is just testing a quirk of the sprite shifters, and how if rendering was disabled on dot 339, all sprites are treated as X = 0 ;;;
 	JSR SetUpSpriteZero
 	.byte $06, $C0, $00, $80 ; X = 80. Sprite zero will be still drawn immediately after rendering is enabled. (Rendering was disabled on dot 339)
 	LDA #2
