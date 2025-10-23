@@ -14148,8 +14148,9 @@ TEST_CHRROMIsNotWritable:
 	RTS                          ; And the test is complete. (Rendering will automatically be re-enabled.)
 ;;;;;;;
 
-FAIL_CHRROMIsNotWritable:
 FAIL_RenderingFlagBehavior:
+	JSR TEST_RenderingFlagBehaviorCleanUp
+FAIL_CHRROMIsNotWritable:
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
 
@@ -14189,6 +14190,8 @@ TEST_RenderingFlagBehavior:
 	JSR TEST_RenderingFlagBehavior3
 	BEQ FAIL_RenderingFlagBehavior ; The sprite zero hit should have occured.
 
+	JSR TEST_RenderingFlagBehaviorCleanUp
+
 	;;END OF TEST;;
 	LDA #1
 	RTS
@@ -14217,6 +14220,15 @@ TEST_RenderingFlagBehavior3:
 	JSR Clockslide_47
 	JMP TEST_RenderingFlagBehaviorMerged
 ;;;;;;;
+
+TEST_RenderingFlagBehaviorCleanUp:
+	JSR DisableRendering
+	JSR PrintCHR
+	.word $200F
+	.byte $24, $24, $FF ; two solid white boxes at X= $78
+	RTS
+;;;;;;;
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                ENGINE                   ;;
