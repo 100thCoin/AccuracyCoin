@@ -6370,7 +6370,6 @@ TEST_MisalignedOAM_P4_1F_Loop:
 	; OAM $1D: [$00, $E3, $00, $80] This X value ($80, at OAM address $20) is NOT in range. PPUOAMAddress+=1; PPUOAMAddress&=$FC; (PPUOAMAddress is now $20)
 	; OAM $20: [$80]($E3, $FF, $FF, $FF) This Y values is also not in range and secondary OAM is full, so add 5 (PPUOAMAddress is now $25)
 	; OAM $25: [$00, $E3, $00, $80]
-	; OAM $2C: [$00, $E3, $00, $80]
 	; This puts 9 objects in range of this scanline, so the sprite overflow flag is set!
 	; (By the way, the sprites are only processed like this for a single scanline. The rest of the scanlines, PPUOAMAddress will be $00 going into sprite evaluation.)
 	JSR Clockslide_500
@@ -13813,7 +13812,7 @@ TEST_StaleShiftRegisters:
 	JSR ClearNametable2_With24 ; Nametable 2 is polluted from other tests. Since it gets drawn during this test, let's clear it first.
 	JSR PrintCHR
 	.word $2C00
-	.byte $FE, $FF
+	.byte $C7, $FF
 	JSR ClearPage2
 	JSR SetUpSpriteZero
 	.byte $05, $C0, $00, $00 
@@ -13826,7 +13825,17 @@ TEST_StaleShiftRegisters:
 	JSR DoSpriteZeroHitTest
 	BEQ FAIL_StaleShiftRegisters ; Fail the test if the sprite zero hit did not occur.
 	INC <ErrorCode
-	;;; Test 2 [Stale Shift Registers]: The shift registers are not clocked when rendering is disabled, so when re-enabled, the old data is drawn ;;;
+	;;; Test 2 [Stale Shift Registers]: Weed-out false positives. ;;;
+	
+	JSR SetUpSpriteZero
+	.byte $06, $C6, $00, $00 ; This is a specific character that will miss this particular sprite zero hit.
+	LDA #2
+	STA $4014
+	JSR Test_StaleShiftRegisters_Run
+	BNE FAIL_StaleShiftRegisters
+	INC <ErrorCode
+
+	;;; Test 3 [Stale Shift Registers]: The shift registers are not clocked when rendering is disabled, so when re-enabled, the old data is drawn ;;;
 
 	; This test does the following:
 	; Place a solid white tile at $2C00
@@ -13839,7 +13848,30 @@ TEST_StaleShiftRegisters:
 	; Since the background shift registers are also still set up with "11111111 00000000" the sprite WILL overlap the background, triggering a sprite zero hit.
 	
 	JSR SetUpSpriteZero
-	.byte $06, $C0, $00, $00 
+	.byte $06, $C0, $00, $00 ; X = 0. Sprite zero will be drawn immediately after rendering is enabled.
+	LDA #2
+	STA $4014
+	JSR Test_StaleShiftRegisters_Run
+	BEQ FAIL_StaleShiftRegisters
+	INC <ErrorCode
+
+	;;; Test 4 [Stale Shift Registers]: This is just testing a quirk of the sprite shifters, and how if rendering was disabled on dot 339, all sprites are treated as X = 0 ;;;
+	JSR SetUpSpriteZero
+	.byte $06, $C0, $00, $80 ; X = 80. Sprite zero will be still drawn immediately after rendering is enabled. (Rendering was disabled on dot 339)
+	LDA #2
+	STA $4014
+	JSR Test_StaleShiftRegisters_Run
+	BEQ FAIL_StaleShiftRegisters
+
+	LDA #1
+	RTS
+;;;;;;;
+
+FAIL_StaleShiftRegisters2:
+	JMP TEST_Fail
+;;;;;;;;;;;;;;;;;
+
+Test_StaleShiftRegisters_Run:
 	JSR Sync_ToLine0Dot1 ; This also runs the OAM DMA
 	; The PPU is now synced with the CPU.
 	; The following instruction will begin on dot 1 of scanline 0.
@@ -13859,15 +13891,8 @@ TEST_StaleShiftRegisters:
 	JSR DisableRendering_S
 	LDA $2002
 	AND #$40
-	BEQ FAIL_StaleShiftRegisters
-	
-	LDA #1
 	RTS
 ;;;;;;;
-
-FAIL_StaleShiftRegisters2:
-	JMP TEST_Fail
-;;;;;;;;;;;;;;;;;
 
 TEST_Scanline0Sprites_TimeItRight:
 	LDA #0

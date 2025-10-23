@@ -527,7 +527,9 @@ For more information, I recommend reading the fully commented assembly code for 
 
 ### Stale Shift Registers
   1: Sprite Zero Hits should be working.  
-  2: The Shift Registers should not be clocked during H-Blank or F-Blank. After re-enabling rendering, a sprite zero hit should be able to occur entirely on stale shift register data.
+  2: Sprite Zero hits shouldn't occur if sprite zero isn't overlapping a solid pixel.  
+  3: The shift registers should not be clocked during H-Blank or F-Blank. After re-enabling rendering, a sprite zero hit should be able to occur entirely on stale shift register data.  
+  4: The sprite shifters should treat all sprites X positions as 0 if rendering was disabled on dot 339.
 
 ### Sprites On Scanline 0
   1: Sprites at Y=0 should actually be drawn at Y=1.  
