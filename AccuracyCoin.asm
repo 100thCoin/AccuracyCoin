@@ -712,10 +712,12 @@ Suite_PowerOnState:
 	;; PPU Behavior ;;
 Suite_PPUBehavior:
 	.byte "PPU Behavior", $FF
+	table "CHR ROM is not writable", $FF, result_CHRROMIsNotWritable, TEST_CHRROMIsNotWritable
 	table "PPU Register Mirroring",  $FF, result_PPURegMirror, TEST_PPURegMirroring
 	table "PPU Register Open Bus",	 $FF, result_PPUOpenBus, TEST_PPU_Open_Bus
 	table "PPU Read Buffer", $FF, result_PPUReadBuffer, TEST_PPUReadBuffer
 	table "Palette RAM Quirks", $FF, result_PaletteRAMQuirks, TEST_PaletteRAMQuirks
+	table "Rendering Flag Behavior", $FF, result_RenderingFlagBehavior, TEST_RenderingFlagBehavior
 	.byte $FF
 	
 	;; PPU VBL Timing ;;
@@ -745,10 +747,8 @@ Suite_SpriteZeroHits:
 	;; PPU Misc ;;
 Suite_PPUMisc:
 	.byte "PPU Misc.", $FF
-	table "CHR ROM is not writable", $FF, result_CHRROMIsNotWritable, TEST_CHRROMIsNotWritable
 	table "Attributes As Tiles", $FF, result_AttributesAsTiles, TEST_AttributesAsTiles
 	table "t Register Quirks", $FF, result_tRegisterQuirks, TEST_tRegisterQuirks
-	table "Rendering Flag Behavior", $FF, result_RenderingFlagBehavior, TEST_RenderingFlagBehavior
 	table "Stale BG Shift Registers", $FF, result_StaleBGShiftRegisters, TEST_StaleBGShiftRegisters
 	table "Sprites On Scanline 0", $FF, result_Scanline0Sprites, TEST_Scanline0Sprites
 

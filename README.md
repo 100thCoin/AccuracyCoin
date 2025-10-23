@@ -403,6 +403,9 @@ For more information, I recommend reading the fully commented assembly code for 
   4: The Stack Pointer should be $FD at power on.  
   5: The Interrupt Flag should be set at power on.
 
+### CHR ROM is not Writable
+  1: Writes to the PPU Address space from the range $0000 through $1FFF should not overwrite teh CHR data if the cartridge has CHR ROM instead of CHR RAM.
+
 ### PPU Register Mirroring
   1: PPU registers should be mirrored through $3FFF.  
 
@@ -427,6 +430,11 @@ For more information, I recommend reading the fully commented assembly code for 
   3: The backdrop colors for palettes 1, 2, and 3 should not be mirrors of the backdrop color of palette 0.  
   4: The backdrop colors for sprites should be mirrors of the backdrop colors for backgrounds.  
   5: The values read from Palette RAM should only be 6-bit, with the upper 2 bits being PPU open bus.  
+
+### Rendering Flag Behavior
+  1: Background shift registers should not be initialized or clocked when rendering is entirely disabled.  
+  2: Background shift registers should be initialized and clocked when only rendering sprites.  
+  3: Sprite Evaluation should still occur when only rendering the background.  
 
 ### VBlank Beginning
   1: The PPU Register $2002 VBlank flag was not set at the correct PPU cycle.  
@@ -514,9 +522,6 @@ For more information, I recommend reading the fully commented assembly code for 
   2: The OAM DMA should use the value of the second write to $4014 as the page number. Requires precise DMC DMA timing, results are tested via a sprite zero hit.  
   3: Only a single OAM DMA should occur despite two writes to $4014.
   
-### CHR ROM is not Writable
-  1: Writes to the PPU Address space from the range $0000 through $1FFF should not overwrite teh CHR data if the cartridge has CHR ROM instead of CHR RAM.
-  
 ### Attributes as Tiles
   1: Moving the PPU t register to an attribute table should render the attribute bytes as tile data in scanlines 0 to 15. Results are tested via a sprite zero hit.  
   2: With the t register pointing to an attribute table, scanlines 16 to 239 should be from the same nametable as the attributes.
@@ -533,11 +538,6 @@ For more information, I recommend reading the fully commented assembly code for 
   2: Sprite Zero hits shouldn't occur if sprite zero isn't overlapping a solid pixel.  
   3: The background shift registers should not be clocked during H-Blank or F-Blank. After re-enabling rendering, a sprite zero hit should be able to occur entirely on stale background shift register data.  
   4: The sprite shifters should treat all sprites X positions as 0 if rendering was disabled on dot 339.
-
-### Rendering Flag Behavior
-  1: Background shift registers should not be initialized or clocked when rendering is entirely disabled.  
-  2: Background shift registers should be initialized and clocked when only rendering sprites.  
-  3: Sprite Evaluation should still occur when only rendering the background.  
 
 ### Sprites On Scanline 0
   1: Sprites at Y=0 should actually be drawn at Y=1.  
