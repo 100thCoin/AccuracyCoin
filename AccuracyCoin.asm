@@ -14162,6 +14162,7 @@ TEST_RenderingFlagBehavior:
 	; We repeat this experiment, but we only disable rendering the background, keeping sprites active. This time, the sprite zero hit will occur!
 
 	JSR DisableRendering
+	JSR ClearPage2
 	JSR PrintCHR
 	.word $200F
 	.byte $FE, $FE, $FF ; two solid white boxes at X= $78
@@ -14184,7 +14185,8 @@ TEST_RenderingFlagBehavior:
 	INC <ErrorCode
 	
 	;;; Test 3 [Rendering Flag Behavior]: Likewise, sprite evaluation will occur even if only the background is enabled. ;;;
-	
+	; Sprites will be disabled until a few ppu cycles before the sprite zero hit.
+	; The sprite zero hit cannot happen unless both sprites and the background are being rendered.
 	LDA #$08 ; only render background
 	STA <$50
 	JSR TEST_RenderingFlagBehavior3
