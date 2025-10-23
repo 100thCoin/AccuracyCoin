@@ -13894,11 +13894,40 @@ Test_StaleShiftRegisters_Run:
 	RTS
 ;;;;;;;
 
+RunScanline0SpriteTest:
+	LDA #$80
+	STA $2000 ; enable NMI
+RunScanline0Sprite_WaitForNMI:
+	JMP RunScanline0Sprite_WaitForNMI ; wait for NMI to sync CPU and PPU
+	
+RunScanline0Sprite_NMI:
+	PLA ; remove the NMI's return status and address.
+	PLA ; ^
+	PLA ; ^
+	LDA #0
+	STA $2000 ; Disable NMI		
+	STA $2003 ; Set OAM Address to $00 just to be safe.
+	LDA #$1E  
+	STA $2001 ; Enable rendering
+	LDA #2
+	STA $4014 ; OAM DMA with page 2.
+	JSR Clockslide_1000 ; Wait for 1918 cpu cycles.
+	JSR Clockslide_900
+	JSR Clockslide_18
+	
+	JSR TEST_Scanline0Sprites_TimeItRight ; Time it right to toggle rendering a bunch such that sprite zero appears on scanline 0.
+	STA $500, X	
+	; And do it again on the following frame so we can collect the data for consecutive frames.
+	JSR TEST_Scanline0Sprites_TimeItRight ; Time it right to toggle rendering a bunch such that sprite zero appears on scanline 0.
+	STA $501, X
+	RTS
+;;;;;;;
+
 TEST_Scanline0Sprites_TimeItRight:
 	LDA #0
 	STA $3E01 ; disable rendering.
 
-	; OAM DMA repeatedly.
+	; OAM DMA repeatedly to keep OAM from decaying.
 	
 	LDA #$2
 	LDX #56
@@ -13906,55 +13935,27 @@ TEST_Scanline0Sprites_TimeItRight:
 TEST_Scanline0Sprites_DMALoop:
 	STA $4014
 	DEX
-	BNE TEST_Scanline0Sprites_DMALoop
+	BNE TEST_Scanline0Sprites_DMALoop ; 56 instances of OAM DMA.
 	
-	JSR Clockslide_300
+	JSR Clockslide_300 ; And stall for 354 more cycles
 	JSR Clockslide_50
 	NOP
 	NOP
 
 	LDA #$1E
-	STA $2001 ; Briefly after dot 66 on the pre-render line.
+	STA $2001 ; Enable rendering briefly after dot 66 on the pre-render line.
 	
 	; wait until HBlank after scanline 0
 	
-	JSR Clockslide_100
+	JSR Clockslide_100 ; And stall for 158 more cycles
 	JSR Clockslide_50
 	NOP
 	NOP
 	NOP
 	NOP
-	LDX <$50
-	LDA $2002
-	AND #$40
-	RTS
-;;;;;;;
-
-RunScanline0SpriteTest:
-	LDA #$80
-	STA $2000
-RunScanline0Sprite_WaitForNMI:
-	JMP RunScanline0Sprite_WaitForNMI
-	
-RunScanline0Sprite_NMI:
-	PLA
-	PLA
-	PLA
-	LDA #0
-	STA $2000		
-	STA $2003
-	LDA #$1E
-	STA $2001
-	LDA #2
-	STA $4014
-	JSR Clockslide_1000
-	JSR Clockslide_900
-	JSR Clockslide_18
-	
-	JSR TEST_Scanline0Sprites_TimeItRight
-	STA $500, X	
-	JSR TEST_Scanline0Sprites_TimeItRight
-	STA $501, X
+	LDX <$50 ; This is for storing the test results at address $50x after the RTS
+	LDA $2002 ; Read PPUSTATUS checking for sprite zero hit.
+	AND #$40 ; bitwise AND to just keep bit 6.
 	RTS
 ;;;;;;;
 
@@ -13968,28 +13969,28 @@ TEST_Scanline0Sprites:
 	JSR DisableRendering
 	LDA #0
 	TAX
-TEST_Scanline0Sprites_ClearPg2:
+TEST_Scanline0Sprites_ClearPg2: ; clear page 2 (used for OAM DMA) with all zeroes!!!
 	STA $200, X
 	INX
 	BNE TEST_Scanline0Sprites_ClearPg2
 
-	JSR SetUpSpriteZero
+	JSR SetUpSpriteZero ; And set up sprite zero in this way.
 	.byte $00, $C6, $00, $80
 
 	JSR PrintCHR
 	.word $2000
-	.byte $24, $FF
+	.byte $24, $FF ; Draw tile $24 at $2000 (empty square)
 	JSR PrintCHR
 	.word $2010
-	.byte $C0, $FF
+	.byte $C0, $FF ; Draw tile C0 at $2010 (a single pixel)
 	
 	JSR ResetScroll
 	
-	JSR WaitForVBlank
-	JSR WaitForVBlank
-	LDA $2002
-	AND #$40
-	BNE FAIL_Scanline0Sprites1
+	JSR WaitForVBlank ; Wait for vblank
+	JSR WaitForVBlank ; Wait for a second vblank, so we can check for sprite zero hits in the previous frame.
+	LDA $2002 ; read PPUSTATUS
+	AND #$40 ; check for sprite zero hit.
+	BNE FAIL_Scanline0Sprites1 ; If the sprite zero hit *DID* occur, the test has failed, since a Y coordinate of 0 should draw the sprite on scanline 1.
 	INC <ErrorCode
 	
 	;;; Test 2 [Sprites On Scanline 0]: Under specific circumstances, a sprite can be drawn on scanline 0 ;;;
@@ -13998,15 +13999,17 @@ TEST_Scanline0Sprites_ClearPg2:
 	
 	; In summary, OAM data can be drawn on scanline 0, since the pre-render line is treated as scanline 5 for the in-range checks occuring during dots 256 to 319
 	; (evaluated as line (261 & 255) = scanline 5)
+	; This results in the existing data in secondary OAM being put into the sprite shifters on the pre-render line. (only if the sprite is "in-range" of scanline 5.)
+	; The data in secondary OAM would either exist due to the previous frame's scanline 239, or whatever was in secondary OAM before rendering was disabled. (F-Blank)
 
-	LDA #$4C
+	LDA #$4C ; Set up NMI routine, sicne I'm using the NMI to sync the CPU and PPU.
 	STA $700
 	LDA #Low(RunScanline0Sprite_NMI)
 	STA $701
 	LDA #HIGH(RunScanline0Sprite_NMI)
 	STA $702
 
-	JSR RunScanline0SpriteTest
+	JSR RunScanline0SpriteTest ; The test occurs in this subroutine. I use a subroutine so I can change very few things and run teh same code again.
 	
 	LDA #2
 	STA <$50 ; this is used to keep these test results in a different address than the previous two results.
@@ -14014,10 +14017,10 @@ TEST_Scanline0Sprites_ClearPg2:
 
 	JSR PrintCHR
 	.word $2010
-	.byte $24, $FF
+	.byte $24, $FF ; Draw tile $24 at $2010 (empty square)
 	JSR PrintCHR
 	.word $2000
-	.byte $C0, $FF
+	.byte $C0, $FF ; Draw tile C0 at $2000 (a single pixel)
 
 	JSR ResetScroll
 	JSR Clockslide_29780
@@ -14027,7 +14030,7 @@ TEST_Scanline0Sprites_ClearPg2:
 	; The 7 remaining pixels are drawn as normal, but shifted left by 1 pixel.
 	; In other words, we're going to test for sprite zero hits at X=0 now.
 
-	JSR RunScanline0SpriteTest
+	JSR RunScanline0SpriteTest ; The test occurs in this subroutine again. (The nametable was modified.)
 
 	JSR WaitForVBlank
 
@@ -14038,8 +14041,8 @@ TEST_Scanline0Sprites_ClearPg2:
 	JSR DisableRendering_S
 
 	; And now we evaluate the results!!!
-	; $500 and $501 are the first test results, where X=$80
-	; $502 and $503 are the second test results, where X=$00
+	; $500 and $501 are the first test results, where we're looking for a sprite zero hit where X=$80
+	; $502 and $503 are the second test results, where we're looking for a sprite zero hit where X=$00
 	; On an RP2C02, there should be one passing test from each set, and one failing test from each set. (50% chance split for which one passes.)
 	; On an RP2C03, there should be two passing from the first set, and two failing from the second set.
 
