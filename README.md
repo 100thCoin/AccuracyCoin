@@ -574,7 +574,8 @@ For more information, I recommend reading the fully commented assembly code for 
   P: JMP (indirect) should take 5 cycles.  
 
 ### Implied Dummy Reads
-  1: Your emulator did not pass the "SLO Absolute, X" test.  
+  0: Your emulator did not pass the "SLO Absolute, X" test.  
+  1: There were unexpected extra bits when reading from a controller port that should not have been set.  
   2: Your emulator did not implement the frame counter interrupt flag properly.  
   3: Your emulator did not update the data bus when the DMC DMA occured, or your DMA timing is off.  
   4: Your emulator did not correctly emulate open bus behavior. (Or if your emulator crashes here, the cycles of JSR are in the wrong order.)  

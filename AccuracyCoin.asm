@@ -10517,14 +10517,23 @@ FAIL_ImpliedDummyRead:
 TEST_ImpliedDummyRead:
 	JSR TEST_ImpliedDummyRead_BackupRAM
 	; Well, before the madness begins, let's make sure some pre-requisites are met.
-	;;; Test 1 [Implied Dummy Reads]: SLO Absolute, X is properly emulated. ;;;
+	;;; Test 0 [Implied Dummy Reads]: SLO Absolute, X is properly emulated. ;;;
 	; This is used to verify the timing that the Frame Counter Interrupt flag gets cleared.
 	JSR TEST_SLO_1F
-	LDX #1
+	LDX #0
 	STX <ErrorCode
 	CMP #1
 	BNE FAIL_ImpliedDummyRead1
 	INC <ErrorCode
+
+	;;; Test 1 [Implied Dummy Reads]: Controller ports only have bit 0 and open bus. ;;;
+	; Confirm there's nothing odd going on with the controller ports.
+	LDA $4016
+	AND #$BE
+	BNE FAIL_ImpliedDummyRead1
+	LDA $4017
+	AND #$BE
+	BNE FAIL_ImpliedDummyRead1
 
 	;;; Test 2 [Implied Dummy Reads]: Prerequisite check. Does the frame counter interrupt flag get set if we enable it? ;;;
 	LDA #0
