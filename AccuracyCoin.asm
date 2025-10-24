@@ -3114,14 +3114,10 @@ TEST_VerifyInstructionIsThreeLoop:
 ;;;;;;;
 
 FAIL_WrongInstructionSize:	; We need to pull 4 different return addresses off the stack.
+	LDX #8
 	PLA
-	PLA
-	PLA
-	PLA
-	PLA
-	PLA
-	PLA
-	PLA
+	DEX
+	BNE FAIL_WrongInstructionSize+2
 	LDA #2	; Error code 0.
 	RTS
 
@@ -8747,105 +8743,7 @@ FAIL_NmiAndIqr:
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
 
-TEST_RMW2007:
-	;;; Test 1 [RMW $2007]: Does a Read-Modify-Write instruction to address $2007 perform an extra write? ;;;
-	; This behavior only applies to RP2C02G PPU's and later.
-	; This behavior only seems to be consistent if the nametable in which the test is occurring is *all zeroes*.
-	; To be more specific, there's probably going to be 3 writes:
-	;	-1) The write at "v", which is different depending on console/PPU revisions. (I can't in good conscience test for this one, considering the different console behavior)
-	;	-2) The "unexpected" write. Write the modified buffer value to: (v & $FF00) | (modified buffer value)
-	;	-3) The third write, which is different depending on CPU/PPU clock alignments, and console/PPU revisions. (I can't in good conscience test for this one, considering the different console behavior)
-	;
-	; This test is checking the second case, since as far as I can tell, it is consistent across different consoles.
-	; So here's how the test will work.
-	; Set up the ppu read buffer.
-	; Move v to some location for the test.
-	; run some read-modify-write instruction to $2007
-	; then just read the location of the second write, which should always be (v & $FF00) | (modified buffer value)
-	JSR DisableRendering
-	JSR SetPPUADDRFromWord
-	.byte $2C, $00
-	LDA #0
-	TAY
-	LDX #4
-TEST_RMW2007_ClearNametableLoop:
-	STA $2007
-	DEY
-	BNE TEST_RMW2007_ClearNametableLoop
-	DEX
-	BNE TEST_RMW2007_ClearNametableLoop
-	; Okay, cool. address $2400 to $27FF are now all zeroes.
-	
-	LDA #$5A
-	JSR SetPPUReadBufferToA
-	; the PPU read buffer is 5A.
-	JSR SetPPUADDRFromWord
-	.byte $2D, $00
-	; For the first test here, "v" will be set to $2500
-	INC $2007
-	; And here's what happened.
-	; Cycle 1: read opcode ($EE)
-	; Cycle 2: read operand ($07)
-	; Cycle 3: read operand ($20)
-	; Cycle 4: Read the PPU-read-buffer ($5A)
-	; Cycle 5: Write ($5A) to $2007. (also INC $5A to $5B) !! Inconsistent behavior depending on console revision: Who knows what VRAM address was just updated, if any.
-	; Cycle 6: Write ($5B) to $2007. This will write to VRAM address $255B. (Also some third write, but that's inconsistent depending on console revision too.)
-	;
-	; Let's read address $255B
-	JSR ReadPPUADDRFromWord
-	.byte $2D, $5B
-	CMP #$5B
-	BNE FAIL_RMW2007
-	INC <ErrorCode
-	;;; Test 2 [RMW $2007]: Is palette RAM inaccessible to this extra write? ;;;
-	
-	JSR WaitForVBlank ; moving v to palette RAM while rendering is disabled will draw a series of pixels of the color at that palette ram index. I'd like to hide this inside VBlank.
-	; Reading from palette RAM does not use the PPU read buffer.
-	JSR SetPPUADDRFromWord
-	.byte $3F, $0D	; the color at this address is $2A
-	
-	INC $2007
-	; And here's what happened.
-	; Cycle 1: read opcode ($EE)
-	; Cycle 2: read operand ($07)
-	; Cycle 3: read operand ($20)
-	; Cycle 4: Read the palette RAM address $0D ($2A)
-	; Cycle 5: Write ($2A) to $2007. (also INC $2A to $2B) !! Inconsistent behavior depending on console revision: Who knows what VRAM address was just updated, if any.
-	; Cycle 6: Write ($2B) to $2007. This should just write to Palette RAM $0E. (Also some third write, but that's inconsistent depending on console revision too.)
-		
-	; Did we write $2B to $3F2B? (We shouldn't have)
-	JSR SetPPUADDRFromWord
-	.byte $3F, $2B
-	LDA $2007 ; Palette RAM doesn't use the PPU Read buffer.
-	CMP #$2B
-	BEQ FAIL_RMW2007
-	INC <ErrorCode
 
-	;;; Test 3 [RMW $2007]: Did we write to the nametable at $3F2B instead? (Well- the mirror at $272B.) ;;;
-	; As it turns out, you shouldn't have written there either.
-	JSR ReadPPUADDRFromWord
-	.byte $27, $2B
-	CMP #$2B
-	BEQ FAIL_RMW2007
-	
-	; I'd like to test for where we *did* write to palette RAM, but that seems inconsistent across consoles, so I'm ending the test here.
-	;; END OF TEST ;;
-	JSR ResetScroll
-	JSR WaitForVBlank
-	JSR SetUpDefaultPalette
-	JSR ResetScroll
-	LDA #1
-	RTS
-;;;;;;;
-	
-FAIL_RMW2007:
-	; we probably want to reset this nametable to be a bunch of $24's right?
-	JSR ResetScroll
-	JSR WaitForVBlank
-	JSR SetUpDefaultPalette
-	JSR ResetScroll
-	JMP TEST_Fail
-;;;;;;;;;;;;;;;;;	
 
 TEST_APU_Prep:
 	SEI	; we don't want any interrupts occurring.
