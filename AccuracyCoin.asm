@@ -10534,6 +10534,7 @@ TEST_ImpliedDummyRead:
 	LDA $4017
 	AND #$BE
 	BNE FAIL_ImpliedDummyRead1
+	INC <ErrorCode
 
 	;;; Test 2 [Implied Dummy Reads]: Prerequisite check. Does the frame counter interrupt flag get set if we enable it? ;;;
 	LDA #0
@@ -11059,9 +11060,9 @@ TEST_ImpliedDummyRead_Continue4:
 	PHA
 	; This one doesn't need to worry about even/odd cycle polarity, since we're not double-reading $4015. We dummy read it, and the PC is moved *far away*.
 	JMP $4013; [Read opcode] [Read operand] [Read operand] 
-	; [DMC DMA, data bus = $48]
+	; [DMC DMA, data bus = $68]
 	; PHA [data bus = A (A = the opcode we want to test)] [also dummy read.]
-	; BRK [Read Opcode] [Dummy Read $4015 (This should clear the Frame Counter interrupt.)] [The rest of BRK/RTI...]
+	; RTS [Read Opcode] [Dummy Read $4015 (This should clear the Frame Counter interrupt.)] [The rest of RTS...]
 	; We don't read $4015 for the operand this time, so we're just going to LDA $4015 after returning to stable code to verify the dummy read happened.
 	;
 	; and hopefully the JSR just takes you here.
