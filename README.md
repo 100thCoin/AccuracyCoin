@@ -94,6 +94,7 @@ For more information, I recommend reading the fully commented assembly code for 
   6: The upper 3 bits when reading from the controller should be open bus.  
   7: Reading from $4015 should not update the databus.  
   8: Writing should always update the databus, even writing to $4015.  
+  9: Bit 5 of address $4015 should be open bus.  
 
 ### Unofficial Instructions
   1: Does "SLO Absolute" do vaguely what's expected of it?  

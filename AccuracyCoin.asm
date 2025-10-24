@@ -1962,7 +1962,7 @@ TEST_Fail_1p5:
 	LDA $4017
 	AND #$E0
 	CMP #$40 ; When running LDA $4017, bit 6 is likely to be set.
-	BNE TEST_Fail2
+	BNE TEST_Fail_1p5
 	; This doubles as a test of dummy read cycles, and the PPU data bus.
 	LDA #$F0
 	STA $2002	; Set the PPU data bus to $F0
@@ -1970,7 +1970,7 @@ TEST_Fail_1p5:
 	LDA $3FFF, X ; dummy read $2006. (The data bus is now $F0) The offset moves the address bus to $4016, reading from controller 1 when the data bus was $F0.
 	AND #$E0
 	CMP #$E0 ; However, in this case, the open bus bits are all set.
-	BNE TEST_Fail2
+	BNE TEST_Fail_1p5
 	INX		 ; We're going to run a similar trick with controller 2, but instead of dummy reading a mirror of $2006, it will dummy read a mirror of $2007. Let's set up the ppu read buffer.
 	JSR WaitForVBlank
 	LDA #0
@@ -2048,6 +2048,15 @@ TEST_OpenBus_PostTest8:
 	TXA ; X = 0 if we ran RTS, X = 1 if we ran RTI.
 	CPX #$01
 	BEQ TEST_Fail2	
+	INC <ErrorCode
+	
+	;;; Test 9 [Open Bus]: Bit 5 of address $4015 is open bus ;;;
+	LDA #$20
+	STA $2002
+	LDX #$25
+	LDA $3FF0, X
+	AND #$20
+	BEQ TEST_Fail2
 	
 	;; END OF TEST ;;	
 TEST_Pass2:
@@ -7277,6 +7286,9 @@ TEST_APURegActivation_YSkip3:
 	JMP TEST_APURegActivation_Finale ; I moved this part because it contains a lot of bytes, and ruined a bunch of branches.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+	.bank 2	; If I don't do this, the ROM won't compile.
+	.org $C000
+
 FAIL_APURegActivation2:
 FAIL_DMA_Timing:
 	LDA #$40
@@ -7286,8 +7298,6 @@ FAIL_DMA_Timing:
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
 
-	.bank 2	; If I don't do this, the ROM won't compile.
-	.org $C000
 
 TEST_DMA_Plus_4015R:
 	;;; Test 1 [DMA + $4015 Read]: Does the frame interrupt flag ever get set? ;;;
@@ -10602,12 +10612,21 @@ TEST_ImpliedDummyReadPreReqContinue:
 	CMP #$5A
 	BNE FAIL_ImpliedDummyRead1
 	; We already confirmed SLO Absolute, X is accurate, so...
+	LDA #0
 	LDX #3
 	.byte $1F
 	.word $4015 ; SLO $4015, X
 	; despite the first read being from $4015, the data bus won't be updated. The second read is from $4018, which will read #$40.
 	; Then it gets SLO'd to be $80
-	BPL FAIL_ImpliedDummyRead1
+	CMP #$80
+	BNE FAIL_ImpliedDummyRead1
+	LDA #$20
+	STA $2002
+	LDX #$25
+	LDA $3FF0, X
+	AND #$20
+	BEQ FAIL_ImpliedDummyRead1
+	
 	
 	; Check the open bus bits of the controller port.
 	JSR WaitForVBlank
@@ -10627,7 +10646,7 @@ TEST_ImpliedDummyReadPreReqContinue:
 	PLA
 	AND #$E0
 	CMP #$E0 ; The open bus bits are all set.
-	BNE FAIL_ImpliedDummyRead1
+	BNE FAIL_ImpliedDummyRead2
 	
 	; This next pre-requisite doesn't have an error code, because I assume the emulator will crash if it gets this wrong.
 	; This is something you would have fixed if you pass the [Open Bus] test.
