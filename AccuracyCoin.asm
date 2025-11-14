@@ -14320,14 +14320,14 @@ ResetScroll:; sets the PPU "v" register to $2000
 	RTS
 ;;;;;;;
 
-ClearNametable:; Overwrites the nametable from $2000 to $27FF with $24. Attribute tables in this area are cleared to $00
+ClearNametable:; Overwrites the nametable from $2000 to $2FFF with $24. Attribute tables in this area are cleared to $00
 	PHA
 	LDA #$20
 	STA $2006 ; Update high byte of v to $20
 	LDA #$00
 	STA $2006 ; Update low byte of v to $00
 	LDA #$24
-	LDX #$08
+	LDX #$10 ; Okay, so I'm honestly being pretty lazy here (let's just say I was optimizing for fewer bytes rather than cpu cycles)
 	LDY #$00
 NTLoop1:
 	STA $2007
@@ -14347,7 +14347,7 @@ NTLoop2:
 	DEX
 	BNE NTLoop2
 	; And the other attributes
-	LDA #$27
+	LDA #$2F
 	STA $2006
 	LDA #$C0
 	STA $2006
