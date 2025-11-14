@@ -402,8 +402,9 @@ PostResetFlagTest:
 	
 	; With uninitialized values from VRAM and Palette RAM copied for future reference, let's overwrite the palette and nametable.
 	JSR SetUpDefaultPalette
-	JSR ClearNametable
 	JSR ClearRAMExceptPage3 ; Page 3 holds a copy of uninitialized RAM, VRAM, Palette RAM...
+	JSR VerifyJSRBehavior
+	JSR ClearNametable
 	LDA #$5A
 	STA PowerOn_MagicNumber ; At this point, let's write out magic number to RAM, indicating that any reset after this point is a warm boot.
 							; So now if the reset button is pressed, we skip writing to the results of TEST_PowerOnState_CPU_Registers, and skip running the PPU reset flag test.
@@ -422,25 +423,6 @@ ReloadMainMenu: ; There's an option to run every test in the ROM, and it draws a
 	INC <Debug_EC ; 01 -> 02
 	; set up the NMI routine.
 	JSR SetUpNMIRoutineForMainMenu
-	
-	; Let's also verify that JSR is pushing the correct values to the stack.
-	; A handful of my subroutines pull off the values pushed by JSR, and use them to read data stored next to the JSR instruction.
-	; I need my code to still be able to load the menu even if the JSR return addresses are wrong.
-	; To verify this, I'll just put a JSR at address $0000, and jump there.
-	LDA #$20 ; JSR
-	STA <$00
-	LDA #Low(VerifyReturnAddressesAreCorrect)
-	STA <$01
-	LDA #High(VerifyReturnAddressesAreCorrect)
-	STA <$02
-	LDA #$60 ; RTS
-	STA <$03
-	INC <Debug_EC ; 02 -> 03
-	JSR $0000 ; Verify return addresses pushed by JSR are correct.	
-	LDA #$20
-	STA <JSRFromRAM
-	LDA #$60
-	STA <JSRFromRAM3
 	
 	LDA #0
 	STA $100 ; initialize the placeholder test results. (While this ROM was in an early state, I had a list of tests I wanted to make, and stored all their results at $100)
@@ -461,7 +443,6 @@ ReloadMainMenu: ; There's an option to run every test in the ROM, and it draws a
 	JSR TEST_VblankSync_PreTest; ; Initialize result_VblankSync_PreTest
 	INC <Debug_EC ; 05 -> 06
 	JSR DMASync ; Initialize result_DMADMASync_PreTest
-	
 	
 	LDA #$FF
 	STA <menuCursorYPos
@@ -487,6 +468,28 @@ ReloadMainMenu: ; There's an option to run every test in the ROM, and it draws a
 InfiniteLoop:
 	JMP InfiniteLoop	; This is the spinning loop while I wait for the NMI to occur.
 ;;;;;;;;;;;;;;;;;;;;
+	
+VerifyJSRBehavior:
+	; Let's also verify that JSR is pushing the correct values to the stack.
+	; A handful of my subroutines pull off the values pushed by JSR, and use them to read data stored next to the JSR instruction.
+	; I need my code to still be able to load the menu even if the JSR return addresses are wrong.
+	; To verify this, I'll just put a JSR at address $0000, and jump there.
+	LDA #$20 ; JSR
+	STA <$00
+	LDA #Low(VerifyReturnAddressesAreCorrect)
+	STA <$01
+	LDA #High(VerifyReturnAddressesAreCorrect)
+	STA <$02
+	LDA #$60 ; RTS
+	STA <$03
+	INC <Debug_EC ; 02 -> 03
+	JSR $0000 ; Verify return addresses pushed by JSR are correct.	
+	LDA #$20
+	STA <JSRFromRAM
+	LDA #$60
+	STA <JSRFromRAM3
+	RTS
+;;;;;;;
 	
 	.org $8200
 	; Menu Data
@@ -12727,7 +12730,7 @@ TEST_JSREdgeCases:
 	; This test is actually ran briefly after power on, since the results are used in "CopyReturnAddressToByte0" and "FixRTS"
 	; If the opcode is at address $1234, the return address pushed to the stack is $1236.
 	; An RTS instruction would then return to $1236, and increment the PC to $1237.
-	LDA IncorrectReturnAddressOffset
+	LDA <IncorrectReturnAddressOffset
 	CMP #0
 	BNE FAIL_JSREdgeCases
 	INC <ErrorCode
@@ -14322,10 +14325,8 @@ ResetScroll:; sets the PPU "v" register to $2000
 
 ClearNametable:; Overwrites the nametable from $2000 to $2FFF with $24. Attribute tables in this area are cleared to $00
 	PHA
-	LDA #$20
-	STA $2006 ; Update high byte of v to $20
-	LDA #$00
-	STA $2006 ; Update low byte of v to $00
+	JSR SetPPUADDRFromWord
+	.byte $20, $00
 	LDA #$24
 	LDX #$10 ; Okay, so I'm honestly being pretty lazy here (let's just say I was optimizing for fewer bytes rather than cpu cycles)
 	LDY #$00
@@ -14336,10 +14337,8 @@ NTLoop1:
 	DEX
 	BNE NTLoop1
 	; Now set up the attributes properly
-	LDA #$23
-	STA $2006
-	LDA #$C0
-	STA $2006
+	JSR SetPPUADDRFromWord
+	.byte $23, $C0
 	LDA #$00
 	LDX #$40
 NTLoop2:
@@ -14347,10 +14346,8 @@ NTLoop2:
 	DEX
 	BNE NTLoop2
 	; And the other attributes
-	LDA #$2F
-	STA $2006
-	LDA #$C0
-	STA $2006
+	JSR SetPPUADDRFromWord
+	.byte $2F, $C0
 	LDA #$00
 	LDX #$40
 NTLoop3:
