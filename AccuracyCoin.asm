@@ -2148,6 +2148,7 @@ TEST_DummyReads:
 	LDX #0
 	JSR Clockslide_29780 ; Wait a frame so the VBlank flag (bit 7) gets set
 	LDA $2002, X ; The page boundary is not crossed, so there should only have been 1 read.
+TEST_DummyReads_BPLFail: ; I ran out of bytes so the branches here are a bit cursed.
 	BPL TEST_Fail2
 	INC <ErrorCode 
 	
@@ -2157,6 +2158,7 @@ TEST_DummyReads:
 	JSR Clockslide_29780 ; Wait a frame so the VBlank flag gets set
 	LDA $3FF0, X ; Dummy read $3F52 (A mirror of $2002), then read $4052 (Open bus emulation is NOT needed to pass this test!)
 	LDA $2002	 ; If bit 7 of A gets set, then the dummy read was from the wrong address (bit 7 of $2002 was not cleared by the dummy read).
+TEST_DummyReads_BMIFail: ; I ran out of bytes so the branches here are a bit cursed.
 	BMI TEST_Fail2
 	INC <ErrorCode 	
 	
@@ -2173,7 +2175,7 @@ TEST_DummyReads:
 	JSR Clockslide_29750 ; Wait (slightly less than) a frame so the VBlank flag gets set
 	STA $3FF0, X ; The dummy read cycle will read from $2002.
 	LDA $2002	 ; If bit 7 of A gets set, then $2002 was not read during the STA
-	BMI TEST_Fail3
+	BMI TEST_DummyReads_BMIFail
 	INC <ErrorCode 	
 
 	;;; Test 6 [Dummy Read Cycles]: LDA ($2002),Y (where Y=3) does not have a dummy read. ;;;
@@ -2183,7 +2185,7 @@ TEST_DummyReads:
 	JSR Clockslide_29750 ; Wait (slightly less than) a frame so the VBlank flag gets set
 	LDA [$0050],Y  ; The dummy read does NOT happen because a page boundary was not crossed.
 	LDA $2002 ; The dummy read didn't occur, so bit 7 should be set.
-	BPL TEST_Fail3 
+	BPL TEST_DummyReads_BPLFail 
 	INC <ErrorCode 	
 	
 	;;; Test 7 [Dummy Read Cycles]: LDA ($3FF0),Y (where Y=62) dummy read occurs, and is on the correct address ;;;
@@ -2191,7 +2193,7 @@ TEST_DummyReads:
 	JSR Clockslide_29750 ; Wait (slightly less than) a frame so the VBlank flag gets set
 	LDA [$0052],Y
 	LDA $2002	 ; If bit 7 of A gets set, then $2002 was not read during the LDA
-	BMI TEST_Fail3
+	BMI TEST_DummyReads_BMIFail
 	INC <ErrorCode 
 	
 	;;; Test 8 [Dummy Read Cycles]: STA ($2002),Y (where Y=1) does not have a dummy read. ;;;
@@ -2200,7 +2202,7 @@ TEST_DummyReads:
 	JSR Clockslide_29750 ; Wait (slightly less than) a frame so the VBlank flag gets set
 	STA [$0050],Y
 	LDA $2002	 ; The dummy read didn't occur, so bit 7 should be set.
-	BPL TEST_Fail3
+	BPL TEST_DummyReads_BPLFail
 	INC <ErrorCode 
 	
 	;;; Test 9 [Dummy Read Cycles]: STA ($3FF0),Y (where Y=62) dummy read is on the correct address ;;;
@@ -2208,26 +2210,25 @@ TEST_DummyReads:
 	JSR Clockslide_29750 ; Wait (slightly less than) a frame so the VBlank flag gets set
 	STA [$0052],Y
 	LDA $2002	 ; If bit 7 of A gets set, then $2002 was not read during the STA
-	BMI TEST_Fail3
+	BMI TEST_DummyReads_BMIFail
 	INC <ErrorCode 
 	
 	;;; Test A [Dummy Read Cycles]: LDA ($2002,X) does not dummy-read $2002 ;;;
 	LDX #0
 	JSR Clockslide_29750 ; Wait (slightly less than) a frame so the VBlank flag gets set
 	LDA [$50,X]
-	BPL TEST_Fail3 ; If bit 7 of A is set, then we pass the test. The dummy read was at $0050, which we can't test for.
+	BPL TEST_DummyReads_BPLFail ; If bit 7 of A is set, then we pass the test. The dummy read was at $0050, which we can't test for.
 	INC <ErrorCode 	
 	
 	;;; Test B [Dummy Read Cycles]: STA ($2002,X) does not dummy-read $2002 ;;;
 	LDX #0
 	JSR Clockslide_29780 ; Wait a frame so the VBlank flag gets set
 	STA [$50,X]
-	BPL TEST_Fail3 ; If bit 7 of A is set, then we pass the test. The dummy read was at $0050, which we can't test for.	
+	LDA $2002	 ; If bit 7 of A gets set, then $2002 was not read during the STA
+	BPL TEST_DummyReads_BPLFail ; If bit 7 of A is set, then we pass the test. The dummy read was at $0050, which we can't test for.	
 	;; END OF TEST ;;
 	LDA #1
 	RTS
-TEST_Fail3:
-	JMP TEST_Fail
 ;;;;;;;
 
 TEST_DummyWrites_Prep:
