@@ -6163,6 +6163,15 @@ MisalignedOAM_Test:
 FAIL_MisalignedOAM_Behavior:
 	JMP FAIL_MisalignedOAM
 	
+TEST_MisalignedOAM_Evaluate:
+	JSR Clockslide_500			; Wait long enough for the ppu to draw every scanline in which these objects are relevant.
+	LDA $2002					; Read PPUSTATUS, putting the sprite overflow flag in bit 5.
+	AND #$20 					; mask away bit 5. The result should be A = $20, since the sprite overflow flag *should* be set.
+	BEQ FAIL_MisalignedOAM_Behavior
+	INC <ErrorCode	
+	RTS
+;;;;;;;
+	
 TEST_MisalignedOAM_Behavior:
 	; Let's talk about what happens when you misaling the PPU OAM Address immediately before sprite evaluation, and how this changes the behavior of sprite evaluation.
 	;;; Test 1 [Misaligned OAM Behavior]: Misaligned OAM can properly draw a sprite and trigger a sprite zero hit (Misaligned OAM "+1 behavior"). ;;;
@@ -6258,11 +6267,7 @@ TEST_MisalignedOAM_P4_Y_1_Loop:
 	; OAM $24: [$00, $E3, $00, $00]
 	; This puts 9 objects in range of this scanline, so the sprite overflow flag is set!
 	; (By the way, the sprites are only processed like this for a single scanline. The rest of the scanlines, PPUOAMAddress will be $00 going into sprite evaluation.)
-	JSR Clockslide_500			; Wait long enough for the ppu to draw every scanline in which these objects are relevant.
-	LDA $2002					; Read PPUSTATUS, putting the sprite overflow flag in bit 5.
-	AND #$20 					; mask away bit 5. The result should be A = $20, since the sprite overflow flag *should* be set.
-	BEQ FAIL_MisalignedOAM_Behavior
-	INC <ErrorCode	
+	JSR TEST_MisalignedOAM_Evaluate ; Evaluate and increment error code.
 	
 	;;; Test 3 [Misaligned OAM Behavior]: Misaligned OAM "+5 behavior" Offset by 1 ;;;
 	; If Secondary OAM is full, instead of incrementing the OAM Address by 4 and bitwise ANDing with $FC, you should instead only increment the OAM address by 5.
@@ -6295,11 +6300,7 @@ TEST_MisalignedOAM_P5_Y_1_Loop:
 	; OAM $26: [$00, $E3, $00, $00]
 	; This puts 9 objects in range of this scanline, so the sprite overflow flag is set!
 	; (By the way, the sprites are only processed like this for a single scanline. The rest of the scanlines, PPUOAMAddress will be $00 going into sprite evaluation.)
-	JSR Clockslide_500			; Wait long enough for the ppu to draw every scanline in which these objects are relevant.
-	LDA $2002					; Read PPUSTATUS, putting the sprite overflow flag in bit 5.
-	AND #$20 					; mask away bit 5. The result should be A = $20, since the sprite overflow flag *should* be set.
-	BEQ FAIL_MisalignedOAM_Behavior1
-	INC <ErrorCode	
+	JSR TEST_MisalignedOAM_Evaluate ; Evaluate and increment error code.
 	
 	;;; Test 4 [Misaligned OAM Behavior]: Misaligned OAM "+4* behavior" Offset by 1 (* Only +1 with the X Position) ;;;
 	; In the "Arbitrary Sprite Zero" test, I said the following:
@@ -6350,11 +6351,7 @@ TEST_MisalignedOAM_P4_1_Loop:
 
 	; This puts 9 objects in range of this scanline, so the sprite overflow flag is set!
 	; (By the way, the sprites are only processed like this for a single scanline. The rest of the scanlines, PPUOAMAddress will be $00 going into sprite evaluation.)
-	JSR Clockslide_500
-	LDA $2002
-	AND #$20 ; Bit 5 holds the sprite overflow flag.
-	BEQ FAIL_MisalignedOAM_Behavior1
-	INC <ErrorCode	
+	JSR TEST_MisalignedOAM_Evaluate ; Evaluate and increment error code.
 
 	;;; Test 5 [Misaligned OAM Behavior]: Misaligned OAM "+4* behavior" Offset by 1, Second OAM Full, so OAMAddr +=5 (* Only +1 with the X Position) ;;;
 	; If Secondary OAM is full, instead of incrementing the OAM Address by 1 and bitwise ANDing with $FC, you should instead only increment the OAM address by 5.
@@ -6385,17 +6382,8 @@ TEST_MisalignedOAM_P4_1F_Loop:
 	; OAM $25: [$00, $E3, $00, $80]
 	; This puts 9 objects in range of this scanline, so the sprite overflow flag is set!
 	; (By the way, the sprites are only processed like this for a single scanline. The rest of the scanlines, PPUOAMAddress will be $00 going into sprite evaluation.)
-	JSR Clockslide_500
-	LDA $2002
-	AND #$20 ; Bit 5 holds the sprite overflow flag.
-	BEQ FAIL_MisalignedOAM_Behavior1
-	INC <ErrorCode	
-	BNE TEST_MisalignedOAM_Continue ; Skip the fail handler. I moved the fail handler here because branches were exceeding $80 bytes.
-	
-FAIL_MisalignedOAM_Behavior1:
-	JMP FAIL_MisalignedOAM
+	JSR TEST_MisalignedOAM_Evaluate ; Evaluate and increment error code.
 
-TEST_MisalignedOAM_Continue:
 	;;; Test 6 [Misaligned OAM Behavior]: Misaligned OAM "+4* behavior" Offset by 2 (* Only +1 with the X Position) ;;;
 	; OAM will be offset by 2.
 	JSR ClearPage2
@@ -6425,11 +6413,7 @@ TEST_MisalignedOAM_P4_2_Loop:
 	; OAM $20: [$00, $80, $00, $00] 
 	; This puts 9 objects in range of this scanline, so the sprite overflow flag is set!
 	; (By the way, the sprites are only processed like this for a single scanline. The rest of the scanlines, PPUOAMAddress will be $00 going into sprite evaluation.)
-	JSR Clockslide_500
-	LDA $2002
-	AND #$20 ; Bit 5 holds the sprite overflow flag.
-	BEQ FAIL_MisalignedOAM_Behavior1
-	INC <ErrorCode	
+	JSR TEST_MisalignedOAM_Evaluate ; Evaluate and increment error code.
 
 	;;; Test 7 [Misaligned OAM Behavior]: Misaligned OAM "+4* behavior" Offset by 3 (* Only +1 with the X Position) ;;;
 	JSR ClearPage2
@@ -6459,10 +6443,7 @@ TEST_MisalignedOAM_P4_3_Loop:
 	; OAM $20: [$80]($00, $80, $FF, $FF) Secondary OAM is full, so instead of the PPUOAMAddress += 4, PPUOAMAddress &= $FC behavior, it's just the PPUOAMAddress +=5 behavior. (PPUOAMAddress is now $25)
 	; OAM $25: [$00, $FF, $FF, $FF]
 	; This puts 9 objects in range of this scanline, so the sprite overflow flag is set!
-	JSR Clockslide_500
-	LDA $2002
-	AND #$20 ; Bit 5 holds the sprite overflow flag.
-	BEQ FAIL_MisalignedOAM_Behavior1
+	JSR TEST_MisalignedOAM_Evaluate ; Evaluate and increment error code.
 	
 	;; END OF TEST ;;
 	JSR ClearOverscanNametable
@@ -7286,8 +7267,6 @@ TEST_APURegActivation_YSkip3:
 	JMP TEST_APURegActivation_Finale ; I moved this part because it contains a lot of bytes, and ruined a bunch of branches.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-	.bank 2	; If I don't do this, the ROM won't compile.
-	.org $C000
 
 FAIL_APURegActivation2:
 FAIL_DMA_Timing:
@@ -7297,6 +7276,11 @@ FAIL_DMA_Timing:
 	STA $4015
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
+
+	.bank 2	; If I don't do this, the ROM won't compile.
+	.org $C000
+	; and 33 00s in a row for a nice and neat silent DPCM sample.
+	.byte $00,  $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 
 
 TEST_DMA_Plus_4015R:
@@ -7334,8 +7318,6 @@ TEST_DMA_Plus_4015R:
 
 
 	
-	; and 33 00s in a row for a nice and neat silent DPCM sample.
-	.byte $00,  $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 
 TEST_DMA_Plus_4016R:
 	;;; Test 1 [DMA + $4016 Read]: Does the DMA Update the read-sensitive controller port? (also doubles as a test for DMA timing) ;;;
@@ -9932,27 +9914,27 @@ FAIL_DeltaModulationChannelC2:
 
 	;;; Test I [APU Delta Modulation Channel]: There should be a one-byte buffer that's filled immediately if empty. ;;;
 	LDA #$8F
-	STA $4010
+	STA $4010 ; enable IRQ flag, fastest speed.
 	LDA #1
-	STA $4013	; 17 byte sample.
+	STA $4013 ; 17 byte sample.
 	LDA #$10
-	STA $4015
+	STA $4015 ; enable the DMC
 	LDA #$10
 TEST_DeltaModulationChannelTestILoop:
-	AND $4015	; Loop until the sample ends.
+	AND $4015 ; Loop until the sample ends.
 	BNE TEST_DeltaModulationChannelTestILoop
 	JSR Clockslide_1728
 	JSR Clockslide_30
 	LDA #0
-	STA $4013	; 1 byte sample.
+	STA $4013 ; 1 byte sample.
 	LDA #$10
-	STA $4015
-	LDA $4015
-	AND #$90	; The IRQ flag should be set, and the sample should have ended.
+	STA $4015 ; Enable DMC
+	LDA $4015 ; Immediately read from $4015:
+	AND #$90  ; The IRQ flag should be set, and the sample should have ended.
 	CMP #$80
 	BNE FAIL_DeltaModulationChannel3
 	LDA #$10
-	STA $4015	; we go again.
+	STA $4015 ; we go again.
 	LDA $4015	
 	BEQ FAIL_DeltaModulationChannel3
 	; at this point we are playing audio.
