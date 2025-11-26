@@ -305,7 +305,7 @@ result_CHRROMIsNotWritable = $485
 result_RenderingFlagBehavior = $486
 
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
-result_PowOn_CPUReg = $0418 
+result_PowOn_CPUReg = $03FD ; page 3 omits the test from the all-test-result-table.
 result_PowOn_PPURAM = $03FE ; page 3 omits the test from the all-test-result-table.
 result_PowOn_PPUPal = $03FF ; page 3 omits the test from the all-test-result-table.
 result_PowOn_PPUReset = $03FD ; page 3 omits the test from the all-test-result-table.
@@ -2636,8 +2636,8 @@ TEST_PowerOnState_PPU_Res_No:
 TEST_PowerOnState_CPU_Registers:
 	;;; Test 1 [CPU Registers Power On State]: Print the values recorded at power on ;;;
 	
-	LDA <RunningAllTests
-	BNE TEST_PowerOnState_CPU_Reg_Skip
+	;LDA <RunningAllTests ; Commented out because this is no longer a pass/fail test. This doesn't run in the all-test mode now.
+	;BNE TEST_PowerOnState_CPU_Reg_Skip
 	
 	JSR ClearNametableFrom2240
 	JSR ResetScrollAndWaitForVBlank
@@ -2678,32 +2678,38 @@ TEST_PowerOnState_CPU_Registers:
 	JSR ResetScroll
 
 TEST_PowerOnState_CPU_Reg_Skip:
-	LDA PowerOn_A
-	BNE TEST_Fail4
-	INC <ErrorCode
+	;; END OF TEST ;;
+	LDA #1 
+	RTS
+;;;;;;
+	; It was recently discovered that real consoles can boot up with bits occasionally set, even from a cold boot.
+	; Stop testing this as a pass/fail.
+
+	;LDA PowerOn_A
+	;BNE TEST_Fail4
+	;INC <ErrorCode
 	
-	LDA PowerOn_X
-	BNE TEST_Fail4
-	INC <ErrorCode
+	;LDA PowerOn_X
+	;BNE TEST_Fail4
+	;INC <ErrorCode
 	
-	LDA PowerOn_Y
-	BNE TEST_Fail4
-	INC <ErrorCode
+	;LDA PowerOn_Y
+	;BNE TEST_Fail4
+	;INC <ErrorCode
 	
-	LDA PowerOn_SP
-	CMP #$FD
-	BNE TEST_Fail4
-	INC <ErrorCode
+	;LDA PowerOn_SP
+	;CMP #$FD
+	;BNE TEST_Fail4
+	;INC <ErrorCode
 	
-	LDA PowerOn_P
-	CMP #4
-	BNE TEST_Fail4
+	;LDA PowerOn_P
+	;CMP #4
+	;BNE TEST_Fail4
 	
 	;; END OF TEST ;;
-	LDA #1
-	STA <dontSetPointer
-	RTS
-;;;;;;;
+	;LDA #1 
+	;RTS
+;;;;;;
 
 TEST_Fail4:
 	JMP TEST_Fail
@@ -7269,7 +7275,6 @@ TEST_APURegActivation_YSkip3:
 
 
 FAIL_APURegActivation2:
-FAIL_DMA_Timing:
 	LDA #$40
 	STA $4017
 	LDA #0
@@ -7282,6 +7287,13 @@ FAIL_DMA_Timing:
 	; and 33 00s in a row for a nice and neat silent DPCM sample.
 	.byte $00,  $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 
+FAIL_DMA_Timing:
+	LDA #$40
+	STA $4017
+	LDA #0
+	STA $4015
+	JMP TEST_Fail
+;;;;;;;;;;;;;;;;;
 
 TEST_DMA_Plus_4015R:
 	;;; Test 1 [DMA + $4015 Read]: Does the frame interrupt flag ever get set? ;;;
@@ -9929,7 +9941,7 @@ TEST_DeltaModulationChannelTestILoop:
 	STA $4013 ; 1 byte sample.
 	LDA #$10
 	STA $4015 ; Enable DMC
-	LDA $4015 ; Immediately read from $4015:
+	LDA $4015 ; Immediately read from $4015: (There's a 50% chance the DMA occurs when the address bus is pointing to $4015. That doesn't cahnge anything though.)
 	AND #$90  ; The IRQ flag should be set, and the sample should have ended.
 	CMP #$80
 	BNE FAIL_DeltaModulationChannel3
@@ -13745,7 +13757,7 @@ TEST_StaleBGShiftRegisters:
 	;;; Test 2 [Stale BG Shift Registers]: Weed-out false positives. ;;;
 	
 	JSR SetUpSpriteZero
-	.byte $06, $C6, $00, $00 ; This is a specific character that will miss this particular sprite zero hit.
+	.byte $06, $C6, $03, $00 ; This is a specific character that will miss this particular sprite zero hit.
 	LDA #2
 	STA $4014
 	JSR Test_StaleShiftRegisters_Run
@@ -13765,7 +13777,7 @@ TEST_StaleBGShiftRegisters:
 	; Since the background shift registers are also still set up with "11111111 00000000" the sprite WILL overlap the background, triggering a sprite zero hit.
 	
 	JSR SetUpSpriteZero
-	.byte $06, $C0, $00, $00 ; X = 0. Sprite zero will be drawn immediately after rendering is enabled.
+	.byte $06, $C8, $03, $00 ; X = 0. Sprite zero will be drawn immediately after rendering is enabled.
 	LDA #2
 	STA $4014
 	JSR Test_StaleShiftRegisters_Run
@@ -13774,7 +13786,7 @@ TEST_StaleBGShiftRegisters:
 
 	;;; Test 4 [Stale BG Shift Registers]: This is just testing a quirk of the sprite shifters, and how if rendering was disabled on dot 339, all sprites are treated as X = 0 ;;;
 	JSR SetUpSpriteZero
-	.byte $06, $C0, $00, $80 ; X = 80. Sprite zero will be still drawn immediately after rendering is enabled. (Rendering was disabled on dot 339)
+	.byte $06, $C8, $03, $80 ; X = 80. Sprite zero will be still drawn immediately after rendering is enabled. (Rendering was disabled on dot 339)
 	LDA #2
 	STA $4014
 	JSR Test_StaleShiftRegisters_Run
@@ -13798,6 +13810,7 @@ Test_StaleShiftRegisters_Run:
 	JSR Clockslide_50
 	JSR Clockslide_17
 	LDA #0
+	NOP
 	NOP
 	STA $2001 ; Disable rendering. (sprite zero SHOULD be evaluated, such that it will occur next scanline.)
 
@@ -14710,7 +14723,7 @@ ReadPalLoop:
 
 DefaultPalette:	; The default palette for the main menu.
 	.byte $2D,$30,$30,$30,$0F,$21,$21,$21,$0F,$26,$26,$26,$0F,$2D,$2D,$2D
-	.byte $2D,$30,$30,$30,$0F,$30,$30,$30,$0F,$30,$30,$30,$0F,$30,$30,$30	
+	.byte $2D,$30,$30,$30,$0F,$30,$30,$30,$0F,$30,$30,$30,$0F,$26,$26,$26	
 SetUpDefaultPalette: ; This function overwrites palette RAM with the values in the above table.
 	LDA #$3F
 	STA $2006
