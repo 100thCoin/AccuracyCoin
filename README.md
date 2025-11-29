@@ -516,7 +516,7 @@ For more information, I recommend reading the fully commented assembly code for 
   1: This emulator failed to sync the CPU to VBlank during a test that ran when the ROM boots.  
   2: OAM Corruption should "corrupt" a row in OAM by copying the 8 values from row 0 to another row.  
   3: This corruption should not occur immediately after disabling rendering.  
-  4: This corruption should now occur immediately after re-enabling rendering.  
+  4: This corruption should not occur immediately after re-enabling rendering.  
   
 ### INC $4014
   1: The DMC DMA should update the data bus.  
