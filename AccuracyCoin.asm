@@ -13731,6 +13731,10 @@ DoSpriteZeroHitTest:
 
 FAIL_tRegisterQuirks2:
 FAIL_StaleShiftRegisters:
+	JSR WaitForVBlank
+	JSR PrintCHR
+	.word $2000
+	.byte $24, $FF
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
 
@@ -13797,6 +13801,10 @@ TEST_StaleBGShiftRegisters:
 	BEQ FAIL_StaleShiftRegisters
 
 	;;END OF TEST;;
+	JSR WaitForVBlank
+	JSR PrintCHR
+	.word $2000
+	.byte $24, $FF
 	LDA #1
 	RTS
 ;;;;;;;
