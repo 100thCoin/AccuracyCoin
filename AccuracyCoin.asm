@@ -13717,10 +13717,6 @@ TEST_tRegisterQuirks:
 	RTS
 ;;;;;;;
 
-FAIL_tRegisterQuirks2:
-FAIL_StaleShiftRegisters:
-	JMP TEST_Fail
-
 DoSpriteZeroHitTest:
 	JSR WaitForVBlank	
 	JSR EnableRendering
@@ -13733,6 +13729,11 @@ DoSpriteZeroHitTest:
 	RTS
 ;;;;;;;
 
+FAIL_tRegisterQuirks2:
+FAIL_StaleShiftRegisters:
+	JMP TEST_Fail
+;;;;;;;;;;;;;;;;;
+
 TEST_StaleBGShiftRegisters:
 	JSR DisableRendering
 
@@ -13741,6 +13742,9 @@ TEST_StaleBGShiftRegisters:
 	JSR ClearNametable2_With24 ; Nametable 2 is polluted from other tests. Since it gets drawn during this test, let's clear it first.
 	JSR PrintCHR
 	.word $2C00
+	.byte $C7, $FF
+	JSR PrintCHR
+	.word $2000
 	.byte $C7, $FF
 	JSR ClearPage2
 	JSR SetUpSpriteZero
