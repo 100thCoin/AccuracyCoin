@@ -3,7 +3,7 @@ AccuracyCoin is a large collection of NES accuracy tests on a single NROM cartri
 
 This ROM was designed for an NTSC console with an RP2A03G CPU and RP2C02G PPU. Some tests might fail on hardware with a different revision.
 
-This ROM currently has 130 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 6 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
+This ROM currently has 131 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 6 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
 Here's an example of the menu in this ROM shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been run yet. (The cursor is currently next to the "RAM Mirroring" test.)
 
@@ -541,7 +541,7 @@ For more information, I recommend reading the fully commented assembly code for 
   4: The sprite shifters should treat all sprites X positions as 0 if rendering was disabled on dot 339.
 
 ### BG Serial In
-  1: Sprite zero hits should not occur when the nametable is entirely blank.
+  1: Sprite zero hits should not occur when the nametable is entirely blank.  
   2: Background shift registers should bring in a 1 into bit 0 when shifted. These can be drawn on screen with carefully timed writes to $2001 to enable/disable rendering to skip reloading the shift registers.
 
 ### Sprites On Scanline 0
