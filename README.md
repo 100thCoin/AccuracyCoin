@@ -540,6 +540,10 @@ For more information, I recommend reading the fully commented assembly code for 
   3: The background shift registers should not be clocked during H-Blank or F-Blank. After re-enabling rendering, a sprite zero hit should be able to occur entirely on stale background shift register data.  
   4: The sprite shifters should treat all sprites X positions as 0 if rendering was disabled on dot 339.
 
+### BG Serial In
+  1: Sprite zero hits should not occur when the nametable is entirely blank.
+  2: Background shift registers should bring in a 1 into bit 0 when shifted. These can be drawn on screen with carefully timed writes to $2001 to enable/disable rendering to skip reloading the shift registers.
+
 ### Sprites On Scanline 0
   1: Sprites at Y=0 should actually be drawn at Y=1.  
   2: A sprite should be able to be drawn at Y=0 via the pre-render scanline's sprite evaluation with stale secondary OAM data.  
