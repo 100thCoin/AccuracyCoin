@@ -14219,8 +14219,11 @@ TEST_BGSerialIn:
 	; So what are the background shift registers doing during this time?
 	; The background shift registers are shifted on all of these cycles.
 	; So for instance, using the example [00110011 00110011]...
-	; would be shifted left to the value [01100110 01100111].
-	; The lowest bit (the new value shifted in on the right) is a 1.
+	; would be shifted left to the value [01100110 01100110].
+	; The lowest bit (the new value shifted in on the right) is a 0 for the low bit plane, and a 1 for the high bit plane.
+	; So if this was the high bit plane, using the example [00110011 00110011]...
+	; instead the value would be shifted left to the value [01100110 01100111].
+	
 	; Since the data read from the pattern tables is loaded into the shift registers on (dot % 8 == 7),
 	; If we disable rendering on (dot % 8 == 6) and re-enable rendering on (dot % 8 == 0), then we can draw a large amount of these '1' bits that keep getting shifted in.
 	;
@@ -14252,7 +14255,7 @@ TEST_BGSerialIn_WasteACycle:
 	JMP TEST_BGSerialIn_Loop                                     ; +3 = 114
 TEST_BGSerialIn_Exit:
 	LDA $2002                ; Anyway, I could've just done that once instead of across the entire screen, but it was suggested to make it more visible.
-	AND #$40                 ; As of this moment, we're researching why it shows up as color 10 of palette 3 (WHITE) instead of, say, color 11 of palette 3 (RED).
+	AND #$40                 ; Keep in mind, this value should show up as a white line, (color %10 of palette %11) instead of red, color %11 of palette %11.
 	BEQ FAIL_BGSerialIn2     ; So we check if a sprite zero hit occured, masked away everything but the sprite zero hit flag, and fail the test if no hit occured.
 	;;END OF TEST;;
 

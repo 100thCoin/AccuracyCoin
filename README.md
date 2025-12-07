@@ -397,13 +397,6 @@ For more information, I recommend reading the fully commented assembly code for 
   3: The 1-cycle DMA should not get delayed by a write cycle, rather it just shouldn't occur in that case.  
   4: If the sample was set to keep looping, the DMC DMA timing in your emulator is off.  
 
-### CPU Registers Power On State
-  1: The A Register should be $00 at power on.  
-  2: The X Register should be $00 at power on.  
-  3: The Y Register should be $00 at power on.  
-  4: The Stack Pointer should be $FD at power on.  
-  5: The Interrupt Flag should be set at power on.
-
 ### CHR ROM is not Writable
   1: Writes to the PPU Address space from the range $0000 through $1FFF should not overwrite teh CHR data if the cartridge has CHR ROM instead of CHR RAM.
 
@@ -423,7 +416,7 @@ For more information, I recommend reading the fully commented assembly code for 
   4: Reading from CHR ROM should use the buffer.  
   5: Reading from Palette RAM should NOT use the buffer.  
   6: Writing to $2006 does not modify the buffer value.  
-  7: The value on the nametable at $2700 through $27FF should be put in the buffer when reading from palette RAM at $3F00 through $3FFF.  
+  7: The value on the nametable at $2F00 through $2FFF should be put in the buffer when reading from palette RAM at $3F00 through $3FFF.  
 
 ### Palette RAM Quirks
   1: This emulator failed the PPU Read Buffer test.  
@@ -659,3 +652,12 @@ In case you are running an old version of this ROM and are still looking for an 
   1: A Read-Modify-Write instruction to address $2007 should perform an extra write where the low byte of the PPU address written is the result of the Read-Modify-Write instruction.  
   2: This extra write should not occur when "v" is pointing to Palette RAM. (An extra write still might occur, but that's not the one we're testing for.)  
   3: If "v" is pointing to Palette RAM, this extra write should not get written to the nametable.
+  
+### CPU Registers Power On State
+  (removed due to a recent discovery where many consoles were found to have noise in these registers at power on. The values trend towards zero, but there's occasionally an extra bit set. Notably the zero flag has been seen to be set at power on multiple times.)
+  (This test still exists in the ROM as a "DRAW" test.)
+  1: The A Register should be $00 at power on.  
+  2: The X Register should be $00 at power on.  
+  3: The Y Register should be $00 at power on.  
+  4: The Stack Pointer should be $FD at power on.  
+  5: The Interrupt Flag should be set at power on.
