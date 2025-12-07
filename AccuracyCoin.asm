@@ -16525,6 +16525,7 @@ New_VBL_Sync_Loop1:
 	LDA $2002
 	BMI New_VBL_Sync_Loop1
 	JSR Clockslide_29700
+	JSR Clockslide_21 ; This might be able to be 22 before errors start occuring? I'll keep it at 21 just to be safe.
 New_VBL_Sync_Loop2:
 	JSR Clockslide_29750	; +29750
 	JSR Clockslide_24		; +24
