@@ -170,7 +170,6 @@ result_UnOp_ANE_8B	= $414
 result_UnOp_LXA_AB	= $415
 result_UnOp_AXS_CB	= $416
 result_UnOp_SBC_EB	= $417
-result_UnOp_Magic   = $3FB ; page 3 omits the test from the all-test-result-table.
 
 result_UnOp_RLA_23 = $419
 result_UnOp_RLA_27 = $41A
@@ -428,7 +427,6 @@ ReloadMainMenu: ; There's an option to run every test in the ROM, and it draws a
 	LDA #0
 	STA $100 ; initialize the placeholder test results. (While this ROM was in an early state, I had a list of tests I wanted to make, and stored all their results at $100)
 	; and also initialize the "print tests" results, as these tests use page 3, which is mostly uninitialized.
-	STA result_UnOp_Magic
 	STA result_PowOn_CPURAM
 	STA result_PowOn_CPUReg
 	STA result_PowOn_PPURAM
@@ -664,7 +662,6 @@ Suite_UnofficialOps_Immediates:
 	table "$AB   LXA Immediate", $FF, result_UnOp_LXA_AB, TEST_LXA_AB
 	table "$CB   AXS Immediate", $FF, result_UnOp_AXS_CB, TEST_AXS_CB
 	table "$EB   SBC Immediate", $FF, result_UnOp_SBC_EB, TEST_SBC_EB
-	table "Print magic values",  $FF, result_UnOp_Magic, TEST_MAGIC
 	.byte $FF
 	
 	;; CPU Interrupts ;;
@@ -4935,6 +4932,18 @@ TEST_ANE_8B:
 	.byte $8F, $9F, $99, (flag_i | flag_n | flag_v)
 	
 	; That's pretty much all we can test with this instruction, so we're good to go!
+	; Let's also determine the magic number, and draw that on screen.
+	JSR WaitForVBlank
+	LDA #0
+	STA <dontSetPointer
+	JSR PrintTextCentered
+	.word $2330
+	.byte "ANE magic = $", $FF
+	LDA #0
+	LDX #$FF
+	.byte $8B, $FF ; ANE #$FF
+	JSR PrintByte
+	
 	;; END OF TEST ;;
 	LDA #1
 	RTS
@@ -4960,6 +4969,15 @@ TEST_LXA_AB:
 	.byte $A5, $A5, $99, (flag_i | flag_n | flag_v)
 	
 	; That's pretty much all we can test with this instruction, so we're good to go!
+	; Let's also determine the magic number, and draw that on screen.
+	JSR WaitForVBlank
+	JSR PrintTextCentered
+	.word $2350
+	.byte "LXA magic = $", $FF
+	LDA #0
+	.byte $AB, $FF ; LXA #$FF
+	JSR PrintByte
+	
 	;; END OF TEST ;;
 	LDA #1
 	RTS
@@ -5026,53 +5044,6 @@ TEST_SBC_EB:
 	.byte $00, $C0, $1F, (flag_i| flag_z | flag_c)
 	
 	;; END OF TEST ;;
-	LDA #1
-	RTS
-;;;;;;;
-
-TEST_MAGIC:
-	; The ANE and LXA instructions have "magic values".
-	; The value is typically $EE or $FF.
-	; This test just prints what the value is for both instructions.	
-	; First, let's confirm the instructions are 2 bytes long.
-	LDX #0
-	.byte $8B, $E8
-	CPX #0
-	BEQ TEST_MAGIC_Continue
-	LDA #2 ; error code 0
-	RTS	
-TEST_MAGIC_Continue:
-	LDA #$FF
-	.byte $AB, $E8
-	CPX #1
-	BNE TEST_MAGIC_Continue2
-	LDA #2 ; error code 0
-	RTS	
-TEST_MAGIC_Continue2:
-	LDA <RunningAllTests
-	BEQ TEST_MAGIC_Continue3 ; skip printing stuff on screen if we're running all tests right now.
-	LDA #01
-	RTS
-TEST_MAGIC_Continue3:
-	LDA #0
-	STA <dontSetPointer
-	JSR PrintTextCentered
-	.word $2330
-	.byte "ANE magic = $", $FF
-	LDA #0
-	LDX #$FF
-	.byte $8B, $FF ; ANE #$FF
-	JSR PrintByte
-	
-	JSR PrintTextCentered
-	.word $2350
-	.byte "LXA magic = $", $FF
-	LDA #0
-	.byte $AB, $FF ; LXA #$FF
-	JSR PrintByte
-	
-;; END OF TEST ;;
-	JSR ResetScroll
 	LDA #1
 	RTS
 ;;;;;;;
@@ -14802,7 +14773,7 @@ InitializeOAMAddrX:; Sets address $200+X through $203+X to the values found in t
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 Read32NametableBytes:	; This is ran immediately after power on, and these values are stored for future printing in the "VRAM at power on" test.
-	LDA #$20
+	LDA #$2C
 	STA $2006
 	LDA #$00
 	STA $2006
