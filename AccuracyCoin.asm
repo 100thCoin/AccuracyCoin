@@ -4933,6 +4933,8 @@ TEST_ANE_8B:
 	
 	; That's pretty much all we can test with this instruction, so we're good to go!
 	; Let's also determine the magic number, and draw that on screen.
+	LDA RunningAllTests
+	BNE ANE_SkipPrintMagic
 	JSR WaitForVBlank
 	LDA #0
 	STA <dontSetPointer
@@ -4943,7 +4945,7 @@ TEST_ANE_8B:
 	LDX #$FF
 	.byte $8B, $FF ; ANE #$FF
 	JSR PrintByte
-	
+ANE_SkipPrintMagic:
 	;; END OF TEST ;;
 	LDA #1
 	RTS
@@ -4970,6 +4972,8 @@ TEST_LXA_AB:
 	
 	; That's pretty much all we can test with this instruction, so we're good to go!
 	; Let's also determine the magic number, and draw that on screen.
+	LDA RunningAllTests
+	BNE LXA_SkipPrintMagic
 	JSR WaitForVBlank
 	JSR PrintTextCentered
 	.word $2350
@@ -4977,7 +4981,7 @@ TEST_LXA_AB:
 	LDA #0
 	.byte $AB, $FF ; LXA #$FF
 	JSR PrintByte
-	
+LXA_SkipPrintMagic:
 	;; END OF TEST ;;
 	LDA #1
 	RTS
