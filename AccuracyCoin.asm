@@ -2861,14 +2861,14 @@ TEST_UnofficialInstructionsExist:
 	LDA #$1F
 	LDX #$FF
 	LDY #$80
-	.byte $9F ; SHA $0500
+	.byte $9F ; SHA $0700
 	.word $1E80 ; Use a mirror
 	; This goes unstable, so the high byte of the target address will be changed.
 	; Hi = ($1E+1) & A & X;
 	; 	 = $1F
-	; $500 = A & X & H
-	;	   = $1F & $FF & $1F
-	;	   = $1F
+	; $1F00 = A & X & H
+	;	    = $1F & $FF & $1F
+	;	    = $1F
 	; H is the high byte of the target address +1.
 	; I'm also specifically running a test here where X = $FF, due to this isntruction having a magic number, and I'd rather not worry about that in this specific test.
 	; So we should write $1F to $1F00, a mirror of $0700
@@ -2932,10 +2932,10 @@ TEST_UnofficialInstructions_Continue:
 	.word $1E80 ; Use a mirror
 	; This goes unstable, so the high byte of the target address will be changed.
 	; Hi = ($1E+1) & A & X;
-	; 	 = $05
-	; $500 = X & H
+	; 	 = $1F
+	; $1F00 = X & H
 	; H is the high byte of the target address before adding the Y offset.
-	; So we should write $1F to $0700
+	; So we should write $1F to $1F00, a mirror of $0700
 	; Before we check $0700, this instruction just destroyed the stack pointer.
 	TSX
 	CPX $0501
@@ -2957,19 +2957,19 @@ TEST_UnofficialInstructions_SHS_Continue:
 	LDA #$80
 	STA <$50
 	LDA #$1E
-	STA <$51 ; ($51) = $1E80
+	STA <$51 ; ($50) = $1E80
 	LDA #$1F
 	LDX #$FF
 	LDY #$80
 	.byte $93, $50 ; SHA ($50) -> $1E80
 	; This goes unstable, so the high byte of the target address will be changed.
 	; Hi = ($1E+1) & A & X;
-	; 	 = $05
-	; $500 = A & X & H
-	;	   = $1F & $FF & $1F
-	;	   = $1F
+	; 	 = $1F
+	; $1F00 = A & X & H
+	;	    = $1F & $FF & $1F
+	;	    = $1F
 	; H is the high byte of the target address +1.
-	; So we should write $1F to $0700
+	; So we should write $1F to $1F00, a mirror of $0700
 	LDA $0700
 	CMP #$1F
 	BNE TEST_Fail5
