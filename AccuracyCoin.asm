@@ -2865,13 +2865,13 @@ TEST_UnofficialInstructionsExist:
 	.word $1E80 ; Use a mirror
 	; This goes unstable, so the high byte of the target address will be changed.
 	; Hi = ($1E+1) & A & X;
-	; 	 = $05
+	; 	 = $1F
 	; $500 = A & X & H
 	;	   = $1F & $FF & $1F
 	;	   = $1F
 	; H is the high byte of the target address +1.
 	; I'm also specifically running a test here where X = $FF, due to this isntruction having a magic number, and I'd rather not worry about that in this specific test.
-	; So we should write $1F to $0700
+	; So we should write $1F to $1F00, a mirror of $0700
 	LDA $0700
 	CMP #$1F
 	BNE TEST_Fail5
