@@ -11,8 +11,11 @@ Here's an example of the menu in this ROM shown on an emulator failing a few tes
 
 # Navigating the menus
 Use the D-Pad to move the cursor up or down.  
+Pressing A will run the highlighted test.  
+Pressing B will mark the highlighted test to be skipped. You can press B again to un-mark the test. This is useful if any tests are crashing the console or emulator and you still want to see the table of results.  
 If the cursor is at the top of the page (highlighting the current page index), pressing left and right will scroll to a new page of tests.  
 If the cursor is at the top of the page (highlighting the current page index), pressing A will run all tests on the page.  
+If the cursor is at the top of the page (highlighting the current page index), pressing B will mark all tests on the page to be skipped.  
 If the cursor is at the top of the page (highlighting the current page index), pressing Start will run all tests on the ROM, and then draw a table showing the results of every test.
 
 Examples:

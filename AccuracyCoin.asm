@@ -88,6 +88,7 @@ DebugMode = $3B
 IncorrectReturnAddressOffset = $3C
 AllTestMenuTestNameOffsetLo = $3D
 AllTestMenuTestNameOffsetHi = $3E
+AllTestMenuTotalSkipped = $3F
 
 Reserverd_41 = $41 ; Used in the Implied Dummy Reads. It's probably best we never actually use this.
 
@@ -900,6 +901,9 @@ AREROM_MenuLoop4:
 	BNE AREROM_MenuLoop4
 	; Now to print the results of each test in columns corresponding to the pages and indexes into the pages.
 	
+	LDA #0
+	STA <AllTestMenuTotalSkipped
+	
 AREROM_PageColumnLoop1:
 	STY <menuTabXPos
 	JSR SetUpSuitePointer         ; Set up the suite pointer.
@@ -931,6 +935,14 @@ AREROM_PageColumnLoop2:           ; Check results of every test on the page Y.
 	ASL A
 	TAX
 	LDA [suitePointerList,X]	; read the result of test X of page Y
+	CMP #$FF					; If the result is $FF, we actually skipped this test.
+	BNE AREROM_PageEvaluate
+AERROM_SkipTest:
+	LDA #$24					; Print a blank space.
+	STA $2007					; ^
+	INC <AllTestMenuTotalSkipped
+	JMP AERROP_Next
+AREROM_PageEvaluate:
 	AND #01
 	BEQ AREROM_PrintFail ; If the result isn't 1, print the error code
 	; and if it passes, print a blue square.
@@ -1025,7 +1037,19 @@ AERROP_AttributeLoop:
 	STA $2007
 	LDA <PostAllTestTally
 	JSR PrintByteDecimal_MinDigits
-
+	
+	LDA <AllTestMenuTotalSkipped
+	BEQ AERROP_NoneSkipped
+	; Since we skipped some tests, let's print how many tests we skipped.
+	JSR PrintText
+	.word $22C5
+	.byte "Tests skipped:", $FF
+	JSR SetPPUADDRFromWord
+	.byte $22, $D4
+	LDA <AllTestMenuTotalSkipped
+	JSR PrintByteDecimal_MinDigits
+	
+AERROP_NoneSkipped:
 	; I'd like to also like to label each of these columns with a page number.
 	JSR PrintText
 	.word $206E
@@ -1466,6 +1490,16 @@ SetPPUSCROLLFromWord:	; pretty much the same as SetPPUADDRFromWord, but it write
 	LDA <$FF
 	RTS
 ;;;;;;;
+
+AsciiToCHR:					; This table converts the ASCII values stored in the ROM to the indexes into the pattern table I made.
+	.byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
+	.byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
+	.byte $24, $26, $24, $24, $35, $24, $24, $24, $24, $24, $32, $30, $29, $31, $25, $33
+	.byte $00, $01, $02, $03, $04, $05, $06, $07, $08, $09, $28, $24, $24, $34, $24, $27
+	.byte $24, $0A, $0B, $0C, $0D, $0E, $0F, $10, $11, $12, $13, $14, $15, $16, $17, $18
+	.byte $19, $1A, $1B, $1C, $1D, $1E, $1F, $20, $21, $22, $23, $24, $24, $24, $24, $24
+	.byte $24, $0A, $0B, $0C, $0D, $0E, $0F, $10, $11, $12, $13, $14, $15, $16, $17, $18
+	.byte $19, $1A, $1B, $1C, $1D, $1E, $1F, $20, $21, $22, $23;, $24, $24, $24, $24, $24
 
 TEST_RunSHASHS_AddrInitAXYFS:
 	;.word TargetAddress
@@ -14526,7 +14560,7 @@ ReadPalLoop:
 ;;;;;;;
 
 DefaultPalette:	; The default palette for the main menu.
-	.byte $2D,$30,$30,$30,$0F,$21,$21,$21,$0F,$26,$26,$26,$0F,$2D,$2D,$2D
+	.byte $2D,$30,$30,$30,$0F,$21,$21,$21,$0F,$26,$26,$26,$0F,$2D,$2D,$0F
 	.byte $2D,$30,$30,$30,$0F,$30,$30,$30,$0F,$30,$30,$30,$0F,$26,$26,$26	
 SetUpDefaultPalette: ; This function overwrites palette RAM with the values in the above table.
 	LDA #$3F
@@ -14809,17 +14843,24 @@ DrawTEST:	; This will print "TEST", "PASS", "FAIL x" or "...." depending on if t
 	CMP #3
 	BNE DrawTEST_NotDRAW
 	LDA #4
-	BNE DrawTEST_PrintDRAW
+	BNE DrawTEST_Print ; Branch always.
 DrawTEST_NotDRAW: ; some tests say "DRAW" instead of "TEST". These say "TEST" though.
 	LDA [suitePointerList,X]
+	CMP #$FF ; If the error code is $FF, we skip this test in the all-test-mode.
+	BNE DrawTEST_NotSkip
+	LDA #5
+	BNE DrawTEST_Print ; Branch always.
+DrawTEST_NotSkip:
 	STA <ErrorCode
 	; 0 = "TEST"
 	; 1 = "PASS"
 	; 2 = "FAIL"
 	; 3 = "...." for a test in progress.
+	; 4 = "DRAW"
+	; 5 = "SKIP"
 	;;;;;;;;;;;;
 	AND #$3 ; bits 0 and 1 hold the results. Bits 3+ hold error codes for printing what failed.
-DrawTEST_PrintDRAW:
+DrawTEST_Print:
 	TAX
 	TAY
 	LDA TestPassFailBlend,Y
@@ -14828,19 +14869,19 @@ DrawTEST_PrintDRAW:
 	STA $2007
 	TXA
 	TAY
-	LDA TestPassFailBlend+5,Y
+	LDA TestPassFailBlend+6,Y
 	TAY
 	LDA AsciiToCHR,Y
 	STA $2007
 	TXA
 	TAY
-	LDA TestPassFailBlend+10,Y
+	LDA TestPassFailBlend+12,Y
 	TAY
 	LDA AsciiToCHR,Y
 	STA $2007
 	TXA
 	TAY
-	LDA TestPassFailBlend+15,Y
+	LDA TestPassFailBlend+18,Y
 	TAY
 	LDA AsciiToCHR,Y
 	STA $2007
@@ -14920,12 +14961,17 @@ UpdateTESTAttributes_NotDRAW:
 	; read the test results
 	LDX <$FD
 	TXA
+	CMP #$FF
+	BNE UpdateTESTAttributes_NotSkip
+	LDA #$03
+	BNE UpdateTESTAttributes_Print
+UpdateTESTAttributes_NotSkip:
 	ASL A
 	TAX	
 	LDA [suitePointerList,X]
 	AND #3
-	TAX
-
+UpdateTESTAttributes_Print:
+	TAX	
 	; the palette will be the results.
 	LDA AttributePaletteNybbles,X
 	AND AttributeNybbles, Y
@@ -15118,21 +15164,10 @@ AttributePaletteNybbles:	; Attribute nybbles used in UpdateTESTAttributes
 	.byte $00, $55, $AA, $FF
 	
 TestPassFailBlend:			; These are used in DrawTEST. index 0 of each of these spells "TEST". index 1 spells "PASS" and so on.
-	.byte "TPF.D"
-	.byte "EAA.R"
-	.byte "SSI.A"
-	.byte "TSL.W"
-
-AsciiToCHR:					; This table converts the ASCII values stored in the ROM to the indexes into the pattern table I made.
-	.byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
-	.byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
-	.byte $24, $26, $24, $24, $35, $24, $24, $24, $24, $24, $32, $30, $29, $31, $25, $33
-	.byte $00, $01, $02, $03, $04, $05, $06, $07, $08, $09, $28, $24, $24, $34, $24, $27
-	.byte $24, $0A, $0B, $0C, $0D, $0E, $0F, $10, $11, $12, $13, $14, $15, $16, $17, $18
-	.byte $19, $1A, $1B, $1C, $1D, $1E, $1F, $20, $21, $22, $23, $24, $24, $24, $24, $24
-	.byte $24, $0A, $0B, $0C, $0D, $0E, $0F, $10, $11, $12, $13, $14, $15, $16, $17, $18
-	.byte $19, $1A, $1B, $1C, $1D, $1E, $1F, $20, $21, $22, $23;, $24, $24, $24, $24, $24
-
+	.byte "TPF.DS"
+	.byte "EAA.RK"
+	.byte "SSI.AI"
+	.byte "TSL.WP"
 
 NMI_Routine:
 	; This is the NMI routine for the main menu.
@@ -15235,8 +15270,7 @@ NMI_EnterDebugModeLoop7:
 	STA $2001
 	JSR EnableNMI
 	JSR SetPPUADDRFromWord
-	.byte $2C, $00
-	
+	.byte $2C, $00	
 	
 NMI_NotPressingSelect:
 	LDA <DebugMode
@@ -15254,6 +15288,13 @@ NMI_Continue:
 	JSR RunTest	
 	JMP ExitNMI
 NMI_Menu_NotBeginningTest:
+	LDA <controller_New
+	AND #$40 ; B
+	BEQ NMI_Menu_NotSkippingTest
+	; Run test!
+	JSR MarkTestToSkip	
+	JMP ExitNMI
+NMI_Menu_NotSkippingTest:
 	LDA <controller_New
 	AND #$04 ; Down
 	BEQ NMI_Menu_NotMovingDown
@@ -15332,6 +15373,12 @@ NMI_Menu_Top_NotPressingDown:
 	BEQ NMI_Menu_Top_NotPressingA
 	JSR AutomaticallyRunEveryTestInSuite
 NMI_Menu_Top_NotPressingA:
+	; If we press B, let's mark every test in the suite to be skipped!
+	LDA <controller_New
+	AND #$40 ; B
+	BEQ NMI_Menu_Top_NotPressingB
+	JSR MarkEveryTestInSuiteToSkip
+NMI_Menu_Top_NotPressingB:
 	; If we press Start, let's run every test in the ROM!
 	LDA <controller_New
 	AND #$10 ; Start
@@ -15360,6 +15407,29 @@ AutomaticallyRunEveryTestLoop:    ; This loop runs once per test on a page.
 	STA <AutomateTestSuite        ; Disable the "AutomateTestSuite" variable.
 	JSR ResetScroll               ; Reset the PPU scroll.
 	JSR EnableNMI                 ; And enable the MNI.
+	RTS
+;;;;;;;
+
+MarkEveryTestInSuiteToSkip:
+	LDA #1
+	STA <AutomateTestSuite        ; The "AutomateTestSuite" variable is used to prevent awkward highlighting of the test results.
+	JSR DisableNMI                ; Disable the NMI, since we're not going to want any extra NMI's running in the middle of this.
+	JSR DisableRendering
+	LDX #0
+MarkEveryTestInSuiteToSkipLoop:    ; This loop runs once per test on a page.
+	STX <menuCursorYPos           ; The "menuCursorYPos" variable is used inside RunTest to determine what code to run.
+	JSR MarkTestToSkip                   ; Run the test at this index into the page.
+	INX                           ; increment X until X=MenuHeight.
+	CPX <menuHeight               ; The "menuHeight" is just how many tests are on a page.
+	BNE MarkEveryTestInSuiteToSkipLoop
+	LDA #$FF
+	STA <menuCursorYPos           ; A "menuCursorYPos" of $FF is the top of the menu. (Highlighting the page number)
+	LDA #0
+	STA <AutomateTestSuite        ; Disable the "AutomateTestSuite" variable.
+	JSR ResetScroll               ; Reset the PPU scroll.
+	JSR WaitForVBlank
+	JSR EnableNMI                 ; And enable the MNI.
+	JSR EnableRendering_BG
 	RTS
 ;;;;;;;
 
@@ -15516,16 +15586,32 @@ RunTest_AllTestSkipNMI:
 	STA <TestResultPointer        ; and store it in RAM
 	LDA <suitePointerList+1,X     ; read the high byte of where to store the test results.
 	STA <TestResultPointer+1      ; and store it in RAM next to the low byte.
+	
+	LDY #0                        ; set up Y for the upcoming indirect reads.
+	LDA [TestResultPointer],Y     ; check if this test is marked to be skipped.
+	CMP #$FF                      ; If the "test results" are $FF, we skip this one.
+	BNE RunTest_SkipSkip          ; If we aren't skipping tests, jump over these next few lines.
+	JSR ResetScrollAndWaitForVBlank; Wait for vblank, otherwise skipping many tests causes enough time for vblank to end before a future test attempts to draw their status.
 	LDA <RunningAllTests
-	BNE RunTest_AllTestSkipDrawing1
-	LDY #0
+	BNE RunTest_AllTestSkipSkip
+	JSR EnableNMI                 ; Enable NMI. (Wait for VBlank pokes $2002, so the NMI doesn't happen here.)
+RunTest_AllTestSkipSkip:
+	JSR EnableRendering_BG	      ; enable rendering the background. (If skipping the first test in the all-test-mode, the screen would otherwise be blanked until the first non-skipped test.)
+	LDY <Copy_Y2			      ; Restore the Y register
+	LDX <Copy_X2			      ; Restore the X register
+	LDA <Copy_A2			      ; Restore the A register
+	RTS                           ; RTS.
+	
+RunTest_SkipSkip:
+	LDA <RunningAllTests          ; Check if this is in the all-test mode.
+	BNE RunTest_AllTestSkipDraw1  ; If so, skip updating the status.
 	LDA #3	                      ; a value of 3 here is used to draw "...." as the test status.
 	STA [TestResultPointer],Y     ; mark this test as "in progress"
 	LDX <menuCursorYPos           ; load X for the upcoming subroutines.
 	JSR DrawTEST	              ; replace the word "TEST" with "...."
 	JSR HighlightTest             ; and highlight it, since the cursor is still here.
 	JSR ResetScroll		          ; Reset the scroll before the test, since we just modified 'v' inside the previous subroutines.
-RunTest_AllTestSkipDrawing1:
+RunTest_AllTestSkipDraw1:
 	LDA #1
 	STA <ErrorCode                ; set this to 1 before running any tests.
 	STA <initialSubTest			  ; Some tests have multiple sets of tests to run, all using the same code. So writing here changes the test value.
@@ -15540,8 +15626,8 @@ RunTest_AllTestSkipDrawing1:
 	STA <Copy_A
 	LDA #0
 	STA $4015					  ; Disable the DMC.
-	LDA <RunningAllTests
-	BNE RunTest_AllTestSkipDrawing2
+	LDA <RunningAllTests          ; Check if this is in the all-test mode.
+	BNE RunTest_AllTestSkipDraw2  ; If so, skip updating the status.
 	LDA <Copy_A
 	JSR WaitForVBlank			  ; and wait for VBlank before updating the "...." text with the results.
 	LDX <menuCursorYPos		      ; load X for the upcoming subroutines.
@@ -15553,14 +15639,52 @@ RunTest_AllTestSkipDrawing1:
 RunTest_SkipHighlightResult:
 	JSR SetUpNMIRoutineForMainMenu; Recreate the NMI routine JMP, since some tests need their own NMI routine.
 	JSR EnableNMI			      ; With the test over, re-enable the NMI
-RunTest_AllTestSkipDrawing2:	  ; If we're running all tests, we don't need the NMI to run.
+RunTest_AllTestSkipDraw2:	      ; If we're running all tests, we don't need the NMI to run.
 	JSR DisableRendering_S        ; disable rendering sprites.
-	JSR EnableRendering_BG	      ; and enable rendering teh background. This should still occur during Vblank.
+	JSR EnableRendering_BG	      ; and enable rendering the background. This should still occur during Vblank.
 	LDA #0
 	STA <dontSetPointer
 	LDY <Copy_Y2			      ; Restore the Y register
 	LDX <Copy_X2			      ; Restore the X register
 	LDA <Copy_A2			      ; Restore the A register
+	RTS
+;;;;;;;
+
+MarkTestToSkip:
+	STX <Copy_X
+	LDX <menuCursorYPos           ; X = which test from the current suite
+	TXA
+	ASL A				          ; Double X, since we're reading a 2-byte word from a list of 2-byte words.
+	TAX
+	
+	LDA <suitePointerList+1,X
+	CMP #3	; if the page used to store the results is page 3 instead of page 4, it's a DRAW test. Forbid skipping it.
+	BEQ MarkTestToSkip_RTS
+	
+	LDA <suitePointerList,X	      ; read the low byte of where to store the test results.
+	STA <TestResultPointer        ; and store it in RAM
+	LDA <suitePointerList+1,X     ; read the high byte of where to store the test results.
+	STA <TestResultPointer+1      ; and store it in RAM next to the low byte.
+	
+	LDY #0                        ; set up Y for the upcoming indirect reads.
+	LDA [TestResultPointer],Y     ; check if this test is already marked to be skipped.
+	CMP #$FF                      ; If the "test results" are $FF, we need to clear it to zero.
+	BEQ MarkTestToUnSkip
+	LDA #$FF                      ; Mark this test to be skipped by storing $FF in the results.
+	STA [TestResultPointer],Y
+	BNE MarkTestToSkip_UpdateNametable	
+MarkTestToUnSkip:
+	LDA #0                        ; Mark this test as not-yet-ran.
+	STA [TestResultPointer],Y
+MarkTestToSkip_UpdateNametable:
+	LDX <menuCursorYPos
+	JSR DrawTEST
+	JSR UpdateTESTAttributes
+	LDA <AutomateTestSuite        ; I use AutomateTestSuite when pressing B to mark all tests on a suite to be skipped.
+	BNE MarkTestToSkip_RTS
+	JSR HighlightTest
+MarkTestToSkip_RTS:
+	LDX <Copy_X
 	RTS
 ;;;;;;;
 
