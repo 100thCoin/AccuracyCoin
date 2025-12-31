@@ -3,7 +3,7 @@ AccuracyCoin is a large collection of NES accuracy tests on a single NROM cartri
 
 This ROM was designed for an NTSC console with an RP2A03G CPU and RP2C02G PPU. Some tests might fail on hardware with a different revision.
 
-This ROM currently has 132 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
+This ROM currently has 131 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
 Here's an example of the menu in this ROM shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been run yet. (The cursor is currently next to the "RAM Mirroring" test.)
 
@@ -97,28 +97,6 @@ For more information, I recommend reading the fully commented assembly code for 
   7: Reading from $4015 should not update the databus.  
   8: Writing should always update the databus, even writing to $4015.  
   9: Bit 5 of address $4015 should be open bus.  
-
-### Unofficial Instructions
-  1: Does "SLO Absolute" do vaguely what's expected of it?  
-  2: Does "ANC Immediate" do vaguely what's expected of it?  
-  3: Does "RLA Absolute" do vaguely what's expected of it?  
-  4: Does "SRE Absolute" do vaguely what's expected of it?  
-  5: Does "ASR Immediate" do vaguely what's expected of it?  
-  6: Does "RRA Absolute" do vaguely what's expected of it?  
-  7: Does "ARR Immediate" do vaguely what's expected of it?  
-  8: Does "SAX Absolute" do vaguely what's expected of it?  
-  9: Does "ANE Immediate" do vaguely what's expected of it?  
-  A: Does "SHA Absolute, Y" do vaguely what's expected of it?  
-  B: Does "SHX Absolute, Y" do vaguely what's expected of it?  
-  C: Does "SHY Absolute, X" do vaguely what's expected of it?  
-  D: Does "SHS Absolute, Y" do vaguely what's expected of it?  
-  E: Does "SHA (Indirect) Y" do vaguely what's expected of it?  
-  F: Does "LAX Absolute" do vaguely what's expected of it?  
-  G: Does "LXA Immediate" do vaguely what's expected of it?  
-  H: Does "LAE Absolute, Y" do vaguely what's expected of it?  
-  I: Does "DCP Absolute" do vaguely what's expected of it?  
-  J: Does "AXS Immediate" do vaguely what's expected of it?  
-  K: Does "ISC Absolute" do vaguely what's expected of it?  
 
 ### All NOP Instructions
   (See message printed on screen for more details)  
@@ -743,3 +721,27 @@ In case you are running an old version of this ROM and are still looking for an 
   3: The Y Register should be $00 at power on.  
   4: The Stack Pointer should be $FD at power on.  
   5: The Interrupt Flag should be set at power on.
+
+### Unofficial Instructions
+  (removed because this test no longer needs to exist. I have individual tests for every non-NOP unofficial opcode.)  
+  1: Does "SLO Absolute" do vaguely what's expected of it?  
+  2: Does "ANC Immediate" do vaguely what's expected of it?  
+  3: Does "RLA Absolute" do vaguely what's expected of it?  
+  4: Does "SRE Absolute" do vaguely what's expected of it?  
+  5: Does "ASR Immediate" do vaguely what's expected of it?  
+  6: Does "RRA Absolute" do vaguely what's expected of it?  
+  7: Does "ARR Immediate" do vaguely what's expected of it?  
+  8: Does "SAX Absolute" do vaguely what's expected of it?  
+  9: Does "ANE Immediate" do vaguely what's expected of it?  
+  A: Does "SHA Absolute, Y" do vaguely what's expected of it?  
+  B: Does "SHX Absolute, Y" do vaguely what's expected of it?  
+  C: Does "SHY Absolute, X" do vaguely what's expected of it?  
+  D: Does "SHS Absolute, Y" do vaguely what's expected of it?  
+  E: Does "SHA (Indirect) Y" do vaguely what's expected of it?  
+  F: Does "LAX Absolute" do vaguely what's expected of it?  
+  G: Does "LXA Immediate" do vaguely what's expected of it?  
+  H: Does "LAE Absolute, Y" do vaguely what's expected of it?  
+  I: Does "DCP Absolute" do vaguely what's expected of it?  
+  J: Does "AXS Immediate" do vaguely what's expected of it?  
+  K: Does "ISC Absolute" do vaguely what's expected of it?  
+  
