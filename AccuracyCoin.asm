@@ -5350,14 +5350,42 @@ TEST_NMI_VBL_End_Loop:
 	CPX #$07
 	BNE TEST_NMI_VBL_End_Loop ; loop until X=7
 	; Address $50 should now look exactly like TEST_VBlank_Beginning_Expected_Results
+	; Now let's do the same thing again, but with the NMI occurring after a 2-cycle NOP instead of the 4-cycle PLA.
+	; The timing of the NMI occuring should be exactly the same despite the interrupt polling occuring on a different cycle.
 	LDX #0
 TEST_NMI_VBL_End_Loop2:
+	TXA
+	LDY #0
+	JSR VblSync_Plus_A
+	; This next CPU cycle is synced with PPU cycle 0+A for this frame.
+	; VBlank ends in about 2273.333 CPU cycles.
+	; So let's stall for 2200 cycles.
+	JSR Clockslide_2252
+	JSR Clockslide_15
+	LDA #$80
+	STA $2000
+	NOP
+	NOP
+	LDA #0
+	STA $2000
+	TYA
+	STA <$60,X	; store in $60,X	
+	INX	
+	CPX #$07
+	BNE TEST_NMI_VBL_End_Loop2 ; loop until X=7
+	; Address $50 should now look exactly like TEST_VBlank_Beginning_Expected_Results
+	
+	LDX #0
+TEST_NMI_VBL_End_Loop3:
 	LDA <$50,X
+	CMP TEST_NMI_VBL_End_Expected_Results,X
+	BNE FAIL_NMI_VBL_End
+	LDA <$60,X
 	CMP TEST_NMI_VBL_End_Expected_Results,X
 	BNE FAIL_NMI_VBL_End
 	INX
 	CPX #$07
-	BNE TEST_NMI_VBL_End_Loop2
+	BNE TEST_NMI_VBL_End_Loop3
 	
 	;; END OF TEST ;;
 	LDA #1
