@@ -1322,6 +1322,44 @@ DMASync05_Loop:
 	RTS
 ;;;;;;;
 	
+MarkTestToSkip:
+	STX <Copy_X
+	LDX <menuCursorYPos           ; X = which test from the current suite
+	TXA
+	ASL A				          ; Double X, since we're reading a 2-byte word from a list of 2-byte words.
+	TAX
+	
+	LDA <suitePointerList+1,X
+	CMP #3	; if the page used to store the results is page 3 instead of page 4, it's a DRAW test. Forbid skipping it.
+	BEQ MarkTestToSkip_RTS
+	
+	LDA <suitePointerList,X	      ; read the low byte of where to store the test results.
+	STA <TestResultPointer        ; and store it in RAM
+	LDA <suitePointerList+1,X     ; read the high byte of where to store the test results.
+	STA <TestResultPointer+1      ; and store it in RAM next to the low byte.
+	
+	LDY #0                        ; set up Y for the upcoming indirect reads.
+	LDA [TestResultPointer],Y     ; check if this test is already marked to be skipped.
+	CMP #$FF                      ; If the "test results" are $FF, we need to clear it to zero.
+	BEQ MarkTestToUnSkip
+	LDA #$FF                      ; Mark this test to be skipped by storing $FF in the results.
+	STA [TestResultPointer],Y
+	BNE MarkTestToSkip_UpdateNametable	
+MarkTestToUnSkip:
+	LDA #0                        ; Mark this test as not-yet-ran.
+	STA [TestResultPointer],Y
+MarkTestToSkip_UpdateNametable:
+	LDX <menuCursorYPos
+	JSR DrawTEST
+	JSR UpdateTESTAttributes
+	LDA <AutomateTestSuite        ; I use AutomateTestSuite when pressing B to mark all tests on a suite to be skipped.
+	BNE MarkTestToSkip_RTS
+	JSR HighlightTest
+MarkTestToSkip_RTS:
+	LDX <Copy_X
+	RTS
+;;;;;;;
+	
 PrintTestName:
 	TXA
 	PHA
@@ -15647,44 +15685,6 @@ RunTest_AllTestSkipDraw2:	      ; If we're running all tests, we don't need the 
 	LDY <Copy_Y2			      ; Restore the Y register
 	LDX <Copy_X2			      ; Restore the X register
 	LDA <Copy_A2			      ; Restore the A register
-	RTS
-;;;;;;;
-
-MarkTestToSkip:
-	STX <Copy_X
-	LDX <menuCursorYPos           ; X = which test from the current suite
-	TXA
-	ASL A				          ; Double X, since we're reading a 2-byte word from a list of 2-byte words.
-	TAX
-	
-	LDA <suitePointerList+1,X
-	CMP #3	; if the page used to store the results is page 3 instead of page 4, it's a DRAW test. Forbid skipping it.
-	BEQ MarkTestToSkip_RTS
-	
-	LDA <suitePointerList,X	      ; read the low byte of where to store the test results.
-	STA <TestResultPointer        ; and store it in RAM
-	LDA <suitePointerList+1,X     ; read the high byte of where to store the test results.
-	STA <TestResultPointer+1      ; and store it in RAM next to the low byte.
-	
-	LDY #0                        ; set up Y for the upcoming indirect reads.
-	LDA [TestResultPointer],Y     ; check if this test is already marked to be skipped.
-	CMP #$FF                      ; If the "test results" are $FF, we need to clear it to zero.
-	BEQ MarkTestToUnSkip
-	LDA #$FF                      ; Mark this test to be skipped by storing $FF in the results.
-	STA [TestResultPointer],Y
-	BNE MarkTestToSkip_UpdateNametable	
-MarkTestToUnSkip:
-	LDA #0                        ; Mark this test as not-yet-ran.
-	STA [TestResultPointer],Y
-MarkTestToSkip_UpdateNametable:
-	LDX <menuCursorYPos
-	JSR DrawTEST
-	JSR UpdateTESTAttributes
-	LDA <AutomateTestSuite        ; I use AutomateTestSuite when pressing B to mark all tests on a suite to be skipped.
-	BNE MarkTestToSkip_RTS
-	JSR HighlightTest
-MarkTestToSkip_RTS:
-	LDX <Copy_X
 	RTS
 ;;;;;;;
 
