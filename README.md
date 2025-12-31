@@ -7,7 +7,7 @@ This ROM currently has 131 tests. These tests print "PASS" or "FAIL" on screen, 
 
 Here's an example of the menu in this ROM shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been run yet. (The cursor is currently next to the "The Decimal Flag" test.)
 
-<img width="256" height="240" alt="Page1" src="https://github.com/user-attachments/assets/c1287d64-2db3-4a66-9761-3a7b618976a6" />
+<img width="256" height="240" alt="Page1" src="https://github.com/user-attachments/assets/335502f4-d5ac-4aed-ac1f-e31ea614d2a3" />
 
 # Navigating the menus
 Use the D-Pad to move the cursor up or down.  
