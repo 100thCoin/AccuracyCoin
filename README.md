@@ -5,7 +5,7 @@ This ROM was designed for an NTSC console with an RP2A03G CPU and RP2C02G PPU. S
 
 This ROM currently has 131 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
-Here's an example of the menu in this ROM shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been run yet. (The cursor is currently next to the "RAM Mirroring" test.)
+Here's an example of the menu in this ROM shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been run yet. (The cursor is currently next to the "The Decimal Flag" test.)
 
 ![AccuracyCoin_Page1](https://github.com/user-attachments/assets/2c17ad97-d702-43d1-9650-e185036d95c8)
 
