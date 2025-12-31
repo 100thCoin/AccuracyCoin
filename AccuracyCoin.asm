@@ -938,7 +938,7 @@ AREROM_PageColumnLoop2:           ; Check results of every test on the page Y.
 	CMP #$FF					; If the result is $FF, we actually skipped this test.
 	BNE AREROM_PageEvaluate
 AERROM_SkipTest:
-	LDA #$24					; Print a blank space.
+	LDA #$C9					; Print a unique "square" tile to indicate that the test was skipped.
 	STA $2007					; ^
 	INC <AllTestMenuTotalSkipped
 	JMP AERROP_Next
