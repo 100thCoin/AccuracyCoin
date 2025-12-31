@@ -7,7 +7,7 @@ This ROM currently has 131 tests. These tests print "PASS" or "FAIL" on screen, 
 
 Here's an example of the menu in this ROM shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been run yet. (The cursor is currently next to the "RAM Mirroring" test.)
 
-![AccuracyCoin_Page1](https://github.com/user-attachments/assets/2c17ad97-d702-43d1-9650-e185036d95c8)
+<img width="256" height="240" alt="Page1" src="https://github.com/user-attachments/assets/c1287d64-2db3-4a66-9761-3a7b618976a6" />
 
 # Navigating the menus
 Use the D-Pad to move the cursor up or down.  
@@ -17,7 +17,7 @@ If the cursor is at the top of the page (highlighting the current page index), p
 
 Examples:
 
-![Result_Table](https://github.com/user-attachments/assets/f6c502a5-6891-4d2e-ad70-ad9d09e83991)
+<img width="563" height="240" alt="TableComp" src="https://github.com/user-attachments/assets/33b6b6d0-0509-4791-a3de-041ab681a43f" />
 
 Any test with multiple acceptable passing behaviors will be drawn with a light blue number over it.
 
