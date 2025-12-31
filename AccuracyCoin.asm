@@ -5310,7 +5310,7 @@ TEST_VBlank_End_Loop2:
 ;;;;;;;
 
 TEST_VBlank_End_Expected_Results:
-	.byte $01, $01, $01, $01, $00, $00, $00, $00
+	.byte $01, $01, $01, $01, $00, $00, $00
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 FAIL_NMI_Control1:
@@ -7413,7 +7413,8 @@ TEST_ControllerStrobing:
 	; cycle 5: write ($41) to $4016, then DEC to ($40)
 	; cycle 6: write ($40) to $4016
 	;
-	; This results in a 1-cycle strobe of the controller ports, and if that 1-cycle strobe happens on a get cycle, the controllers actually aren't strobed at all!
+	; This results in a 1-cycle strobe of the controller ports!
+	; - if that 1-cycle strobe happens on a get cycle, the controllers actually aren't strobed at all! (See the next error code)
 	JSR WaitForVBlank
 	LDA #2
 	STA $4014 ; sync CPU with put cycle.
@@ -13775,9 +13776,9 @@ TEST_StaleBGShiftRegisters:
 	BEQ FAIL_StaleShiftRegisters
 	INC <ErrorCode
 
-	;;; Test 4 [Stale BG Shift Registers]: This is just testing a quirk of the sprite shifters, and how if rendering was disabled on dot 339, all sprites are treated as X = 0 ;;;
+	;;; Test 4 [Stale BG Shift Registers]: This is just testing a quirk of the sprite shifters, and how if rendering wasn't enabled when dot 339 occurs, all sprites are treated as X = 0 ;;;
 	JSR SetUpSpriteZero
-	.byte $06, $C8, $03, $80 ; X = 80. Sprite zero will be still drawn immediately after rendering is enabled. (Rendering was disabled on dot 339)
+	.byte $06, $C8, $03, $80 ; X = 80. Sprite zero will be still drawn immediately after rendering is enabled. (Dot 339 occured while rendering was still disabled)
 	LDA #2
 	STA $4014
 	JSR Test_StaleShiftRegisters_Run
