@@ -588,7 +588,7 @@ or
   1: Sprite Zero Hits should be working.  
   2: Sprite Zero hits shouldn't occur if sprite zero isn't overlapping a solid pixel.  
   3: The background shift registers should not be clocked during H-Blank or F-Blank. After re-enabling rendering, a sprite zero hit should be able to occur entirely on stale background shift register data.  
-  4: The sprite shifters should treat all sprites X positions as 0 if rendering was disabled on dot 339.  
+  4: The sprite shifters should treat all sprites X positions as 0 if rendering has already been disabled and remains that way during dot 339.  
 
 ### BG Serial In
   1: Sprite zero hits should not occur when the nametable is entirely blank.  
