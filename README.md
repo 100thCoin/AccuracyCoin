@@ -3,7 +3,7 @@ AccuracyCoin is a large collection of NES accuracy tests on a single NROM cartri
 
 This ROM was designed for an NTSC console with an RP2A03G CPU and RP2C02G PPU. Some tests might fail on hardware with a different revision.
 
-This ROM currently has 131 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
+This ROM currently has 132 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
 Here's an example of the menu in this ROM shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been run yet. (The cursor is currently next to the "RAM Mirroring" test.)
 
@@ -228,6 +228,10 @@ For more information, I recommend reading the fully commented assembly code for 
   1: LDA $4000 should not read back $00 if a DMA did not occur.  
   2: The DMC DMA was either on the wrong cycle, or it did not update the data bus.  
 
+### DMA + $2002 Read
+  1: Your emulator did not pass the "SLO Absolute, X" test.  
+  2: The DMC DMA was either on the wrong cycle, or the halt/alignment cycles did not read from $2002.  
+
 ### DMA + $2007 Read
   1: The PPU Read Buffer is not working.  
   2: The DMC DMA was either on the wrong cycle, or the halt/alignment cycles did not read from $2007.  
@@ -243,15 +247,6 @@ For more information, I recommend reading the fully commented assembly code for 
 
 ### DMA + $4016 Read
   1: The DMC DMA was either on the wrong cycle, or the halt/alignment cycles did not read from $4016, which otherwise should have clocked the controller port.  
-
-### APU Register Activation
-  1: A series of prerequisite tests failed. CPU and PPU open bus, PPU Read Buffer, DMA + Open Bus, and DMA + $2007 Read.  
-  2: Reading from $4015 should clear the APU Frame Counter Interrupt flag.  
-  3: The OAM DMA should not be able to read from the APU registers if $40 is written to $4016, and the CPU Address Bus is not in the range of $4000 to $401F.  
-  4: Something went wrong during the open bus execution. Controller port 2 was possibly clocked too many times.  
-  5: The OAM DMA should be able to read from the APU registers (and mirrors of them) if $40 is written to $4016, and the CPU Address Bus is in the range of $4000 to $401F.  
-  6: Bus conflicts with the APU registers were not properly emulated.  
-  7: Despite the controller registers not being visible in OAM, the controllers should still be clocked.  
 
 ### DMC DMA Bus Conflicts
   1: The DMA did not occur on the correct CPU cycle.  
@@ -272,7 +267,7 @@ For more information, I recommend reading the fully commented assembly code for 
   3: The 1-cycle DMA should not get delayed by a write cycle, rather it just shouldn't occur in that case.  
   4: If the sample was set to keep looping, the DMC DMA timing in your emulator is off.  
 
-## Page 14: APU Timing
+## Page 14: APU Tests
 
 ### APU Length Counter
   1: Reading from $4015 should not state that the pulse 1 channel is playing before you write to $4003.  
@@ -385,6 +380,15 @@ For more information, I recommend reading the fully commented assembly code for 
   L: Writing to $4015 when the DMC timer has 2 cycles until clocked should not trigger a DMC DMA until after the 3 or 4 CPU cycle delay of writing to $4015.  
   M: Writing to $4015 when the DMC timer has 1 cycle until clocked should not trigger a DMC DMA until after the 3 or 4 CPU cycle delay of writing to $4015.  
   N: Writing to $4015 when the DMC timer has 0 cycles until clocked should not trigger a DMC DMA until after the 3 or 4 CPU cycle delay of writing to $4015.  
+
+### APU Register Activation
+  1: A series of prerequisite tests failed. CPU and PPU open bus, PPU Read Buffer, DMA + Open Bus, and DMA + $2007 Read.  
+  2: Reading from $4015 should clear the APU Frame Counter Interrupt flag.  
+  3: The OAM DMA should not be able to read from the APU registers if $40 is written to $4016, and the CPU Address Bus is not in the range of $4000 to $401F.  
+  4: Something went wrong during the open bus execution. Controller port 2 was possibly clocked too many times.  
+  5: The OAM DMA should be able to read from the APU registers (and mirrors of them) if $40 is written to $4016, and the CPU Address Bus is in the range of $4000 to $401F.  
+  6: Bus conflicts with the APU registers were not properly emulated.  
+  7: Despite the controller registers not being visible in OAM, the controllers should still be clocked.  
 
 ### Controller Strobing
   1: A value of $02 written to $4016 should not strobe the controllers.  
@@ -693,6 +697,10 @@ Some tests have multiple acceptable behaviors that are tested for in this ROM. T
   1: The Address-Bus-High-Byte-Corruption performed a bitwise AND upon ABH with both X and A.  
   2: The Address-Bus-High-Byte-Corruption performed a bitwise AND upon ABH with only X.   
   3: The Address-Bus-High-Byte-Corruption included a magic number to be bitwise ORed with ABH, or did not occur at all.  
+
+### DMA + $2002 Read
+  1: The DMC Load DMA occured after 2 APU cycles. (The common behavior)  
+  2: The DMC Load DMA occured after 3 APU cycles. (The uncommon behavior)  
 
 ### DMA + $4016 Read
   1: The controller was read the way a US-released NES / AV Famicom should read controllers.  

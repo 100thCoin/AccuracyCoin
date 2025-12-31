@@ -304,6 +304,8 @@ result_CHRROMIsNotWritable = $485
 result_RenderingFlagBehavior = $486
 result_BGSerialIn = $487
 
+result_DMA_Plus_2002R = $488
+
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
 result_PowOn_CPUReg = $03FD ; page 3 omits the test from the all-test-result-table.
 result_PowOn_PPURAM = $03FE ; page 3 omits the test from the all-test-result-table.
@@ -676,26 +678,27 @@ Suite_CPUInterrupts:
 Suite_DMATests:
 	.byte "APU Registers and DMA tests", $FF	
 	table "DMA + Open Bus", $FF, result_DMA_Plus_OpenBus, TEST_DMA_Plus_OpenBus
+	table "DMA + $2002 Read", $FF, result_DMA_Plus_2002R, TEST_DMA_Plus_2002R
 	table "DMA + $2007 Read", $FF, result_DMA_Plus_2007R, TEST_DMA_Plus_2007R
 	table "DMA + $2007 Write", $FF, result_DMA_Plus_2007W, TEST_DMA_Plus_2007W
 	table "DMA + $4015 Read", $FF, result_DMA_Plus_4015R, TEST_DMA_Plus_4015R
 	table "DMA + $4016 Read", $FF, result_DMA_Plus_4016R, TEST_DMA_Plus_4016R
-	table "APU Register Activation", $FF, result_APURegActivation, TEST_APURegActivation
 	table "DMC DMA Bus Conflicts", $FF, result_DMABusConflict, TEST_DMABusConflict
 	table "DMC DMA + OAM DMA", $FF, result_DMCDMAPlusOAMDMA, TEST_DMCDMAPlusOAMDMA
 	table "Explicit DMA Abort", $FF, result_ExplicitDMAAbort, TEST_ExplicitDMAAbort
 	table "Implicit DMA Abort", $FF, result_ImplicitDMAAbort, TEST_ImplicitDMAAbort
 	.byte $FF
 	
-	;; APU Timing ;;
+	;; APU Tests ;;
 Suite_APUTiming:
-	.byte "APU Timing", $FF
+	.byte "APU Tests", $FF
 	table "Length Counter", $FF, result_APULengthCounter, TEST_APULengthCounter
 	table "Length Table", $FF, result_APULengthTable, TEST_APULengthTable
 	table "Frame Counter IRQ", $FF, result_FrameCounterIRQ, TEST_FrameCounterIRQ
 	table "Frame Counter 4-step", $FF, result_FrameCounter4Step, TEST_FrameCounter4Step
 	table "Frame Counter 5-step", $FF, result_FrameCounter5Step, TEST_FrameCounter5Step
 	table "Delta Modulation Channel", $FF, result_DeltaModulationChannel, TEST_DeltaModulationChannel
+	table "APU Register Activation", $FF, result_APURegActivation, TEST_APURegActivation
 	table "Controller Strobing", $FF, result_ControllerStrobing, TEST_ControllerStrobing
 	table "Controller Clocking", $FF, result_ControllerClocking, TEST_ControllerClocking
 	.byte $FF
@@ -1749,7 +1752,98 @@ TEST_SHS_Behavior3_Skip:
 ;;;;;;;
 	
 	
+TEST_DMA_Plus_2002R:
 	
+	;;; Test 1 [DMA + $2002]: Verify SLO works. ;;;
+	JSR TEST_SLO_1F
+	LDX #0
+	STX <ErrorCode
+	CMP #1
+	BNE FAIL_DMA_Plus_2002R
+	INC <ErrorCode
+
+	;;; Test 2 [DMA + $2002]: Verify the dummy reads during a DMC DMA can read from $2002 and clear the VBlank flag. ;;;
+	
+	JSR WaitForVBlank
+	LDA #$00
+	STA $4017	; enable the frame counter IRQ, and use the 4-step mode.
+	JSR Clockslide_30000 ; Wait for VBlank with the VBlank flag set.
+	LDA #0
+	.byte $1F
+	.word $4015 ; SLO $4015, X
+	; if this next cycle is a "get", A = $00. If this next cycle is a "put" A = $80.
+	; if the next cycle is a "get", delay by 1 CPU cycle.
+	BPL TEST_DMA_Plus_2002R_putSync
+TEST_DMA_Plus_2002R_putSync:
+	; We are now synced to a "put" cycle.
+	; Enable the DMC DMA
+	LDA #$10  ; [put] [get]
+	STA $4015 ; [put] [get] [put] [get]
+	LDA $2002 ; [3] [2] [1] [DMC DMA] [read from $2002, VBlank flag already cleared.]
+	BPL TEST_DMA_Plus_2002R_RareBehavior ; If the VBlank flag was set, you fail the test.
+
+	;;END OF TEST;;
+	JSR Test_DMA_Plus_2002_Cleanup
+	JSR WaitForVBlank
+	LDA <RunningAllTests
+	BNE Test_DMA_Plus_2002_Res1
+	JSR PrintTextCentered
+	.word $2350
+	.byte "Load DMA after 2 APU cycles", $FF
+	JSR ResetScroll
+Test_DMA_Plus_2002_Res1:
+	LDA #5	; Success code 1
+	RTS
+;;;;;;;
+
+FAIL_DMA_Plus_2002R:
+	JSR Test_DMA_Plus_2002_Cleanup
+	JMP TEST_Fail
+;;;;;;;;;;;;;;;;;
+
+TEST_DMA_Plus_2002R_RareBehavior:
+	; Okay, so some very rare CPU revisions actually take an extra APU cycle for laod DMAs, so I'm going to allow that behavior as well. Let's check for it.
+	JSR WaitForVBlank
+	LDA #$00
+	STA $4017	; enable the frame counter IRQ, and use the 4-step mode.
+	JSR Clockslide_30000 ; Wait for VBlank with the VBlank flag set.
+	LDA #0
+	.byte $1F
+	.word $4015 ; SLO $4015, X
+	; if this next cycle is a "put", A = $00. If this next cycle is a "get" A = $80.
+	; if the next cycle is a "get", delay by 1 CPU cycle.
+	BPL TEST_DMA_Plus_2002R__putSync
+TEST_DMA_Plus_2002R__putSync:
+	; We are now synced to a "put" cycle.
+	; Enable the DMC DMA
+	LDA #$10  ; [put] [get]
+	STA $4015 ; [put] [get] [put] [get]
+	NOP		  ; [5] [4]
+	LDA $2002 ; [3] [2] [1] [DMC DMA] [read from $2002, VBlank flag already cleared.]
+	BPL TEST_DMA_Plus_2002R_RareBehavior ; If the VBlank flag was set, you fail the test this time for real.
+	
+	;;END OF TEST;;
+	JSR Test_DMA_Plus_2002_Cleanup
+	JSR WaitForVBlank
+	LDA <RunningAllTests
+	BNE Test_DMA_Plus_2002_Res2
+	JSR PrintTextCentered
+	.word $2350
+	.byte "Load DMA after 3 APU cycles", $FF
+	JSR ResetScroll
+Test_DMA_Plus_2002_Res2:	
+	LDA #9 ; Success code 2
+	RTS
+;;;;;;;
+
+
+Test_DMA_Plus_2002_Cleanup:
+	LDA #0
+	STA $4015
+	LDA #$40
+	STA $4017
+	RTS
+;;;;;;;
 	
 	
 	
@@ -8974,6 +9068,7 @@ TEST_FrameCounterIRQ:
 	STA $4014 ; align with "put" cycle.
 	LDA #0
 	LDX #0
+	; TODO: Shouldn't I make sure the SLO instruction works before running this?
 	.byte $1F	; SLO Absolute, X
 	.word $4015 ; This reads from $4015 twice!
 	BNE FAIL_FrameCounterIRQ ; If SLO is properly emulated, you might see bit 7 set here (failing the test). The flag is actually cleared before the second read, so it bit 7 should be 0.
@@ -12425,8 +12520,8 @@ Sync_ToLine0Dot1_Even:
 	LDX #0
 	.byte $1F
 	.word $4015 ; SLO $4015, X
-	; if this next cycle is a "put", A = $00. If this next cycle is a "get" A = $80.
-	; if the write to $4014 is on a "put" cycle, then there's a 1 cycle delay.
+	; if this next cycle is a "get", A = $00. If this next cycle is a "put" A = $80.
+	; if the write to $4014 is on a "get" cycle, then there's a 1 cycle delay.
 	PHA
 	LDA #2
 	STA $4014
@@ -12446,8 +12541,8 @@ Sync_ToLine0Dot1_Odd:
 	LDX #0
 	.byte $1F
 	.word $4015 ; SLO $4015, X
-	; if this next cycle is a "put", A = $00. If this next cycle is a "get" A = $80.
-	; if the write to $4014 is on a "put" cycle, then there's a 1 cycle delay.
+	; if this next cycle is a "get", A = $00. If this next cycle is a "put" A = $80.
+	; if the write to $4014 is on a "get" cycle, then there's a 1 cycle delay.
 	PHA
 	LDA #2
 	STA $4014
@@ -14243,6 +14338,7 @@ TEST_BGSerialIn_Exit:
 FAIL_BGSerialIn2:
 	JMP FAIL_BGSerialIn
 ;;;;;;;;;;;;;;;;;
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
