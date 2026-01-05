@@ -1833,7 +1833,7 @@ TEST_DMA_Plus_2002R:
 	
 	;;; Test 1 [DMA + $2002]: Verify SLO works. ;;;
 	JSR TEST_SLO_1F
-	LDX #0
+	LDX #1
 	STX <ErrorCode
 	CMP #1
 	BNE FAIL_DMA_Plus_2002R
