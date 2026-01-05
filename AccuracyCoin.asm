@@ -1560,6 +1560,8 @@ TEST_RunSHASHS_PreLoop:
 	LDX <Test_UnOp_ExpectedResultAddrLo
 	JSR WriteFFOnEachPageOffsetX
 	JSR TEST_UnOpRunTest
+	LDX <Test_UnOp_ExpectedResultAddrLo
+	JSR RestoreTestResultFromBehavior3
 	; Evaluating the test.
 	LDA <initialSubTest
 	STA <ErrorCode
@@ -1619,7 +1621,13 @@ ANDByteOnEachPageOffsetX:
 ;;;;;;;
 
 WriteFFOnEachPageOffsetX:
-	; Initialize stuff fro these "behavior 3" tests.
+	; Initialize stuff for these "behavior 3" tests.
+	; Oh hey wait- this overwrites page 4. That's not good.
+	; But like- behavior 3 assumes that writing to page 4 is a possibility, so...
+	LDA $400, X
+	; Where would this never write to?
+	STA $7FF ; Pretty sure I never use $FF as the address low byte.
+	
 	LDA #$FF
 	STA <$00, X
 	STA $100, X
@@ -1632,6 +1640,11 @@ WriteFFOnEachPageOffsetX:
 	RTS
 ;;;;;;;
 
+RestoreTestResultFromBehavior3:
+	LDA $7FF
+	STA $400, X
+	RTS
+;;;;;;;
 
 TEST_SHS_Behavior3_9B
 	PHA ; just used to prevent issues with the PLA in ErrorCodeF
@@ -1652,8 +1665,6 @@ TEST_SHA_Behavior3_93:
 	
 	LDA #0
 	STA <dontSetPointer
-	LDX #$50
-	JSR WriteFFOnEachPageOffsetX
 	JSR PrintTextCentered
 	.word $22B0
 	.byte " SHA Behavior 3", $FF
@@ -1674,8 +1685,6 @@ TEST_SHA_Behavior3_9F:
 	
 	LDA #0
 	STA <dontSetPointer
-	LDX #$50
-	JSR WriteFFOnEachPageOffsetX
 	JSR PrintTextCentered
 	.word $22B0
 	.byte " SHA Behavior 3", $FF
@@ -1763,8 +1772,6 @@ TEST_SHS_Behavior3:
 	BNE TEST_SHS_Behavior3_Skip
 	LDA #0
 	STA <dontSetPointer
-	LDX #$50
-	JSR WriteFFOnEachPageOffsetX
 	JSR PrintTextCentered
 	.word $22D0
 	.byte " SHS Behavior 3", $FF
@@ -5262,7 +5269,7 @@ TEST_NMI_Timing_Loop2:
 	BEQ TEST_NMI_Timing_End	
 TEST_NMI_Timing_Loop3:
 	LDA <$50,X
-	CMP TEST_NMI_Timing_Expected_Results,X  ; The expected result shifted over by 1 ppu cycle.
+	CMP TEST_NMI_Timing_Expected_Results,X  ; The expected results.
 	BNE FAIL_NMI_Timing
 	INX
 	CPX #$0A
