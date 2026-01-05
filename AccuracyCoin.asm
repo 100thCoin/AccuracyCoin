@@ -1850,14 +1850,14 @@ TEST_DMA_Plus_2002R:
 	.word $4015 ; SLO $4015, X
 	; if this next cycle is a "get", A = $00. If this next cycle is a "put" A = $80.
 	; if the next cycle is a "get", delay by 1 CPU cycle.
-	BPL TEST_DMA_Plus_2002R_putSync
+	BMI TEST_DMA_Plus_2002R_putSync
 TEST_DMA_Plus_2002R_putSync:
 	; We are now synced to a "put" cycle.
 	; Enable the DMC DMA
 	LDA #$10  ; [put] [get]
 	STA $4015 ; [put] [get] [put] [get]
 	LDA $2002 ; [3] [2] [1] [DMC DMA] [read from $2002, VBlank flag already cleared.]
-	BPL TEST_DMA_Plus_2002R_RareBehavior ; If the VBlank flag was set, you fail the test.
+	BMI TEST_DMA_Plus_2002R_RareBehavior ; If the VBlank flag was set, you fail the test.
 
 	;;END OF TEST;;
 	JSR Test_DMA_Plus_2002_Cleanup
@@ -1889,7 +1889,7 @@ TEST_DMA_Plus_2002R_RareBehavior:
 	.word $4015 ; SLO $4015, X
 	; if this next cycle is a "put", A = $00. If this next cycle is a "get" A = $80.
 	; if the next cycle is a "get", delay by 1 CPU cycle.
-	BPL TEST_DMA_Plus_2002R__putSync
+	BMI TEST_DMA_Plus_2002R__putSync
 TEST_DMA_Plus_2002R__putSync:
 	; We are now synced to a "put" cycle.
 	; Enable the DMC DMA
@@ -1897,7 +1897,7 @@ TEST_DMA_Plus_2002R__putSync:
 	STA $4015 ; [put] [get] [put] [get]
 	NOP		  ; [5] [4]
 	LDA $2002 ; [3] [2] [1] [DMC DMA] [read from $2002, VBlank flag already cleared.]
-	BPL TEST_DMA_Plus_2002R_RareBehavior ; If the VBlank flag was set, you fail the test this time for real.
+	BMI TEST_DMA_Plus_2002R_RareBehavior ; If the VBlank flag was set, you fail the test this time for real.
 	
 	;;END OF TEST;;
 	JSR Test_DMA_Plus_2002_Cleanup
