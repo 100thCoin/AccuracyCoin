@@ -1897,7 +1897,7 @@ TEST_DMA_Plus_2002R__putSync:
 	STA $4015 ; [put] [get] [put] [get]
 	NOP		  ; [5] [4]
 	LDA $2002 ; [3] [2] [1] [DMC DMA] [read from $2002, VBlank flag already cleared.]
-	BMI TEST_DMA_Plus_2002R_RareBehavior ; If the VBlank flag was set, you fail the test this time for real.
+	BMI FAIL_DMA_Plus_2002R ; If the VBlank flag was set, you fail the test this time for real.
 	
 	;;END OF TEST;;
 	JSR Test_DMA_Plus_2002_Cleanup
