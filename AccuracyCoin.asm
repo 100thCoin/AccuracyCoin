@@ -1627,6 +1627,9 @@ WriteFFOnEachPageOffsetX:
 	LDA $400, X
 	; Where would this never write to?
 	STA $7FF ; Pretty sure I never use $FF as the address low byte.
+	; This would also pollute page 3, the uninitialized RAM data.
+	LDA $300, X
+	STA $7FE
 	
 	LDA #$FF
 	STA <$00, X
@@ -1643,6 +1646,8 @@ WriteFFOnEachPageOffsetX:
 RestoreTestResultFromBehavior3:
 	LDA $7FF
 	STA $400, X
+	LDA $7FE
+	STA $300, X
 	RTS
 ;;;;;;;
 
@@ -12489,6 +12494,11 @@ FAIL_OAM_Corruption2:
 ;;;;;;;;;;;;;;;;;
 
 CopyLowestPageBytesTo60:
+	LDA $7FF
+	STA $400
+	LDA $7FE
+	STA $300
+
 	LDA <$00
 	STA <$60
 	LDA $100
@@ -12511,6 +12521,11 @@ CopyLowestPageBytesTo60:
 ;;;;;;;
 
 WriteFFToLowestPageBytes:
+	LDA $400
+	STA $7FF
+	LDA $300
+	STA $7FE
+
 	LDA #$FF
 	STA <$00
 	STA $100
