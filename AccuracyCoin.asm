@@ -1846,6 +1846,7 @@ TEST_DMA_Plus_2002R:
 
 	;;; Test 2 [DMA + $2002]: Verify the dummy reads during a DMC DMA can read from $2002 and clear the VBlank flag. ;;;
 	
+	LDX #0
 	JSR WaitForVBlank
 	LDA #$00
 	STA $4017	; enable the frame counter IRQ, and use the 4-step mode.
