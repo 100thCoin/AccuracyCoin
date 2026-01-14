@@ -194,7 +194,10 @@ For more information, I recommend reading the fully commented assembly code for 
   9: Branch instructions should poll for interrupts before cycle 2.  
   A: Branch instructions should not poll for interrupts before cycle 3.  
   B: Branch instructions should poll for interrupts before cycle 4.  
-  C: An interrupt polled successfully on the first poll of a branch, cleared, and then polled again, should still occur.  
+  C: Error code E requires proper PPU open bus emulation to verify the behavior, and your emulator did not pass a pre-requisite PPU open bus test.  
+  D: Error code E requires proper open bus emulation to verify the behavior, and your emulator did not pass a pre-requisite open bus test.  
+  E: An interrupt polled successfully on the first poll of a branch, cleared, and then polled again, should still occur.  
+
 
 ### NMI Overlap BRK
   1: BRK Returned to the wrong address.  

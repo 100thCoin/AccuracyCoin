@@ -8241,7 +8241,32 @@ FAIL_IFlagLatency2:
 	JMP FAIL_IFlagLatency
 
 TEST_IFlagLatency_Test_C:
-	;;; Test C [Interrupt Flag Latency]: What if the first poll detects an interrupt, but the flag is cleared before the second poll? ;;;
+	;;; Test C [Interrupt Flag Latency]: A real quick ppu open bus pre-requisite check ;;;
+	; Test E is pretty wild, and involves jumping to a PPU register. To prevent a crash, I need to verify that jumping there is safe.
+	LDA #$44
+	STA $2002
+	LDA #0
+	LDA $3FA5 ; Specifically where the PC will end up at some point during test E
+	CMP #$44
+	BNE FAIL_IFlagLatency2
+	INC <ErrorCode
+
+	;;; Test D [Interrupt Flag Latency]: A real quick open bus pre-requisite check ;;;
+	; Test E is pretty wild, and involves jumping to open bus. To prevent a crash, I need to verify that jumping there is safe.
+	
+	LDA #$5A
+	STA $2002	; ppu bus is now $5A
+	LDX #$10
+	LDA $3FF0, X; Read ppu bus, read open bus. (this works on an everdrive too.)
+	CMP #$5A
+	BNE FAIL_IFlagLatency2
+	
+	; We also need to confirm that the DMC DMA is able to update the databus.
+	LDA <result_DMADMASync_PreTest
+	BEQ FAIL_IFlagLatency2
+	INC <ErrorCode
+	
+	;;; Test E [Interrupt Flag Latency]: What if the first poll detects an interrupt, but the flag is cleared before the second poll? ;;;
 	; The plan:
 	; At address $4013
 	; 1.) Read opcode $90
@@ -8250,6 +8275,8 @@ TEST_IFlagLatency_Test_C:
 	; 3.) Dummy read $4015 (clearing IRQ flag), move PC
 	; - poll for interrupts, (an interrupt will not occur)
 	; 4.) Dummy read, update PCH.
+	
+	; This will also branch to $3FA5, reading from PPU Open bus to grab an RTS.
 
 	; Does an IRQ occur after the branch? Let's find out!
 
@@ -8292,6 +8319,9 @@ TEST_IFlagLatency_Test_C:
 	; (transition from put to get: the Frame Counter Interrupt flag is cleared)
 	; poll for interrupts, interrupt will *not* occur.
 	;(get cycle) Dummy read.
+	
+	; This will run `BCC $3FA5`
+	; Where the CPU will read the value of $60 from the PPU Read Buffer.
 	
 	; Surprise! the IRQ *DOES* occur after the branch!
 		
