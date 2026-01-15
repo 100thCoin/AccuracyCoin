@@ -540,8 +540,9 @@ or
 ### Suddenly Resize Sprite
   1: Sprite Zero Hits should be working.  
   2: Writing to $2000 to enable 16 pixel tall sprites at the beginning of HBlank should properly allow an otherwise out-of-range 8 pixel tall sprite to extend into the current scanline.  
-  3: Writing to $2000 to disable 16 pixel tall sprites at the beginning of HBlank should properly prevent an otherwise in-range 16 pixel tall sprite from extending into the current scanline.  
-  
+  3: This does the same thing as error code 2, but writes to $2000 after sprite zero would be prepared in the sprite shift registers. The data should still exist in the shift registers despite it now being out of range.
+  4: Writing to $2000 to disable 16 pixel tall sprites at the beginning of HBlank should properly prevent an otherwise in-range 16 pixel tall sprite from extending into the current scanline.  
+  5: This does the same thing as error code 4, but writes to $2000 after sprite zero would be determined out-of-range. The data should not exist in the shift registers despite it now being in range.
 
 ### Arbitrary Sprite Zero
   1: Sprite 0 should trigger a sprite zero hit. No other sprite should.  

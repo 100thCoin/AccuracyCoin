@@ -2011,7 +2011,40 @@ TEST_SuddenlyResizeSprite:
 	AND #$40                   ; Mask away everything except the sprite zero hit flag.
 	BEQ FAIL_SuddenlyResizeSprite
 	INC <ErrorCode
-	;;; Test 3 [Suddenly Resize Sprite]: What about going from a 16px tall sprite that was detected on this scanline, and setting PPUCTRL to use 8px tall sprites? ;;;
+	
+	;;; Test 3 [Suddenly Resize Sprite]: What if we do the same thing as the previous test, but enable the 16px sprite mode AFTER sprite zero is added to the shift registers? ;;;
+
+	JSR Sync_ToLine0Dot1 ; 86 cycles until HBlank
+	JSR Clockslide_100 ; 7 cycles until it's safe to disable rendering
+	LDA #0             ; 5 cycles until it's safe.
+	NOP                ; 3 cycles until it's safe.
+	STA $2001          ; Disable rendering!
+	
+	; At this moment, we're ready for a sprite zero hit on the next rendered scanline.
+	; Additionally, OAM2 contains $00, $E2, $03, and $80.
+	
+	; re-enable rendering at the start of H-Blank, scanline 14.
+	; Since we're at the end of HBlank scanline 0, we have 14 full scanlines - 1 HBlank to go.
+	; We've got approx. 4710 ppu cycles until we're ready, or 1570 CPU cycles.
+	
+	JSR Clockslide_1000 ; 570 cycles to go
+	JSR Clockslide_500  ; 70 cycles to go
+	JSR Clockslide_50   ; 20 cycles to go
+	JSR Clockslide_14   ; 6 cycles to go
+	LDA #$18            ; 4 cycles to go
+	LDX #$23            ; 2 cycles to go
+	STA $2001           ; -2 cycles to go
+	STX $2000           ; -6 cycles to go
+	
+	; In theory, a sprite zero hit will NOT occur next scanline now.
+	
+	JSR WaitForVBlank
+	LDA $2002                  ; Read PPUSTATUS
+	AND #$40                   ; Mask away everything except the sprite zero hit flag.
+	BNE FAIL2_SuddenlyResizeSprite
+	INC <ErrorCode
+	
+	;;; Test 4 [Suddenly Resize Sprite]: What about going from a 16px tall sprite that was detected on this scanline, and setting PPUCTRL to use 8px tall sprites? ;;;
 	
 	JSR PrintCHR               ; Clear the neamtable byte set up by the previous error code.
 	.word $2C10                ; ^
@@ -2027,11 +2060,11 @@ TEST_SuddenlyResizeSprite:
 	STA $2005
 	STA $2005
 	
-	JSR Sync_ToLine0Dot1 ; 1676 cycles to go
-	JSR Clockslide_1000  ; 676 cycles to go
-	JSR Clockslide_600   ; 76 cycles to go
-	JSR Clockslide_50    ; 26 cycles to go
-	JSR Clockslide_20    ; 6 cycles to go
+	JSR Sync_ToLine0Dot1 ; 1791 cycles to go
+	JSR Clockslide_1000  ; 791 cycles to go
+	JSR Clockslide_700   ; 91 cycles to go
+	JSR Clockslide_50    ; 41 cycles to go
+	JSR Clockslide_35    ; 6 cycles to go
 	LDA #3               ; 4 cycles to go
 	STA $2000            ; 0 cycles to go
 
@@ -2041,6 +2074,24 @@ TEST_SuddenlyResizeSprite:
 	LDA $2002                  ; Read PPUSTATUS
 	AND #$40                   ; Mask away everything except the sprite zero hit flag.
 	BNE FAIL2_SuddenlyResizeSprite
+	
+	;;; Test 5 [Suddenly Resize Sprite]: What if we do the same thing as the previous test, but enable the 16px sprite mode AFTER sprite zero is added to the shift registers? ;;;
+	LDA #$23
+	STA $2000
+	JSR Sync_ToLine0Dot1 ; 1791 cycles to go
+	JSR Clockslide_1000  ; 791 cycles to go
+	JSR Clockslide_700   ; 91 cycles to go
+	JSR Clockslide_50    ; 41 cycles to go
+	JSR Clockslide_40    ; 1 cycle to go
+	LDA #3               ; -1 cycles to go
+	STA $2000            ; -5 cycles to go
+
+	; In theory, a sprite zero hit will NOT occur next scanline.
+	
+	JSR WaitForVBlank
+	LDA $2002                  ; Read PPUSTATUS
+	AND #$40                   ; Mask away everything except the sprite zero hit flag.
+	BEQ FAIL2_SuddenlyResizeSprite
 	
 	;; END OF TEST ;;
 
