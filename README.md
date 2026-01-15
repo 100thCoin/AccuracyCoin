@@ -3,7 +3,7 @@ AccuracyCoin is a large collection of NES accuracy tests on a single NROM cartri
 
 This ROM was designed for an NTSC console with an RP2A03G CPU and RP2C02G PPU. Some tests might fail on hardware with a different revision.
 
-This ROM currently has 131 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
+This ROM currently has 132 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
 Here's an example of the menu in this ROM shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been run yet. (The cursor is currently next to the "The Decimal Flag" test.)
 
@@ -516,6 +516,11 @@ or
 
 ## Page 18: Sprite Evaluation
 
+### Sprite Overflow Behavior
+  1: Evaluating 9 sprites in a single scanline should set the Sprite Overflow Flag.  
+  2: The Sprite Overflow Flag should not be the same thing as the CPU's Overflow flag.  
+  3: Evaluating only 8 sprites in a single scanline should not set the Sprite Overflow Flag.  
+
 ### Sprite 0 Hit Behavior
   1: A Sprite zero hit did not occur.  
   2: Sprite zero hits should not happen if background rendering is disabled.  
@@ -532,15 +537,16 @@ or
   D: Your sprites are being rendered one scanline higher than they should be, or your sprite zero hit detection isn't actually checking for "solid pixels" overlapping.  
   E: The sprite zero hit flag was set too early.  
 
+### Suddenly Resize Sprite
+  1: Sprite Zero Hits should be working.  
+  2: Writing to $2000 to enable 16 pixel tall sprites at the beginning of HBlank should properly allow an otherwise out-of-range 8 pixel tall sprite to extend into the current scanline.  
+  3: Writing to $2000 to disable 16 pixel tall sprites at the beginning of HBlank should properly prevent an otherwise in-range 16 pixel tall sprite from extending into the current scanline.  
+  
+
 ### Arbitrary Sprite Zero
   1: Sprite 0 should trigger a sprite zero hit. No other sprite should.  
   2: The first processed sprite of a scanline should be treated as "sprite zero".  
   3: Misaligned OAM should be able to trigger a sprite zero hit.  
-
-### Sprite Overflow Behavior
-  1: Evaluating 9 sprites in a single scanline should set the Sprite Overflow Flag.  
-  2: The Sprite Overflow Flag should not be the same thing as the CPU's Overflow flag.  
-  3: Evaluating only 8 sprites in a single scanline should not set the Sprite Overflow Flag.  
 
 ### Misaligned OAM Behavior
   1: Misaligned OAM should be able to trigger a sprite zero hit.  

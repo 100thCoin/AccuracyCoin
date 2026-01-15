@@ -305,6 +305,8 @@ result_RenderingFlagBehavior = $486
 result_BGSerialIn = $487
 
 result_DMA_Plus_2002R = $488
+result_SuddenlyResizeSprite = $489
+
 
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
 result_PowOn_CPUReg = $03FD ; page 3 omits the test from the all-test-result-table.
@@ -740,6 +742,7 @@ Suite_SpriteZeroHits:
 	.byte "Sprite Evaluation", $FF
 	table "Sprite overflow behavior", $FF, result_SprOverflow_Behavior, TEST_SprOverflow_Behavior
 	table "Sprite 0 Hit behavior", $FF, result_Sprite0Hit_Behavior, TEST_Sprite0Hit_Behavior
+	table "Suddenly Resize Sprite", $FF, result_SuddenlyResizeSprite, TEST_SuddenlyResizeSprite
 	table "Arbitrary Sprite zero", $FF, result_ArbitrarySpriteZero, TEST_ArbitrarySpriteZero
 	table "Misaligned OAM behavior", $FF, result_MisalignedOAM_Behavior, TEST_MisalignedOAM_Behavior
 	table "Address $2004 behavior", $FF, result_Address2004_Behavior, TEST_Address2004_Behavior
@@ -755,6 +758,7 @@ Suite_PPUMisc:
 	table "Stale BG Shift Registers", $FF, result_StaleBGShiftRegisters, TEST_StaleBGShiftRegisters
 	table "BG Serial In", $FF, result_BGSerialIn, TEST_BGSerialIn
 	table "Sprites On Scanline 0", $FF, result_Scanline0Sprites, TEST_Scanline0Sprites
+
 
 	;table "RMW $2007 Extra Write", $FF, result_RMW2007, TEST_RMW2007 ; Commented out for now. More research required.
 	;table "Palette Corruption", $FF, result_Unimplemented, DebugTest (I did not write a test for this, because it relies on a specific cpu/ppu clock alignment.)
@@ -1865,7 +1869,7 @@ TEST_DMA_Plus_2002R_putSync:
 	LDA $2002 ; [3] [2] [1] [DMC DMA] [read from $2002, VBlank flag already cleared.]
 	BMI TEST_DMA_Plus_2002R_RareBehavior ; If the VBlank flag was set, you fail the test.
 
-	;;END OF TEST;;
+	;; END OF TEST ;;
 	JSR Test_DMA_Plus_2002_Cleanup
 	JSR WaitForVBlank
 	LDA <RunningAllTests
@@ -1905,7 +1909,7 @@ TEST_DMA_Plus_2002R__putSync:
 	LDA $2002 ; [3] [2] [1] [DMC DMA] [read from $2002, VBlank flag already cleared.]
 	BMI FAIL_DMA_Plus_2002R ; If the VBlank flag was set, you fail the test this time for real.
 	
-	;;END OF TEST;;
+	;; END OF TEST ;;
 	JSR Test_DMA_Plus_2002_Cleanup
 	JSR WaitForVBlank
 	LDA <RunningAllTests
@@ -1928,7 +1932,124 @@ Test_DMA_Plus_2002_Cleanup:
 	RTS
 ;;;;;;;
 	
+VerifySpriteZeroHits:
+	JSR DisableRendering       ; Disable rendering so the following can happen even out of vblank.
+	JSR ClearNametable2_With24 ; Clear nametable 2 with tile $24 (empty tiles)
+	JSR ClearPage2             ; Clear Page 2 with all $FFs
+	JSR SetUpSpriteZero        ; Prepare sprite zero with the following values:
+	.byte $05, $C0, $03, $08   ; Single dot on scanline 8, X = 08
+	JSR PrintCHR               ; Update nametable
+	.word $2C21                ; Single dot to overlap the sprite.
+	.byte $C0, $FF             ; This will trigger the prite zero hit.
+	JSR SetPPUADDRFromWord     ; Update t
+	.byte $2C, $00             ; This is also needed for the sprite zero hit.
+	LDA #2                     ; Page 2 for the OAM DMA
+	STA $4014                  ; Trigger the OAM DMA
+	JSR WaitForVBlank          ; Wait for vblank
+	JSR EnableRendering        ; Draw both the background and sprites.	
+	JSR WaitForVBlank          ; Wait for vblank
+	LDA $2002                  ; Read PPUSTATUS
+	AND #$40                   ; Mask away everything except the sprite zero hit flag.
+	RTS                        ; and return.
+;;;;;;;
 	
+FAIL_SuddenlyResizeSprite:
+	JMP TEST_Fail
+	
+TEST_SuddenlyResizeSprite:
+
+	;;; Test 1 [Suddenly Resize Sprite]: Verify Sprite Zero Hits behave properly. ;;;
+	JSR VerifySpriteZeroHits
+	BEQ FAIL_SuddenlyResizeSprite
+	INC <ErrorCode
+
+	;;; Test 2 [Suddenly Resize Sprite]: What happens if you write to $2001 during HBlank at *just* the right time to resize an 8px tall sprite to a 16px tall sprite? ;;;
+	JSR PrintCHR               ; Clear the neamtable byte set up by the previous error code.
+	.word $2C21                ; ^
+	.byte $24, $FF             ; ^
+	
+	JSR PrintCHR               ; Set up nametable
+	.word $2C10                ; ^
+	.byte $C6, $FF             ; ^
+	
+	JSR SetPPUADDRFromWord     ; Update t
+	.byte $2C, $00             ; This is also needed for the sprite zero hit.
+	
+	; This test will need to set up sprite zero on the following scanline (prepare sprite zero information in OAM2) and disable rendering.
+	; Then, after 8 to 15 scanlines, re-enable rendering just before H-Blank, and 
+	JSR SetUpSpriteZero        ; Prepare sprite zero with the following values:
+	.byte $00, $CE, $03, $80   ; $CE is empty, but $CF is a single pixel on scanline 4. This will become a 16px tall sprite.
+	JSR Sync_ToLine0Dot1 ; 86 cycles until HBlank
+	JSR Clockslide_100 ; 7 cycles until it's safe to disable rendering
+	LDA #0             ; 5 cycles until it's safe.
+	NOP                ; 3 cycles until it's safe.
+	STA $2001          ; Disable rendering!
+	
+	; At this moment, we're ready for a sprite zero hit on the next rendered scanline.
+	; Additionally, OAM2 contains $00, $E2, $03, and $80.
+	
+	; re-enable rendering at the start of H-Blank, scanline 14.
+	; Since we're at the end of HBlank scanline 0, we have 14 full scanlines - 1 HBlank to go.
+	; We've got approx. 4710 ppu cycles until we're ready, or 1570 CPU cycles.
+	
+	JSR Clockslide_1000 ; 570 cycles to go
+	JSR Clockslide_500  ; 70 cycles to go
+	JSR Clockslide_50   ; 20 cycles to go
+	NOP                 ; 18 cycles to go
+	NOP                 ; 16 cycles to go
+	NOP                 ; 14 cycles to go
+	NOP                 ; 12 cycles to go
+	LDA #$18            ; 10 cycles to go
+	LDX #$23            ; 8 cycles to go
+	STA $2001           ; 4 cycles to go
+	STX $2000           ; 0 cycles to go
+	
+	; In theory, a sprite zero hit will occur next scanline now.
+	
+	JSR WaitForVBlank
+	LDA $2002                  ; Read PPUSTATUS
+	AND #$40                   ; Mask away everything except the sprite zero hit flag.
+	BEQ FAIL_SuddenlyResizeSprite
+	INC <ErrorCode
+	;;; Test 3 [Suddenly Resize Sprite]: What about going from a 16px tall sprite that was detected on this scanline, and setting PPUCTRL to use 8px tall sprites? ;;;
+	
+	JSR PrintCHR               ; Clear the neamtable byte set up by the previous error code.
+	.word $2C10                ; ^
+	.byte $24, $FF             ; ^
+	
+	JSR PrintCHR               ; Set up nametable
+	.word $2C50                ; ^
+	.byte $C0, $FF             ; ^
+	
+	JSR SetPPUADDRFromWord     ; Update t
+	.byte $2C, $00             ; This is also needed for the sprite zero hit
+	LDA #0
+	STA $2005
+	STA $2005
+	
+	JSR Sync_ToLine0Dot1 ; 1676 cycles to go
+	JSR Clockslide_1000  ; 676 cycles to go
+	JSR Clockslide_600   ; 76 cycles to go
+	JSR Clockslide_50    ; 26 cycles to go
+	JSR Clockslide_20    ; 6 cycles to go
+	LDA #3               ; 4 cycles to go
+	STA $2000            ; 0 cycles to go
+
+	; In theory, a sprite zero hit will NOT occur next scanline.
+	
+	JSR WaitForVBlank
+	LDA $2002                  ; Read PPUSTATUS
+	AND #$40                   ; Mask away everything except the sprite zero hit flag.
+	BNE FAIL2_SuddenlyResizeSprite
+	
+	;; END OF TEST ;;
+
+	LDA #1
+	RTS
+;;;;;;;
+
+FAIL2_SuddenlyResizeSprite:
+	JMP TEST_Fail
 	
 	.bank 1
 	.org $A000	; This next line of code is located at address $A000 in the ROM.
@@ -13291,7 +13412,7 @@ TEST_PaletteRAMQuirksCont:
 	CMP #$FF
 	BNE FAIL_PaletteRAMQuirks2
 	
-	;;END OF TEST;;
+	;; END OF TEST ;;
 	JSR WaitForVBlank
 	JSR SetUpDefaultPalette
 	JSR ResetScroll
@@ -13390,7 +13511,7 @@ TEST_INC4014_BNEFAIL: ; I ran out of bytes to branch from the bottom of this tes
 	JSR DisableNMI ; If it failed, the NMI has already occured.
 	LDA <$50
 	BNE TEST_INC4014_BNEFAIL	
-	;;END OF TEST;;
+	;; END OF TEST ;;
 
 	LDA #1
 	RTS
@@ -13449,7 +13570,7 @@ TEST_AttributesAsTiles_loop:
 	JSR DoSpriteZeroHitTest ; This just renders a full screen and reads from $2002, AND #$40
 
 	BEQ FAIL_AttributesAsTiles ; If sprite zero hit did not occur, fail the test.	
-	;;END OF TEST;;
+	;; END OF TEST ;;
 
 	LDA #1
 	RTS
@@ -13564,7 +13685,7 @@ TEST_tRegisterQuirks:
 	JSR DoSpriteZeroHitTest ; This just renders a full screen and reads from $2002, AND #$40
 	BEQ FAIL_tRegisterQuirks2 ; Fail the test if the sprite zero hit did not occur.
 	INC <ErrorCode
-	;;END OF TEST;;
+	;; END OF TEST ;;
 
 	LDA #1
 	RTS
@@ -13653,7 +13774,7 @@ TEST_StaleBGShiftRegisters:
 	JSR Test_StaleShiftRegisters_Run
 	BEQ FAIL_StaleShiftRegisters
 
-	;;END OF TEST;;
+	;; END OF TEST ;;
 	JSR WaitForVBlank
 	JSR PrintCHR
 	.word $2000
@@ -13886,7 +14007,7 @@ TEST_Scanline0Sprites_ClearPg2: ; clear page 2 (used for OAM DMA) with all zeroe
 	JSR ResetScroll
 Scanline0Sprites_SkipComp:
 
-	;;END OF TEST;;
+	;; END OF TEST ;;
 	LDA #5
 	RTS
 ;;;;;;;
@@ -13912,7 +14033,7 @@ Scanline0Sprites_RGB:
 	JSR ResetScroll
 Scanline0Sprites_SkipRGB:
 
-	;;END OF TEST;;
+	;; END OF TEST ;;
 	LDA #9
 	RTS
 ;;;;;;;
@@ -13934,7 +14055,7 @@ TEST_CHRROMIsNotWritable:
 	                             ; And now let's evaluate the test results.
 	LDA $500                     ; We stored the results at $500.
 	BNE FAIL_CHRROMIsNotWritable ; If the value read wasn't $00, fail the test.
-	;;END OF TEST;;
+	;; END OF TEST ;;
 	LDA #1                       ; A value of 1 means the test passed.
 	RTS                          ; And the test is complete. (Rendering will automatically be re-enabled.)
 ;;;;;;;
@@ -13985,7 +14106,7 @@ TEST_RenderingFlagBehavior:
 
 	JSR TEST_RenderingFlagBehaviorCleanUp
 
-	;;END OF TEST;;
+	;; END OF TEST ;;
 	LDA #1
 	RTS
 ;;;;;;;
@@ -14102,7 +14223,7 @@ TEST_BGSerialIn_Exit:
 	LDA $2002                ; Anyway, I could've just done that once instead of across the entire screen, but it was suggested to make it more visible.
 	AND #$40                 ; Keep in mind, this value should show up as a white line, (color %10 of palette %11) instead of red, color %11 of palette %11.
 	BEQ FAIL_BGSerialIn2     ; So we check if a sprite zero hit occured, masked away everything but the sprite zero hit flag, and fail the test if no hit occured.
-	;;END OF TEST;;
+	;; END OF TEST ;;
 
 	JSR WaitForVBlank        ; Wait for vblank...
 	JSR SetUpDefaultPalette  ; Fix the color palette.
