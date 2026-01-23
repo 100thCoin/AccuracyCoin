@@ -306,6 +306,7 @@ result_BGSerialIn = $487
 
 result_DMA_Plus_2002R = $488
 result_SuddenlyResizeSprite = $489
+result_Rendering2007Read = $48A
 
 
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
@@ -723,6 +724,7 @@ Suite_PPUBehavior:
 	table "PPU Read Buffer", $FF, result_PPUReadBuffer, TEST_PPUReadBuffer
 	table "Palette RAM Quirks", $FF, result_PaletteRAMQuirks, TEST_PaletteRAMQuirks
 	table "Rendering Flag Behavior", $FF, result_RenderingFlagBehavior, TEST_RenderingFlagBehavior
+	table "$2007 read w/ rendering", $FF, result_Rendering2007Read, TEST_Rendering2007Read
 	.byte $FF
 	
 	;; PPU VBL Timing ;;
@@ -1937,7 +1939,7 @@ VerifySpriteZeroHits:
 	JSR ClearNametable2_With24 ; Clear nametable 2 with tile $24 (empty tiles)
 	JSR ClearPage2             ; Clear Page 2 with all $FFs
 	JSR SetUpSpriteZero        ; Prepare sprite zero with the following values:
-	.byte $05, $C0, $03, $08   ; Single dot on scanline 8, X = 08
+	.byte $05, $C0, $03, $08   ; Single dot on scanline 5, X = 08
 	JSR PrintCHR               ; Update nametable
 	.word $2C21                ; Single dot to overlap the sprite.
 	.byte $C0, $FF             ; This will trigger the prite zero hit.
@@ -2101,6 +2103,43 @@ TEST_SuddenlyResizeSprite:
 
 FAIL2_SuddenlyResizeSprite:
 	JMP TEST_Fail
+	
+TEST_Rendering2007Read:
+	
+	;;; Test 1 [$2007 Read w/ Rendering]: verify sprite zero hits real quick... ;;;
+
+	JSR VerifySpriteZeroHits
+	BEQ FAIL2_SuddenlyResizeSprite
+	INC <ErrorCode
+	
+	;;; Test 2 [$2007 Read w/ Rendering]: If you read from address $2007 while rendering is enabled, the v register gets incremented in an unusual way. Let's test for it! ;;;
+
+	; The previous test alreayd sets up the nametable for this next test.
+	; Let's begin by setting sprite zero to be one scanline higher up than it was in the previous test.
+	JSR SetUpSpriteZero        ; Prepare sprite zero with the following values:
+	.byte $04, $C0, $03, $08   ; Single dot on scanline 4, X = 08
+	
+	JSR WaitForVBlank
+	LDA #2
+	STA $4014
+	
+	; We don't need to most precise timing for this.
+	; Simply read from $2007 at some point on a visible scanline.
+	
+	JSR Clockslide_2000
+	LDA $2007 ; this is what we are testing for. What happens to v?
+	; The correct answer is, v+= $1001
+	JSR Clockslide_26352 ; wait until vblank. (without the potential for vblank suppression)
+	LDA $2002
+	AND #$40
+	BEQ FAIL2_SuddenlyResizeSprite ; if the was no sprite zero hit, fail the test.
+	
+	;; END OF TEST ;;
+
+	LDA #1
+	RTS
+;;;;;;;
+
 	
 	.bank 1
 	.org $A000	; This next line of code is located at address $A000 in the ROM.
@@ -5506,9 +5545,10 @@ TEST_NMI_Suppression_End:
 ;;;;;;;
 
 TEST_NMI_Suppression_Expected_Results:
-	; With a single CPU/PPU clock alignment, this will be off by 1, starting at the $02 instead of the $03.
-		;skip reading the FF bytes. it could be 00 or 02. The final FF could be 01/03.
-	.byte $FF, $02, $02, $FF, $00, $01, $FF, $03, $03, $03, $03
+	; With a single CPU/PPU clock alignment, this will be off by 1.
+	; skip reading the FF bytes. it could be 00 or 02. The final FF could be 01/03.
+	.byte $FF, $02, $02, $FF, $00, $01, $FF, $03, $03, $03
+	
 FAIL_NMI_Suppression:
 FAIL_NMI_VBL_End:
 	JSR DisableNMI
@@ -15562,6 +15602,9 @@ NMI_EnterDebugModeLoop7:
 	JSR EnableNMI
 	JSR SetPPUADDRFromWord
 	.byte $2C, $00	
+	LDA #0
+	STA $2005
+	STA $2005
 	
 NMI_NotPressingSelect:
 	LDA <DebugMode

@@ -3,7 +3,7 @@ AccuracyCoin is a large collection of NES accuracy tests on a single NROM cartri
 
 This ROM was designed for an NTSC console with an RP2A03G CPU and RP2C02G PPU. Some tests might fail on hardware with a different revision.
 
-This ROM currently has 132 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
+This ROM currently has 133 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
 Here's an example of the menu in this ROM shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been run yet. (The cursor is currently next to the "The Decimal Flag" test.)
 
@@ -255,13 +255,14 @@ For more information, I recommend reading the fully commented assembly code for 
 
 ### APU Length Counter
   1: Reading from $4015 should not state that the pulse 1 channel is playing before you write to $4003.  
-  2: Reading from $4015 should state that the pulse 1 channel is playing after you write to $4003  
-  3: Writing $80 to $4017 should immediately clock the Length Counter.  
-  4: Writing $00 to $4017 should not clock the Length Counter.  
-  5: Disabling the audio channel should immediately clear the length counter to zero.  
-  6: The length counter shouldn't be set when the channel is disabled.  
-  7: If the channel is set to play infinitely, it shouldn't clock the length counter.  
-  8: If the channel is set to play infinitely, the length counter should be left unchanged.  
+  2: Reading from $4015 should state that the pulse 1 channel is playing after you write to $4003.  
+  3: The audio caannel should automatically stop playing if you wait for the length counter to expire.  
+  4: Writing $80 to $4017 should immediately clock the Length Counter.  
+  5: Writing $00 to $4017 should not clock the Length Counter.  
+  6: Disabling the audio channel should immediately clear the length counter to zero.  
+  7: The length counter shouldn't be set when the channel is disabled.  
+  8: If the channel is set to play infinitely, it shouldn't clock the length counter.  
+  9: If the channel is set to play infinitely, the length counter should be left unchanged.  
 
 ### APU Length Table
   1: Your emulator did not pass APU Length Counter.  
@@ -483,6 +484,10 @@ or
   1: Background shift registers should not be initialized or clocked when rendering is entirely disabled.  
   2: Background shift registers should be initialized and clocked when only rendering sprites.  
   3: Sprite Evaluation should still occur when only rendering the background.  
+  
+### $2007 Read w/ Rendering
+  1: Sprite Zero Hits should be working.  
+  2: Reading from $2007 while rendering is enabled should result in a vertical increment of v.  
 
 ## Page 17: PPU VBlank Timing
 
