@@ -2235,9 +2235,9 @@ TEST_BranchDummyRead:
 	CLC ; We're about to run a BCC instruction at $1FFF, so let's clear the carry flag.
 	JSR $1FFF ; Jump to $1FFF to run the test.
 	; $1FFF: (opcode: $90 = BCC)
-	; $2000: (operand: $0F. BCC $1FF2)
+	; $2000: (operand: $F1. BCC $1FF2)
 	; $2001: (Dummy Read. Update PCL. PC = $20F2.)
-	; $2002: (Dummy Read. Update PCH. PC = $1FF2. End of instruction.)
+	; $20F2: (Dummy Read. Update PCH. PC = $1FF2. End of instruction.)
 	; $1FF2: (opcode: $60 = RTS)
 	LDA $2002 ; read PPUSTATUS
 	AND #$80  ; Keep only the vblank flag.
