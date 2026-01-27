@@ -368,12 +368,12 @@ For more information, I recommend reading the fully commented assembly code for 
 
 ### APU Register Activation
   1: A series of prerequisite tests failed. CPU and PPU open bus, PPU Read Buffer, DMA + Open Bus, and DMA + $2007 Read.  
-  2: Reading from $4015 should clear the APU Frame Counter Interrupt flag.  
-  3: The OAM DMA should not be able to read from the APU registers if $40 is written to $4016, and the CPU Address Bus is not in the range of $4000 to $401F.  
-  4: Something went wrong during the open bus execution. Controller port 2 was possibly clocked too many times.  
-  5: The OAM DMA should be able to read from the APU registers (and mirrors of them) if $40 is written to $4016, and the CPU Address Bus is in the range of $4000 to $401F.  
-  6: Bus conflicts with the APU registers were not properly emulated.  
-  7: Despite the controller registers not being visible in OAM, the controllers should still be clocked.  
+  2: There were unexpected extra bits when reading from a controller port that should not have been set.  
+  3: Reading from $4015 should clear the APU Frame Counter Interrupt flag.  
+  4: The OAM DMA should not be able to read from the APU registers if $40 is written to $4016, and the CPU Address Bus is not in the range of $4000 to $401F.  
+  5: Something went wrong during the open bus execution. Controller port 2 was possibly clocked too many times.  
+  6: The OAM DMA should be able to read from the APU registers (and mirrors of them) if $40 is written to $4016, and the CPU Address Bus is in the range of $4000 to $401F.  
+  7: Bus conflicts with the APU registers were not properly emulated.  
 
 ### Controller Strobing
   1: A value of $02 written to $4016 should not strobe the controllers.  

@@ -2204,7 +2204,7 @@ TEST_BranchDummyRead:
 	LDA #$50
 	STA $1FA5
 	STX $1FA6 ; X=60. RTS
-	; $1FA$ now reads: INC <$50, RTS
+	; $1FA4 now reads: INC <$50, RTS
 	
 	JSR WaitForVBlank
 	JSR Clockslide_29780 ; Set the vblank flag.
@@ -7042,7 +7042,17 @@ TEST_APURegActivation:
 	STA <ErrorCode
 	; It is assumed we're not going to crash when running this test if those 2 pre-requisites pass.
 
-	;;; Test 2 [APU Register Activation]: Pre-requisite test: Reading from $4015 clears the "frame interrupt flag" ;;;
+	;;; Test 2 [APU Register Activation]: Controller ports only have bit 0 and open bus. ;;;
+	; Confirm there's nothing odd going on with the controller ports.
+	LDA $4016
+	AND #$BE
+	BNE FAIL_APURegActivation0
+	LDA $4017
+	AND #$BE
+	BNE FAIL_APURegActivation0
+	INC <ErrorCode
+
+	;;; Test 3 [APU Register Activation]: Pre-requisite test: Reading from $4015 clears the "frame interrupt flag" ;;;
 	SEI ; If the frame interrupt flag is set without this, we can get stuck in an infinite loop of BRK instructions.
 	LDA #0
 	STA $4017	; enable the frame counter Interrupt flag.
@@ -7050,13 +7060,14 @@ TEST_APURegActivation:
 	JSR Clockslide_100
 	LDA $4015
 	AND #$40
+FAIL_APURegActivation_slide:
 	BEQ FAIL_APURegActivation0 ; If this fails, the Frame interrupt flag wasn't set? Likely not implemented.
 	LDA $4015
 	AND #$40
 	BNE FAIL_APURegActivation0 ; If this fails, the Frame interrupt flag wasn't cleared when read last time.
 	INC <ErrorCode
 	
-	;;; Test 3 [APU Register Activation]: Can the DMA read from the APU registers when the CPU is not executing out of page $40? ;;;	
+	;;; Test 4 [APU Register Activation]: Can the DMA read from the APU registers when the CPU is not executing out of page $40? ;;;	
 	; What's happening here?
 	; The 2A03 chip (the CPU/APU) has an address bus.
 	; Inside the 2A03 chip are 3 address buses: The 6502 Address Bus, the DMC Address Bus, and the OAM Address bus. On any given cycle, only one of these buses can be chosen to connect to the 2A03 address bus.
@@ -7074,10 +7085,10 @@ TEST_APURegActivation:
 	; This does *NOT* read from the APU Registers!
 	LDA $4015
 	AND #$40
-	BEQ FAIL_APURegActivation0 ; If this fails, the DMA read from the APU registers.
+	BEQ FAIL_APURegActivation_slide ; If this fails, the DMA read from the APU registers.
 	INC <ErrorCode
 
-	;;; Test 4 [APU Register Activation]: Can your emulator handle the wacky setup required to determine if the APU registers are active due to the 6502 address bus? (this could cause a crash) ;;;
+	;;; Test 5 [APU Register Activation]: Can your emulator handle the wacky setup required to determine if the APU registers are active due to the 6502 address bus? (this could cause a crash) ;;;
 	; Oh- also don't press anything on controller 2 during this test. thanks. :)
 	;
 	; Okay, so what is this test all about?
@@ -7180,7 +7191,7 @@ TEST_APURegActivation:
 	BNE FAIL_APURegActivation
 	INC <ErrorCode
 	
-	;;; Test 5 [APU Register Activation]: The DMA can read from the APU registers when the CPU is executing out of page $40? ;;;
+	;;; Test 6 [APU Register Activation]: The DMA can read from the APU registers when the CPU is executing out of page $40? ;;;
 	; Step 1: copy OAM to page 2.
 	LDX #0
 TEST_APURegActivation_Test5Loop:
@@ -7251,7 +7262,7 @@ FAIL_APURegActivation:
 ;;;;;;;;;;;;;;;;;
 		
 TEST_APURegActivation_Continue:
-	;;; Test 6 [APU Register Activation]: If the APU registers are active, there will be bus conflicts if the OAM DMA is reading from outside of open bus. ;;;
+	;;; Test 7 [APU Register Activation]: If the APU registers are active, there will be bus conflicts if the OAM DMA is reading from outside of open bus. ;;;
 	; The setup here is incredibly similar, except the OAM DMA will occur on page 2 instead, after clearing page 2 to all FFs.
 	; Also we're going to write a value of $00 to $2FF to populate the data bus with $00 before the OAM ends.
 	;
