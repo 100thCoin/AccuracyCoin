@@ -3,7 +3,7 @@ AccuracyCoin is a large collection of NES accuracy tests on a single NROM cartri
 
 This ROM was designed for an NTSC console with an RP2A03G CPU and RP2C02G PPU. Some tests might fail on hardware with a different revision.
 
-This ROM currently has 133 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
+This ROM currently has 134 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
 Here's an example of the menu in this ROM shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been run yet. (The cursor is currently next to the "The Decimal Flag" test.)
 
@@ -680,6 +680,13 @@ or
   V: BRK should perform a dummy read on cycle 2.  
   W: RTI should perform a dummy read on cycle 2.  
   X: RTS should perform a dummy read on cycle 2.  
+
+### Branch Dummy Reads
+  1: Your emulator does not accurately emulate RAM Mirroring.  
+  2: Your emulator does not accurately emulate the PPU Open Bus.  
+  3: Your emulator does not accurately emulate reads from address $2004.  
+  4: The third CPU cycle of branch instructions should dummy read from the byte following the operand.  
+  5: The fourth CPU cycle of branch instructions (if the branch crosses a page boundary) should dummy read from the location of the PC before correcting the high byte.  
 
 ### JSR Edge Cases
   1: Your emulator pushed the wrong value for the return address.  

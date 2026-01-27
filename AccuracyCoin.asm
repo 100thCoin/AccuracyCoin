@@ -307,7 +307,7 @@ result_BGSerialIn = $487
 result_DMA_Plus_2002R = $488
 result_SuddenlyResizeSprite = $489
 result_Rendering2007Read = $48A
-
+result_BranchDummyRead = $48B
 
 result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
 result_PowOn_CPUReg = $03FD ; page 3 omits the test from the all-test-result-table.
@@ -770,6 +770,7 @@ Suite_CPUBehavior2:
 	.byte "CPU Behavior 2", $FF
 	table "Instruction Timing", 	 $FF, result_InstructionTiming, TEST_InstructionTiming
 	table "Implied Dummy Reads",	 $FF, result_ImpliedDummyRead, TEST_ImpliedDummyRead
+	table "Branch Dummy Reads", 	 $FF, result_BranchDummyRead, TEST_BranchDummyRead
 	table "JSR Edge Cases",			 $FF, result_JSREdgeCases,	TEST_JSREdgeCases
 	.byte $FF
 
@@ -1942,7 +1943,7 @@ VerifySpriteZeroHits:
 	.byte $05, $C0, $03, $08   ; Single dot on scanline 5, X = 08
 	JSR PrintCHR               ; Update nametable
 	.word $2C21                ; Single dot to overlap the sprite.
-	.byte $C0, $FF             ; This will trigger the prite zero hit.
+	.byte $C0, $FF             ; This will trigger the sprite zero hit.
 	JSR SetPPUADDRFromWord     ; Update t
 	.byte $2C, $00             ; This is also needed for the sprite zero hit.
 	LDA #2                     ; Page 2 for the OAM DMA
@@ -2114,7 +2115,7 @@ TEST_Rendering2007Read:
 	
 	;;; Test 2 [$2007 Read w/ Rendering]: If you read from address $2007 while rendering is enabled, the v register gets incremented in an unusual way. Let's test for it! ;;;
 
-	; The previous test alreayd sets up the nametable for this next test.
+	; The previous test already sets up the nametable for this next test.
 	; Let's begin by setting sprite zero to be one scanline higher up than it was in the previous test.
 	JSR SetUpSpriteZero        ; Prepare sprite zero with the following values:
 	.byte $04, $C0, $03, $08   ; Single dot on scanline 4, X = 08
@@ -2140,7 +2141,115 @@ TEST_Rendering2007Read:
 	RTS
 ;;;;;;;
 
+FAIL_BranchDummyRead:
+	JMP TEST_Fail
+
+TEST_BranchDummyRead:
+
+	JSR DisableRendering
+
+	;;; Test 1 [Branch Dummy Reads]: (prerequisite) verify RAM mirroring. ;;;
+	LDA #$60
+	STA $7F2  ; Write to $7F2.
+	LDX $1FF2 ; Read from $1FF2, a mirror of $7F2.
+	CPX #$60
+	BNE FAIL_BranchDummyRead ; If the mirror doesn't match, abort!
+	INC <ErrorCode
 	
+	;;; Test 2 [Branch Dummy Reads]: (prerequisite) verify ppu open bus. ;;;
+	LDA #$90
+	STA $2002 ; Write to PPU data bus.
+	LDX $2000 ; Read from ppu data bus.
+	CPX #$90
+	BNE FAIL_BranchDummyRead ; If the value read doesn't match the value written, abort!
+	LDA $2002 ; verify that bits 0 through 5 are open bus:
+	AND #$3F ; Mask away bit 6 and 7.
+	CMP #$10
+	BNE FAIL_BranchDummyRead ; If the value read doesn't match the expected value, abort!
+	INC <ErrorCode
+
+	;;; Test 3 [Branch Dummy Reads]: (prerequisite) verify address $2004 behavior. ;;;
+	JSR ClearPage2
+	LDA #$60
+	STA $200
+	LDA #2
+	STA $4014 ; OAM DMA
+	
+	LDX $2004 ; OAM[0] = $60.
+	CPX #$60
+	BNE FAIL_BranchDummyRead ; If OAMDATA isn't working, abort!
+	INC <ErrorCode
+	
+	;;; Test 4 [Branch Dummy Reads]: Verify the first dummy read on a branch ;;;
+	; Branches work like this:
+	; 1. [Read opcode]
+	; 2. [read operand]
+	; 3. [dummy read the byte after the operand]
+	; 4. [dummy read the temporary location of the PC before correcting the high byte]
+	
+	; Let's begin by verifying the dummy read on cycle 3.
+	; Verifying this dummy read is harder than verifying the dummy read on cycle 4.
+	; If cycle 3 was on PPUSTATUS, then the following cycle is forced to read from PPUSTATUS.
+	; - Since both the opcode and operand are using the ppu bus, they must match. Since all branch opcodes end in $0, the destination from the branch will end up on $xxx2.
+	; - If branching backwards, $20x2 will be read on cycle 4.
+	; - If branching forwards, $20x2 will be the opcode for the next instruction.
+	; Luckily, the PPU runs faster than the CPU, so we know for sure that the second consecutive read will have the vblank flag cleared. (But only if the dummy read exists.)
+	; So failing this test will run opcode %1--10000, while passing would run %0--10000.
+	; If we leave the sprite overflow and sprite zero flags cleared, then we form a BPL on pass, BCC on fail.
+	; BPL will take us to $2024, reading $60 from OAMDATA (RTS)
+	; BCC will take us to $1FA4...
+
+	LDA #$E6 ; INC Zero Page opcode
+	STA $1FA4
+	LDA #$50
+	STA $1FA5
+	STX $1FA6 ; X=60. RTS
+	; $1FA$ now reads: INC <$50, RTS
+	
+	JSR WaitForVBlank
+	JSR Clockslide_29780 ; Set the vblank flag.
+
+	LDA #$10
+	STA $2002; update PPU bus with $10 (opcode for BPL)
+	CLC
+	JSR $2000; jump to PPU registers.
+	; $2000: (opcode: $10 = BPL)
+	; $2001: (operand: $10. BPL $2012)
+	; $2002: (Dummy read. Update PCL. PC = $2012. End of instruction.)
+	; $2012: (opcode: $60 = RTS)
+	LDA <$50 ; If you failed the test, then you would have executed INC <$50 at $1FA4.
+	BNE FAIL_BranchDummyRead
+	INC <ErrorCode
+	
+	;;; Test 5 [Branch Dummy Reads]: Verify the second dummy read on a branch ;;;
+	; This one is much easier to test for. Simply BCC at $1FFF to $1FF2.
+
+	; There is already an RTS opcode at $1FF2, from error code 1.
+	
+	JSR WaitForVBlank
+	JSR Clockslide_29780 ; Set the vblank flag.
+	LDA #$90
+	STA $1FFF ; Set address $1FFF to be the opcode for BCC.
+	LDA #$F1
+	STA $2002 ; Set the PPU databus to $0F. (The operand needed for the BCC.)
+	CLC ; We're about to run a BCC instruction at $1FFF, so let's clear the carry flag.
+	JSR $1FFF ; Jump to $1FFF to run the test.
+	; $1FFF: (opcode: $90 = BCC)
+	; $2000: (operand: $0F. BCC $1FF2)
+	; $2001: (Dummy Read. Update PCL. PC = $20F2.)
+	; $2002: (Dummy Read. Update PCH. PC = $1FF2. End of instruction.)
+	; $1FF2: (opcode: $60 = RTS)
+	LDA $2002 ; read PPUSTATUS
+	AND #$80  ; Keep only the vblank flag.
+	BNE FAIL_BranchDummyRead ; If the vblank flag was still set, fail the test.
+	;; END OF TEST ;;
+
+	LDA #1
+	RTS
+;;;;;;;
+
+
+
 	.bank 1
 	.org $A000	; This next line of code is located at address $A000 in the ROM.
 	
@@ -6112,10 +6221,7 @@ SpriteOverflowLUT:
 	; Attributes = 0 (not flipped, palette 0)
 	; X Position = $80 (middle of screen)
 	
-	JMP FAIL_ArbitrarySpriteZero ; Disable rendering sprites *and* fail the test.
-
-TEST_SprOverflow_Behavior:
-	;;; Test 1 [Sprite Overflow Behavior]: 9 sprites in a single scanline will set the Sprite Overflow Flag. ;;;
+VerifySprOverflowFlag:
 	JSR ClearPage2
 	LDA #0
 	TAX
@@ -6138,6 +6244,12 @@ SprOverflow_Prep1:
 	JSR Clockslide_3000 ; wait long enough for these to render.
 	LDA $2002
 	AND #$20 ; Bit 5 holds the sprite overflow flag
+	RTS
+;;;;;;;
+
+TEST_SprOverflow_Behavior:
+	;;; Test 1 [Sprite Overflow Behavior]: 9 sprites in a single scanline will set the Sprite Overflow Flag. ;;;
+	JSR VerifySprOverflowFlag ; This is in a subroutine so I can re-use these bytes elsewhere.
 	BEQ FAIL_SprOverflow
 	INC <ErrorCode	
 	
