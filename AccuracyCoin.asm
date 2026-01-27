@@ -2162,8 +2162,8 @@ TEST_BranchDummyRead:
 	LDX $2000 ; Read from ppu data bus.
 	CPX #$90
 	BNE FAIL_BranchDummyRead ; If the value read doesn't match the value written, abort!
-	LDA $2002 ; verify that bits 0 through 5 are open bus:
-	AND #$3F ; Mask away bit 6 and 7.
+	LDA $2002 ; verify that bits 0 through 4 are open bus:
+	AND #$1F ; Mask away bits 5, 6, and 7.
 	CMP #$10
 	BNE FAIL_BranchDummyRead ; If the value read doesn't match the expected value, abort!
 	INC <ErrorCode
