@@ -525,6 +525,7 @@ or
   1: Evaluating 9 sprites in a single scanline should set the Sprite Overflow Flag.  
   2: The Sprite Overflow Flag should not be the same thing as the CPU's Overflow flag.  
   3: Evaluating only 8 sprites in a single scanline should not set the Sprite Overflow Flag.  
+  4: Sprite evaluation should occur even if only the background is being rendered. This should also set the Sprite Overflow Flag.  
 
 ### Sprite 0 Hit Behavior
   1: A Sprite zero hit did not occur.  

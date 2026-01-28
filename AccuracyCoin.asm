@@ -6220,32 +6220,6 @@ SpriteOverflowLUT:
 	; Pattern = $FC (solid white square)
 	; Attributes = 0 (not flipped, palette 0)
 	; X Position = $80 (middle of screen)
-	
-VerifySprOverflowFlag:
-	JSR ClearPage2
-	LDA #0
-	TAX
-	TAY
-SprOverflow_PrepLoop:
-	LDA SpriteOverflowLUT, Y
-	STA $200, X
-	INX
-	INY
-	CPY #4
-	BNE SprOverflow_Prep1
-	LDY #0
-SprOverflow_Prep1:
-	CPX #4*9
-	BNE SprOverflow_PrepLoop
-	JSR WaitForVBlank
-	LDA #02
-	STA $4014 ; Set up OAM so objects 0 through 8 exist on scanline 1.
-	JSR EnableRendering	; Enable both the background and sprites.
-	JSR Clockslide_3000 ; wait long enough for these to render.
-	LDA $2002
-	AND #$20 ; Bit 5 holds the sprite overflow flag
-	RTS
-;;;;;;;
 
 TEST_SprOverflow_Behavior:
 	;;; Test 1 [Sprite Overflow Behavior]: 9 sprites in a single scanline will set the Sprite Overflow Flag. ;;;
@@ -6278,10 +6252,48 @@ TEST_SprOverflow_Behavior:
 	AND #$20 ; Bit 5 holds the sprite overflow flag. (in this case, not set because only 8 sprites existed on the busiest scanline)
 	BNE FAIL_SprOverflow
 	INC <ErrorCode		
-
+	
+	;;; Test 4 [Sprite Overflow Behavior]: Sprite evaluation occurs even if ONLY the background is rendering. ;;;
+	JSR sprOverflow_Setup
+	JSR EnableRendering_BG	; Enable just the background.
+	JSR Clockslide_3000 ; wait long enough for these to evaluate.
+	LDA $2002
+	AND #$20 ; Bit 5 holds the sprite overflow flag
+	BEQ FAIL_SprOverflow
+	
 	;; END OF TEST ;;
 	JSR ClearOverscanNametable
 	LDA #1
+	RTS
+;;;;;;;
+	
+sprOverflow_Setup:
+	JSR ClearPage2
+	LDA #0
+	TAX
+	TAY
+SprOverflow_PrepLoop:
+	LDA SpriteOverflowLUT, Y
+	STA $200, X
+	INX
+	INY
+	CPY #4
+	BNE SprOverflow_Prep1
+	LDY #0
+SprOverflow_Prep1:
+	CPX #4*9
+	BNE SprOverflow_PrepLoop
+	JSR WaitForVBlank
+	LDA #02
+	STA $4014 ; Set up OAM so objects 0 through 8 exist on scanline 1.
+	RTS
+	
+VerifySprOverflowFlag:
+	JSR sprOverflow_Setup
+	JSR EnableRendering	; Enable both the background and sprites.
+	JSR Clockslide_3000 ; wait long enough for these to render.
+	LDA $2002
+	AND #$20 ; Bit 5 holds the sprite overflow flag
 	RTS
 ;;;;;;;
 	
