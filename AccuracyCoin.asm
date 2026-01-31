@@ -14128,8 +14128,9 @@ TEST_Scanline0Sprites_ClearPg2: ; clear page 2 (used for OAM DMA) with all zeroe
 	.byte $C0, $FF ; Draw tile C0 at $2010 (a single pixel)
 	
 	JSR ResetScroll
-	
+		
 	JSR WaitForVBlank ; Wait for vblank
+	JSR EnableRendering
 	JSR WaitForVBlank ; Wait for a second vblank, so we can check for sprite zero hits in the previous frame.
 	LDA $2002 ; read PPUSTATUS
 	AND #$40 ; check for sprite zero hit.
@@ -14145,14 +14146,14 @@ TEST_Scanline0Sprites_ClearPg2: ; clear page 2 (used for OAM DMA) with all zeroe
 	; This results in the existing data in secondary OAM being put into the sprite shifters on the pre-render line. (only if the sprite is "in-range" of scanline 5.)
 	; The data in secondary OAM would either exist due to the previous frame's scanline 239, or whatever was in secondary OAM before rendering was disabled. (F-Blank)
 
-	LDA #$4C ; Set up NMI routine, sicne I'm using the NMI to sync the CPU and PPU.
+	LDA #$4C ; Set up NMI routine, since I'm using the NMI to sync the CPU and PPU.
 	STA $700
 	LDA #Low(RunScanline0Sprite_NMI)
 	STA $701
 	LDA #HIGH(RunScanline0Sprite_NMI)
 	STA $702
 
-	JSR RunScanline0SpriteTest ; The test occurs in this subroutine. I use a subroutine so I can change very few things and run teh same code again.
+	JSR RunScanline0SpriteTest ; The test occurs in this subroutine. I use a subroutine so I can change very few things and run the same code again.
 	
 	LDA #2
 	STA <$50 ; this is used to keep these test results in a different address than the previous two results.
@@ -14242,7 +14243,7 @@ FAIL_Scanline0Sprites:
 	JMP TEST_Fail
 
 Scanline0Sprites_RGB:
-	;;; Test 3 (RGB) [Sprites On Scanline 0]: On an RGB PPU, no sprite zero htis should occur at x=0 ;;;
+	;;; Test 3 (RGB) [Sprites On Scanline 0]: On an RGB PPU, no sprite zero hits should occur at x=0 ;;;
 
 	LDA $502
 	ORA $503
