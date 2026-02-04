@@ -3124,6 +3124,7 @@ TEST_PowerOnState_PPU_ResetFlag:
 	.word $2252
 	.byte "Reset Flag Detected!", $FF
 	JSR ResetScroll
+	LDA #1
 	RTS
 	
 TEST_PowerOnState_PPU_Res_No:
@@ -3132,6 +3133,7 @@ TEST_PowerOnState_PPU_Res_No:
 	.word $2252
 	.byte "No Reset Flag Detected!", $FF
 	JSR ResetScroll
+	LDA <ErrorCode
 	RTS
 ;;;;;;;
 
