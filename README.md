@@ -3,7 +3,7 @@ AccuracyCoin is a large collection of NES accuracy tests on a single NROM cartri
 
 This ROM was designed for an NTSC console with an RP2A03G CPU and RP2C02G PPU. Some tests might fail on hardware with a different revision.
 
-This ROM currently has 134 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
+This ROM currently has 136 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
 Here's an example of the menu in this ROM shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been run yet. (The cursor is currently next to the "The Decimal Flag" test.)
 
@@ -543,6 +543,9 @@ or
   D: Your sprites are being rendered one scanline higher than they should be, or your sprite zero hit detection isn't actually checking for "solid pixels" overlapping.  
   E: The sprite zero hit flag was set too early.  
 
+### $2002 Flag Clear Timing
+  1: The flags were not cleared on the correct ppu cycle.  
+
 ### Suddenly Resize Sprite
   1: Sprite Zero Hits should be working.  
   2: Writing to $2000 to enable 16 pixel tall sprites at the beginning of HBlank should properly allow an otherwise out-of-range 8 pixel tall sprite to extend into the current scanline.  
@@ -617,6 +620,18 @@ or
   3: (RGB PPU Only) Sprite zero hits should not occur at X=$00 during this test on an RGB PPU.  
   4: (Composite PPU Only) Consecutive frames should shift the background on scanline 0, causing the sprite zero hit to miss on every other frame. (Tested at X=$00)  
 
+### $2004 Stress Test  
+  1: Reading from $2004 (with rendering enabled) on dot 0 should return Secondary_OAM Index 0.  
+  2: Reading from $2004 (with rendering enabled) from dots 1 through dots 64 should return #$FF.  
+  3: Reading from $2004 (with rendering enabled) from dots 65 through 256 should read from the "OAM Latch" used during OAM Evaluation.  
+  4: Reading from $2004 (with rendering enabled) from dots 65 through 256 should read from the "OAM Latch" used during OAM Evaluation. (For sprites that a re in-range on the target scanline.)  
+  5: Reading from $2004 (with rendering enabled) from dots 65 through 256 should read from the "OAM Latch" used during OAM Evaluation.  
+  6: Reading from $2004 (with rendering enabled) from dots 65 through 256 should read from the "OAM Latch" used during OAM Evaluation. (After the OAM Address loops around.)  
+  7: Reading from $2004 (with rendering enabled) from dots 257 through 320 should read from secondary OAM.  
+  8: OAM Evaluation should always write to Secondary OAM even when the object is not in range.
+  9: Secondary OAM is initialized with all $FFs during dots 1 through 64, so you should read $FF from dots 274 to dots 320
+  A: Reading from $2004 (with rendering enabled) from dots 321 through 340 should read from index 0 of secondary OAM.  
+
 ## Page 20: CPU Behavior 2
 
 ### Instruction Timing
@@ -681,6 +696,7 @@ or
   V: BRK should perform a dummy read on cycle 2.  
   W: RTI should perform a dummy read on cycle 2.  
   X: RTS should perform a dummy read on cycle 2.  
+  Y: RTS should perform a dummy read on cycle 6.  
 
 ### Branch Dummy Reads
   1: Your emulator does not accurately emulate RAM Mirroring.  
