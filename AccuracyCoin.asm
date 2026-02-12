@@ -432,12 +432,6 @@ ReloadMainMenu: ; There's an option to run every test in the ROM, and it draws a
 	JSR SetUpNMIRoutineForMainMenu
 	
 	LDA #0
-	STA $100 ; initialize the placeholder test results. (While this ROM was in an early state, I had a list of tests I wanted to make, and stored all their results at $100)
-	; and also initialize the "print tests" results, as these tests use page 3, which is mostly uninitialized.
-	STA result_PowOn_CPURAM
-	STA result_PowOn_CPUReg
-	STA result_PowOn_PPURAM
-	STA result_PowOn_PPUPal
 	
 	STA $6000 ; An incorrect open bus implementation might end up executing address $6000, so let's initialize these 3 bytes to BRKs.
 	STA $6001 ; Though I would prefer if this was a NES 2.0 cartridge without any PRG RAM, so writing here might do nothing anyway.
@@ -463,13 +457,10 @@ ReloadMainMenu: ; There's an option to run every test in the ROM, and it draws a
 	JSR DrawPageNumber	; Draw the correct page number at the top of the screen.
 	INC <Debug_EC ; 08 -> 09
 	JSR WaitForVBlank	; Stall until the PPU is in VBlank.
-	INC <Debug_EC ; 09 -> 0A
 	JSR ResetScroll		; Set the ppu 'v' and 't' registers to $2000, and reset the fine scroll values as well.
-	INC <Debug_EC ; 0A -> 0B
 	JSR EnableRendering_BG; Enable rendering the background. (We don't need sprites here.)
-	INC <Debug_EC ; 0B -> 0C
 	JSR EnableNMI		; Enable the Non Maskable Interrupt.
-	INC <Debug_EC ; 0C -> 0D
+	INC <Debug_EC ; 09 -> 0A
 	; If your emulator hangs here, you probably haven't implemented the NMI?
 InfiniteLoop:
 	JMP InfiniteLoop	; This is the spinning loop while I wait for the NMI to occur.
@@ -497,7 +488,7 @@ VerifyJSRBehavior:
 	RTS
 ;;;;;;;
 	
-	.org $8200
+	.org $8100
 	; Menu Data
 
 	; Here is how the pages of tests are organized.
@@ -1115,7 +1106,7 @@ PressStartToContinue_End:
 	RTI
 ;;;;;;;
 
-	.org $9400
+	.org $9280
 	
 DMASyncWith48:
 	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
