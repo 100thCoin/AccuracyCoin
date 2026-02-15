@@ -3287,7 +3287,7 @@ TEST_Fail_1p5:
 	.byte $2C, $00
 	; SetPPUADDRFromWord will return here.
 	LDA $2007 ; empty PPU buffer
-	LDA $3FFF, X ; dummy read $2007 (The data bus is now $F0) The offset moves the address bus to $4017, reading from controller 1 when the data bus was $F0.
+	LDA $3FFF, X ; dummy read $2007 (The data bus is now $F0) The offset moves the address bus to $4017, reading from controller 2 when the data bus was $F0.
 	PHA
 	JSR ResetScroll	; And reset the scroll, since we just moved "v" to $2400.
 	PLA
@@ -15805,6 +15805,7 @@ InitializeSpriteZeroLoop:
 
 InitializeSpriteX:	; Sets address $200+X*4 through $203+X*4 to the values found in the 4 bytes following the JSR to this subroutine.
 	; This also adjusts the return address.
+	; TODO: This subroutine is currently unnsed.
 	JSR CopyReturnAddressToByte0
 	LDA #$02
 	STA <$03
