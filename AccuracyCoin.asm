@@ -2283,6 +2283,7 @@ ReadFrom2002WithExactTiming:
 
 
 Sync_ToSpriteFlagsClearing:
+	; see TEST_2002FlagClearTiming
 	SEI
 	LDA #$00
 	STA $4017 ; enable the frame counter IRQ. (Used to determine get/put cycle later)
@@ -2294,7 +2295,7 @@ Sync_ToSpriteFlagsClearing:
 	STA $4014
 	JSR DisableRendering
 	; Assume we're on scanline 245, dot 336.
-	; Aim for scanline 0 dot 1.
+	; Aim for the end of the CPU read occuring on scanline 0 dot 1.
 	; let's wait for 1820 cycles. We should be at most on dot 0.
 	JSR Clockslide_1816 ; Cool, I can leech off an existing clockslide.
 	NOP
@@ -2360,8 +2361,12 @@ Test_2004_SpecificStallsForRenderingStuff:
 
 Test_2004_Stress_RunTest:
 
-	JSR Sync_ToSpriteFlagsClearing
-	; We should now be on scanline 5, dot 231
+	JSR Sync_ToSpriteFlagsClearing ; You probably want to read the comments inside this subroutine.
+	; In case you didn't read those comments, we're aiming for the END of the CPU read occuring on specific dots here.
+	; The data from address $2004 can change mid-read, and it's the value at the end of the read that we care about. Not the value at the start.
+	; See TEST_2002FlagClearTiming for more info.
+	
+	; We should now be synced, such that the next read will end on on scanline 5, dot 231
 	; let's enable rendering on dot 320.
 	JSR Clockslide_25
 	LDA #$10  ; + 2
@@ -2369,7 +2374,7 @@ Test_2004_Stress_RunTest:
 	
 	; let's wait for, say, scanline $80.
 	; we need to wait for exactly 13874 CPU cycles.
-	; But we also want the first read from $2004 to occur on dot 0, so let's actually stall for 13870 cycles.
+	; But we also want the first read from $2004 to END on dot 0, so let's actually stall for 13870 cycles.
 	JSR Clockslide_10000
 	JSR Clockslide_3000
 	JSR Clockslide_800
@@ -2381,7 +2386,7 @@ Test_2004_Stress_RunTest:
 TEST_2004_StressLoop:
 
 	; And the test begins.
-	; the LDA instruction starts a bit early, but the read cycle will occur on dot 0.
+	; the LDA instruction starts a bit early, but the read cycle will END on dot 0.
 	LDA $2004 ; dot 0.
 	STA <$50
 	LDA $2004 ; dot 21.
@@ -2970,6 +2975,22 @@ FlagClearTiming_PrepLUT:
 
 TEST_2002FlagClearTiming:
 	;;; Test 1 [$2007 Read w/ Rendering]: Verify the timing in which the sprite zero and sprite overflow flags are cleared. ;;;	
+	
+	; Just so you are aware, all the flags are cleared on dot 1 of the pre-render line.
+	; This is a fact.
+	
+	; The vblank flag is cleard on the same ppu cycle as the sprite zero and overflow flags.
+	; It's true.
+	
+	; If you are failing this test, you might be inclined to scoot the sprite flags over, so they get cleared on dot 0, but that's not the proper solution.
+	; Here's what's going on:
+	
+	; Reads from $2002 will read the vblank flag at the beginning of the read (when M2 goes high) and the sprite flags are read at the end (when M2 goes low)
+	; On a revision G CPU, M2 has a duty cycle of 15/24, meaning that there are 7.5 master clock cycles between M2 going high and M2 going low.
+	; In other words, the sprite flags are read approximately 1.875 PPU cycles after the vblank flag is read.
+	
+	; That is why you will see in the results, the vblank flag appears to be cleared later.
+	
 	LDA FlagClearTiming_PrepLUT, Y
 	STA $200, X
 	INY

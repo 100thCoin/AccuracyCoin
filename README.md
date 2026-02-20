@@ -411,10 +411,11 @@ or
 00 00 00 00 FF FF FF FF
 00 00 00 00 FF FF FF FF
 </pre>
+  Other known patterns include all `00`s or all `FF`s.  
 
 ### DRAW CPU Registers
   This test prints uninitialized register contents recorded at power on.  
-  Note that there has been consoles known to have noise in some of these bits, and there is no "canonical" power on state for these.  
+  Note that there have been consoles known to have noise in some of these bits, and there is no "canonical" power on state for these.  
 <pre>
               A 00
               X 00
@@ -438,16 +439,31 @@ or
 00 00 00 00 FF FF FF FF
 00 00 00 00 FF FF FF FF
 </pre>
+  Other known patterns include all `00`s or all `FF`s.  
 
 ### DRAW Palette RAM
   This test prints uninitialzed RAM values from Palette RAM, $3F00 through $3F1F.  
   Note that pre-G PPUs are unable to read palette RAM.  
-  Additionally, every console tested appears to have a unique power on state for palette RAM. My console has the following:  
+  Additionally, every console tested appears to have a unique and consistent power on state for palette RAM. My console has the following:  
 <pre>
 00 00 28 00 00 08 00 00
 00 01 01 20 00 08 00 02
 00 00 00 00 00 02 21 00
 00 00 00 00 00 10 00 00
+</pre>
+  I've ran my test on other consoles, and here are a few other results:  
+<pre>
+10 00 00 00 00 00 00 00
+00 20 00 00 00 00 00 00
+10 20 00 10 00 10 00 00
+00 10 10 20 00 10 20 00
+</pre>
+  While the two result above would suggest it's mostly all zeroes with a few bit flips, I have also seen the following:  
+<pre>
+20 24 0A 25 34 11 0F 02
+00 26 04 25 08 1D 25 12
+20 07 02 00 34 22 00 00
+00 08 00 00 08 02 03 02
 </pre>
 
 ## Page 16: PPU Behavior  
