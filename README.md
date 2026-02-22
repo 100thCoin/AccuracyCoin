@@ -477,8 +477,9 @@ or
 ### PPU Register Open Bus
   1: Reading from a write-only register PPU should return the most recently written value to the PPU data bus.  
   2: All PPU Registers should update the PPU data bus when written.  
-  3: Bits 0 through 4 when reading from address $2002 should read read the PPU data bus.  
+  3: Bits 0 through 4 when reading from address $2002 should read the PPU data bus.  
   4: The PPU data bus value should decay before 1 second passes.  
+  5: Reads from $2002 should update the upper 3 bits of the ppu data bus.  
 
 ### PPU Read Buffer
   1: Reading from the PPU register at $2007 is not working at all in this emulator.  
@@ -559,8 +560,9 @@ or
   D: Your sprites are being rendered one scanline higher than they should be, or your sprite zero hit detection isn't actually checking for "solid pixels" overlapping.  
   E: The sprite zero hit flag was set too early.  
 
-### $2002 Flag Clear Timing
+### $2002 Flag Timing
   1: The flags were not cleared on the correct ppu cycle.  
+  2: The flags were not set on the correct ppu cycle.  
 
 ### Suddenly Resize Sprite
   1: Sprite Zero Hits should be working.  

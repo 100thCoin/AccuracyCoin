@@ -737,7 +737,7 @@ Suite_SpriteZeroHits:
 	.byte "Sprite Evaluation", $FF
 	table "Sprite overflow behavior", $FF, result_SprOverflow_Behavior,   TEST_SprOverflow_Behavior
 	table "Sprite 0 Hit behavior",    $FF, result_Sprite0Hit_Behavior,    TEST_Sprite0Hit_Behavior
-	table "$2002 flag clear timing",  $FF, result_2002FlagClearTiming,    TEST_2002FlagClearTiming
+	table "$2002 flag timing",        $FF, result_2002FlagClearTiming,    TEST_2002FlagTiming
 	table "Suddenly Resize Sprite",   $FF, result_SuddenlyResizeSprite,   TEST_SuddenlyResizeSprite
 	table "Arbitrary Sprite zero",    $FF, result_ArbitrarySpriteZero,    TEST_ArbitrarySpriteZero
 	table "Misaligned OAM behavior",  $FF, result_MisalignedOAM_Behavior, TEST_MisalignedOAM_Behavior
@@ -2283,7 +2283,7 @@ ReadFrom2002WithExactTiming:
 
 
 Sync_ToSpriteFlagsClearing:
-	; see TEST_2002FlagClearTiming
+	; see TEST_2002FlagTiming
 	SEI
 	LDA #$00
 	STA $4017 ; enable the frame counter IRQ. (Used to determine get/put cycle later)
@@ -2346,7 +2346,7 @@ Test_2004_SpecificStallsForRenderingStuff:
 	; We want to re-enable this as close to scanline 0, dot 320 as possible.
 	; in other words, we have exactly 2071 CPU cycles until we want to re-enable rendering.
 	JSR Clockslide_2000
-	JSR Clockslide_44 ; before moving this to a subroutine, this was 50, so I removes 6 CPU cycles (and added them later to the clockslide at the end before the RTS.)
+	JSR Clockslide_44 ; before moving this to a subroutine, this was 50, so I removed 6 CPU cycles (and added them later to the clockslide at the end before the RTS.)
 	JSR Clockslide_16
 	; 5 cycles to go.
 	LDA #$10 ; 3 cycles to go
@@ -2359,17 +2359,16 @@ Test_2004_SpecificStallsForRenderingStuff:
 
 	RTS
 
-Test_2004_Stress_RunTest:
-
+Test_2004_Stress_Delay:
 	JSR Sync_ToSpriteFlagsClearing ; You probably want to read the comments inside this subroutine.
 	; In case you didn't read those comments, we're aiming for the END of the CPU read occuring on specific dots here.
 	; The data from address $2004 can change mid-read, and it's the value at the end of the read that we care about. Not the value at the start.
-	; See TEST_2002FlagClearTiming for more info.
+	; See TEST_2002FlagTiming for more info.
 	
 	; We should now be synced, such that the next read will end on on scanline 5, dot 231
 	; let's enable rendering on dot 320.
 	JSR Clockslide_25
-	LDA #$10  ; + 2
+	LDA #$18  ; + 2
 	STA $2001 ; + 3 + 1
 	
 	; let's wait for, say, scanline $80.
@@ -2379,7 +2378,12 @@ Test_2004_Stress_RunTest:
 	JSR Clockslide_3000
 	JSR Clockslide_800
 	JSR Clockslide_50
-	JSR Clockslide_18
+	JSR Clockslide_12
+	RTS
+
+Test_2004_Stress_RunTest:
+
+	JSR Test_2004_Stress_Delay
 	
 	LDY #1
 	
@@ -2466,7 +2470,7 @@ TEST_2004_StressLoop:
 	CPY #22
 	BEQ TEST_2004_Stress_DataComplete
 	; Since we're not disabling rendering for extended periods, OAM Decay is not a threat!
-	; We are current on scanline 130, dot 101 + Y
+	; We are currently on scanline 130, dot 101 + Y
 	; so VBlank is in 37409 ppu cycles, or 12469.66 ppu cycles.
 	JSR Test_2004_SpecificStallsForRenderingStuff	
 	LDA <$00 ; stall for 5 more cycles
@@ -2970,11 +2974,8 @@ FAIL_2004_Stress_Eval2:
 	RTS
 ;;;;;;;
 
-FlagClearTiming_PrepLUT:
-	.byte $00, $FE, $00, $80
-
-TEST_2002FlagClearTiming:
-	;;; Test 1 [$2007 Read w/ Rendering]: Verify the timing in which the sprite zero and sprite overflow flags are cleared. ;;;	
+TEST_2002FlagTiming:
+	;;; Test 1 [$2002 Flag Timing]: Verify the timing in which the sprite zero and sprite overflow flags are cleared. ;;;	
 	
 	; Just so you are aware, all the flags are cleared on dot 1 of the pre-render line.
 	; This is a fact.
@@ -2991,20 +2992,20 @@ TEST_2002FlagClearTiming:
 	
 	; That is why you will see in the results, the vblank flag appears to be cleared later.
 	
-	LDA FlagClearTiming_PrepLUT, Y
-	STA $200, X
-	INY
-	TYA
-	AND #$3
-	TAY
+	JSR InitializeSpriteX
+	.byte $80, $FE, $00, $80
+	
 	INX
-	BNE TEST_2002FlagClearTiming
+	BNE TEST_2002FlagTiming
+	DEC $200 ; make sprite zero one scanline earlier.
 	; okay, now every object will be drawn at Y=$00, X=$80
 	JSR DisableRendering
 	JSR ClearNametable2_With24 ; Nametable 2 is polluted from other tests. Since it gets drawn during this test, let's clear it first.
+	
 	JSR PrintCHR
-	.word $2C10
+	.word $2E10
 	.byte $FE, $FF
+
 	JSR SetPPUADDRFromWord
 	.byte $2C, $00
 	; Now the background is set up for the test.
@@ -3022,22 +3023,22 @@ TEST_2002FlagClearTiming:
 	NOP
 	LDA <$00
 	LDX #0
-TEST_2002FlagClearTimingLoop:
+TEST_2002FlagTimingLoop:
 	LDA #$18
 	NOP
 	STA $2001 ; rendering enabled on dot 321 of scanline 0. (this first time this is ran, at least.)
 	JSR ReadFrom2002WithExactTiming ; I'm re-using the logic for this elsewhere, so I made it a subroutine to save bytes.
 	TYA
 	AND #$E0
-	STA <$50, X ; store test results.
+	STA <$6C, X ; store test results.
 	LDA <$00
 	INX
 	CPX #$4
-	BNE TEST_2002FlagClearTimingLoop
+	BNE TEST_2002FlagTimingLoop
 	
 	LDX #0
 TEST_2002FCT_CheckAnswerLoop:
-	LDA <$50, X
+	LDA <$6C, X
 	CMP TEST_2002FCT_AnswerKey, X
 	BNE TEST_2002FCT_CheckAltAnswer
 	INX
@@ -3048,7 +3049,7 @@ TEST_2002FCT_CheckAnswerLoop:
 TEST_2002FCT_CheckAltAnswer:
 	LDX #0
 TEST_2002FCT_CheckAltAnswerLoop:
-	LDA <$50, X
+	LDA <$6C, X
 	CMP TEST_2002FCT_AltAnswerKey, X
 	BNE TEST_2002FCT_Fail
 	INX
@@ -3056,6 +3057,35 @@ TEST_2002FCT_CheckAltAnswerLoop:
 	BNE TEST_2002FCT_CheckAltAnswerLoop
 	
 TEST_2002FCT_Pass:
+	INC <ErrorCode
+
+	;;; Test 2 [$2002 Flag Timing]: Verify the timing in which the sprite zero and sprite overflow flags are set. ;;;	
+
+	JSR Test_2002_FlagSet_RunTest
+
+	; evaluate the $2002 flag timing test results.
+	
+	; sanitize the results.
+	LDX #8
+TEST_2002FCT_Sanitize:
+	LDA <$50, X
+	AND #$E0
+	STA <$50, X
+	DEX
+	BNE TEST_2002FCT_Sanitize
+	
+	
+	LDA <$53 ; This byte should be $00
+	BNE TEST_2002FCT_Fail
+	LDA <$54  ; This byte should be $00 or $40, depending on clock alignment. (alignments 0 and 1 are $00, alignments 2 and 3 are $40)
+	BEQ TEST_2002FCT_Next
+	CMP #$40
+	BNE TEST_2002FCT_Fail
+TEST_2002FCT_Next:
+	LDA <$55 ; This byte should be $60
+	CMP #$60
+	BNE TEST_2002FCT_Fail
+
 	;; END OF TEST ;;
 	LDA #1
 	RTS
@@ -3068,6 +3098,58 @@ TEST_2002FCT_AnswerKey:
 	.byte $E0, $E0, $80, $00
 TEST_2002FCT_AltAnswerKey:
 	.byte $E0, $80, $80, $00
+
+
+Test_2002_FlagSet_RunTest:
+
+	JSR Test_2004_Stress_Delay ; just re-use this.
+	JSR Clockslide_42
+	LDX #1
+	
+Test_2002_FlagSet_Loop:
+	; And the test begins.
+	; the LDA instruction starts a bit early, but the read cycle will END on dot 0.
+	LDA $2002 ; dot 0.
+	STA <$50, X
+	JSR Clockslide_200
+	JSR Clockslide_50
+	INX
+	CPX #8
+	BEQ TEST_2002_FlagSet_DataComplete
+	; Since we're not disabling rendering for extended periods, OAM Decay is not a threat!
+	; We are current on scanline 130, dot 101 + Y
+	; so VBlank is in 37409 ppu cycles, or 12469.66 ppu cycles.
+
+	JSR Clockslide_10000
+	JSR Clockslide_3000
+	; I went a little overboard. We are now on scanline 244, dot 227 + Y
+	LDA #0
+	STA $2001 ; disable rendering.
+	
+	LDA #$2C
+	STA $2006
+	LDA #0
+	STA $2006
+	; We want to re-enable this as close to scanline 0, dot 320 as possible.
+	; in other words, we have exactly 2071 CPU cycles until we want to re-enable rendering.
+	JSR Clockslide_2000
+	JSR Clockslide_50 
+	NOP
+	NOP
+	; 5 cycles to go.
+	LDA #$18 ; 3 cycles to go
+	STA $2001 ; cool.
+	; okay, now scanline $80 dot 1 is 14438 CPU cycles away,
+	JSR Clockslide_10000
+	JSR Clockslide_4000
+	JSR Clockslide_400
+	JSR Clockslide_36
+	JMP Test_2002_FlagSet_Loop
+
+TEST_2002_FlagSet_DataComplete:
+
+	RTS
+;;;;;;;	
 
 
 	.bank 1
@@ -3592,6 +3674,10 @@ TEST_PPU_Open_Bus:
 	; Here's how PPU Open bus works.
 	; The PPU data bus is updated whenever the CPU writes to any PPU Register.
 	
+	JSR ClearPage2
+	LDA #2
+	STA $4014
+	
 	LDX #0
 	LDY #1
 	LDA #$5A
@@ -3661,7 +3747,7 @@ TEST_PPU_Open_Bus:
 	TYA
 	LDA $2000
 	CMP #$24
-	BNE TEST_FailPPUOpenBus
+	BNE TEST_FailPPUOpenBus2
 	INC <ErrorCode 
 	
 	;;; Test 3 [PPU Open Bus]: Address $2002, bits 0 through 4 are open bus ;;;
@@ -3674,11 +3760,20 @@ TEST_PPU_Open_Bus:
 	BNE TEST_FailPPUOpenBus2
 	INC <ErrorCode 
 	JSR ResetScroll
+	
+	;;; Test 4 [PPU Open Bus]: The upper 3 bits of the PPU data bus is updated by reads of $2002. ;;;
+	JSR WaitForVBlank ; this clears the vblank flag.
+	LDA #$FF
+	STA $2002
+	LDA $2002
+	LDA $2000
+	CMP #$1F
+	BNE TEST_FailPPUOpenBus2
 
 	LDA <$50	; This value will be $00 if you are running [PPU Open Bus], but $01 if you are running [Dummy Write Cycles], which re-runs this test to verify the ppu bus works as a prerequisite.
 	BNE TEST_PPU_Open_Bus_SkipDecayTest
 	
-	;;; Test 4 [PPU Open Bus]: The PPU data bus decays. ;;;
+	;;; Test 5 [PPU Open Bus]: The PPU data bus decays. ;;;
 	LDA #$FF
 	STA $2002
 	LDX #120
@@ -3688,6 +3783,7 @@ TEST_PPU_Open_Bus_120FrameStall:; wait approximately two seconds.
 	BNE TEST_PPU_Open_Bus_120FrameStall
 	LDA $2000
 	BNE TEST_FailPPUOpenBus2
+	INC <ErrorCode 
 
 	;; END OF TEST ;;
 TEST_PPU_Open_Bus_SkipDecayTest:
@@ -15826,7 +15922,6 @@ InitializeSpriteZeroLoop:
 
 InitializeSpriteX:	; Sets address $200+X*4 through $203+X*4 to the values found in the 4 bytes following the JSR to this subroutine.
 	; This also adjusts the return address.
-	; TODO: This subroutine is currently unnsed.
 	JSR CopyReturnAddressToByte0
 	LDA #$02
 	STA <$03
