@@ -383,11 +383,12 @@ For more information, I recommend reading the fully commented assembly code for 
 
 ### Controller Clocking
   1: Reading $4016 more than 8 times should always result in bit 0 being set to 1.  
-  2: Your emulator did not pass the SLO Absolute, X test.  
-  3: (NES / AV Famicom only) Double-reading address $4016 should only clock the controller once.  
-  4: (NES / AV Famicom only) This double-read should be the same value for both reads.  
-  5: (NES / AV Famicom only) The "put"/"halt" cycles of the DMC DMA should be able to clock the controller if the DMA occurs during a read from $4016. The LDA instruction should clock the controller again after the DMC DMA's "get" cycle.  
-  6: (NES / AV Famicom only) If the DMC DMA "get" cycle has a bus conflict with $4016, the controller will only get clocked once during LDA $4016 even with the DMC DMA occurring.  
+  2: Reading from a controller port while it is still strobed shouldn't affect the contents of the shift register, as it should be constantly loaded with the currently held buttons.  
+  3: Your emulator did not pass the SLO Absolute, X test.  
+  4: (NES / AV Famicom only) Double-reading address $4016 should only clock the controller once.  
+  5: (NES / AV Famicom only) This double-read should be the same value for both reads.  
+  6: (NES / AV Famicom only) The "put"/"halt" cycles of the DMC DMA should be able to clock the controller if the DMA occurs during a read from $4016. The LDA instruction should clock the controller again after the DMC DMA's "get" cycle.  
+  7: (NES / AV Famicom only) If the DMC DMA "get" cycle has a bus conflict with $4016, the controller will only get clocked once during LDA $4016 even with the DMC DMA occurring.  
 
 ## Page 15: Power On State
 
