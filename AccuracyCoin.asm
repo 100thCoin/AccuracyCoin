@@ -332,7 +332,7 @@ OpenBusTestFakedOpenBusBehavior:
 CannotWriteToROM_01:
 	.byte $01; This value is used in the "Cannot write to ROM" test.
 	
-RESET:	; This ROM, despite the guidance of the NesDev Wiki's "startup code", writes a bunch of uninitialized registers, and reads uninitialized RAM. Intentionally.
+RESET:	            ; This ROM, despite the guidance of the NesDev Wiki's "startup code", writes a bunch of uninitialized registers, and reads uninitialized RAM. Intentionally.
 	STA <$00		; First thing we do at power on is store A to address $00 as a temporary place to hold it. This does not modify the CPU flags.
 	PHP				; Push the processor flags...
 	PLA				; ... and pull them off.
@@ -2134,7 +2134,7 @@ TEST_Rendering2007Read:
 	LDA #2
 	STA $4014
 	
-	; We don't need to most precise timing for this.
+	; We don't need the most precise timing for this.
 	; Simply read from $2007 at some point on a visible scanline.
 	
 	JSR Clockslide_2000
@@ -7155,7 +7155,7 @@ TEST_ArbitrarySpriteZeroLoop:
 	LDA #32*4					; (+2 CPU cycles) Load A with 32*4 (128, or $80) which is the OAM address for the object we initialized.
 	JSR EnableRendering			; (+30 CPU cycles) Enable rendering of both the background and sprites, so the sprite zero hit can occur.
 								; After setting up sprite 8 and running the OAM DMA, we have 1596 CPU cycles remaining before cycle 0 of scanline 0.
-	JSR Clockslide_1830			; (+1598 CPU cycles) This function just stalls for 1598 CPU cycles, so we should be slightly after cycle 0 of scanline 0.
+	JSR Clockslide_1830			; (+1830 CPU cycles) This function just stalls for 1830 CPU cycles, so we should be slightly after cycle 0 of scanline 0.
 	STA $2003					; Store A ($80) at PPUOAMAddress. (and probably copy 8 instances of $FF from OAM[$00] to OAM[$20], which won't break anything)
 								; Now, the sprite evaluation will occur with sprite 8 getting processed first.
 								; Since this object is the first one processed, PPU cycle 66 will check if it is in range of the current scanline.
@@ -7200,7 +7200,7 @@ Address2004_SpriteZeroTest:     ; I also re-use this code in the $2004 behavior 
 	STA $4014					; Same as above. Run the OAM DMA with page 2.
 	LDA #$81					; Load A with $81, which we will write to $2003 to offset the OAM address.
 	JSR EnableRendering			; Same as above. Enable rendering sprites + background.
-	JSR Clockslide_1830			; Same as above, except we're 1 CPU cycles earlier than last time. (3 PPU cycles)
+	JSR Clockslide_1830			; Same as above, except we're 1 CPU cycle earlier than last time. (3 PPU cycles)
 	STA $2003					; Store A ($81) at a mirror of PPUOAMAddress. (and probably copy 8 instances of $FF from OAM[$00] to OAM[$20], which won't break anything)
 	JSR Clockslide_500			; Same as above. Wait a few scanline for this entire sprite to be drawn
 	LDA $2002					; Read PPUSTATUS
