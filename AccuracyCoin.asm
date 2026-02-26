@@ -12996,6 +12996,7 @@ TEST_DMCDMAPlusOAMDMA_Loop1:
 	JSR DMASync_50CyclesRemaining	
 	LDA #$4E			; +2 cycles.
 	STA $4010			; +4 cycles. Make this sample loop, and use the SECOND FASTEST DMC rate.
+	                    ; We're using the second fastest DMC rate, since we want the DMC DMA to occur at the end of the OAM DMA later in this test.
 	JSR Clockslide_50	; [DMC DMA. + 4]
 	; 566 more cycles until the next DMA.
 	JSR Clockslide_500
@@ -13094,9 +13095,9 @@ TEST_ExplicitDMAAbort:
 
 TEST_ExplicitDMAAbort_Loop1:
 	JSR DMASync_50CyclesRemaining	
-	LDA #$4E			; +2 cycles.
-	STA $4010			; +4 cycles. Make this sample loop, and use the SECOND FASTEST DMC rate.
-	JSR Clockslide_50	; [DMC DMA. + 4]
+	LDA #$4E            ; +2 cycles.
+	STA $4010           ; +4 cycles. Make this sample loop, and use the SECOND FASTEST DMC rate.
+	JSR Clockslide_50   ; [DMC DMA. + 4]
 	; 566 more cycles until the next DMA.
 	JSR Clockslide_500
 	; 66 more cycles.
@@ -13169,9 +13170,10 @@ TEST_ImplicitDMAAbort:
 TEST_ImplicitDMAAbort_Loop1:
 	JSR DMASync_50CyclesRemaining	
 	LDA #$00
-	STA $4015	; disable the DMA.
+	STA $4015           ; disable the DMA.
 	LDA #$0E			; +2 cycles.
 	STA $4010			; +4 cycles. Make this sample stop looping, and use the SECOND FASTEST DMC rate.
+	                    ; We're using the second fastest DMC rate, since I'm re-using code from TEST_DMCDMAPlusOAMDMA.
 	JSR Clockslide_44	; [DMC DMA. + 4]
 	; 566 more cycles until the next DMA.
 	TXA ; 64 more cycles.
@@ -13216,10 +13218,10 @@ TEST_ImplicitDMAAbort_Loop1:
 TEST_ImplicitDMAAbort_Loop2:
 	JSR DMASync_50CyclesRemaining	
 	LDA #$00
-	STA $4015	; disable the DMA.
-	LDA #$0E			; +2 cycles.
-	STA $4010			; +4 cycles. Make this sample stop looping, and use the SECOND FASTEST DMC rate.
-	JSR Clockslide_44	; [DMC DMA. + 4]
+	STA $4015           ; disable the DMA.
+	LDA #$0E            ; +2 cycles.
+	STA $4010           ; +4 cycles. Make this sample stop looping, and use the SECOND FASTEST DMC rate.
+	JSR Clockslide_44   ; [DMC DMA. + 4]
 	; 566 more cycles until the next DMA.
 	TXA ; 64 more cycles.
 	JSR Clockslide64_Minus_A ; A cycles until DMA.
@@ -13257,16 +13259,14 @@ TEST_ImplicitDMAAbort_Loop2:
 	LDX #0
 TEST_ImplicitDMAAbort_Loop3:
 	JSR DMASync_50CyclesRemaining	
-	LDA #$4E			; +2 cycles.
-	STA $4010			; +4 cycles. Make this sample keep looping, and use the SECOND FASTEST DMC rate.
 	LDA #$00
-	STA $4015	; disable the DMA.
-	NOP
-	NOP
+	STA $4015           ; disable the DMA.
+	LDA #$4E			; +2 cycles.
+	STA $4010			; +4 cycles. Make this sample stop looping, and use the SECOND FASTEST DMC rate.
+	JSR Clockslide_44	; [DMC DMA. + 4]
+	; 566 more cycles until the next DMA.
 	TXA ; 64 more cycles.
 	JSR Clockslide64_Minus_A ; A cycles until DMA.
-	JSR Clockslide_35	; [DMC DMA. + 4]
-	; 566 more cycles until the next DMA.
 	JSR Clockslide_500
 	; 66 more cycles.
 
@@ -13274,23 +13274,20 @@ TEST_ImplicitDMAAbort_Loop3:
 	
 	LDA #$10
 	STA $4015	; enable the DMA right as it is occurring.
-
+	NOP
+	NOP
+	NOP
 	TXA
-	NOP
-	NOP
-	NOP
-	NOP
-	NOP
-	JSR Clockslide37_Plus_A ; we ran a clockslide + A earlier, so to sync back up we need to run a clockslide - A.
 	JSR Clockslide_500
-	JSR Clockslide_14
+	JSR Clockslide37_Plus_A ; we ran a clockslide + A earlier, so to sync back up we need to run a clockslide - A.
+	JSR Clockslide_23
 	LDA <$00
 	LDA #$4E			; +2 cycles.
 	STA $4010			; +4 cycles. Make this sample loop, and use the SECOND FASTEST DMC rate.
 	LDA #$10
 	STA $4015	; enable the DMA 
 	JSR Clockslide_500
-	JSR Clockslide_14
+	LDA <$0
 	;56 cycles to go.
 	JSR CalculateDMADuration
 	TYA
@@ -13415,14 +13412,14 @@ TEST_ImplicitDMAAbort_Key1:
 TEST_ImplicitDMAAbort_Key2:
 	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $01, $00, $00, $00, $00, $00
 TEST_ImplicitDMAAbort_Key3:
-	.byte $01, $01, $01, $01, $01, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
+	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $04, $04, $04, $04, $04, $04
 	
 TEST_ImplicitDMAAbort_AltKey1:
 	.byte $00, $00, $00, $00, $00, $00, $00, $00, $04, $04, $01, $01, $00, $00, $00, $00
 TEST_ImplicitDMAAbort_AltKey2:
 	.byte $00, $00, $00, $00, $00, $00, $00, $00, $04, $04, $01, $00, $00, $00, $00, $00
 TEST_ImplicitDMAAbort_AltKey3:
-	.byte $01, $01, $01, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
+	.byte $00, $00, $00, $00, $00, $00, $00, $00, $04, $04, $04, $04, $04, $04, $04, $04
 	
 
 TEST_ControllerClocking_Strobe:
