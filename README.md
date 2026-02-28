@@ -726,8 +726,9 @@ or
 
 ### JSR Edge Cases
   1: Your emulator pushed the wrong value for the return address.  
-  2: Your emulator has incorrect open bus emulation.  
-  3: JSR should leave the value of the second operand on the data bus.  
+  2: JSR should push the return address to the stack between reading the first and second operand.
+  3: Your emulator has incorrect open bus emulation.  
+  4: JSR should leave the value of the second operand on the data bus.  
 
 # Success Codes
 Some tests have multiple acceptable behaviors that are tested for in this ROM. The behavior used will either be printed on screen after running the test, or you'll see a "success code" on the all-test table.  

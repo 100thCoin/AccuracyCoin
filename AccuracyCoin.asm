@@ -13981,6 +13981,16 @@ WriteFFToLowestPageBytes:
 	RTS
 ;;;;;;;
 
+JSREdgeCases_160:
+	TSX
+	TXA
+	LDX #$68
+	TXS
+	TAX
+	JSR $0650 ; This will actually JSR to address $0150. That's because the high byte is overwritten by the JSR isntruction as it is being executed.
+	TXS
+	RTS
+;;;;;;;
 
 FAIL_JSREdgeCases:
 	JMP TEST_Fail
@@ -13994,8 +14004,45 @@ TEST_JSREdgeCases:
 	CMP #0
 	BNE FAIL_JSREdgeCases
 	INC <ErrorCode
+
+	;;; Test 2 [JSR Edge Cases]: Is the high byte operand read AFTER the data is pushed to the stack? ;;;
+
+	; Here are all the cycles of JSR. (Simplified. JSR is actually a super odd instruction. I recommend looking at it in visual 6502 some time.)
+	; 1: Read the opcode.
+	; 2: Read the first operand.
+	; 3: Dummy read from stack.
+	; 4: Push PC High to the stack.
+	; 5: Push PC Low to the stack.
+	; 6: Read the second operand, and update the program counter.
+
+	; To test this, I'll write a JSR to address $0650, but the test will run from address $0160.
+	; However, the stack pointer will be at $162, overwriting it with 01 before the high byte oeprand is read.
 	
-	;;; Test 2 [JSR Edge Cases]: Open bus pre-requisite ;;;
+	; Address $166: 20 50 06
+	
+	; Despite appearing to be a JSR to $0650, this jumps to $0150 instead.
+	; This code also avoids crashes with the alternate incorrect asnwer, where you incorrectly JSR to $0168 (if both writes to the stack incorrectly occur before reading either operand.)
+	
+	; Let's set up some code at those locations.
+	LDA #$C8 ; INY
+	STA $150
+	LDA #$60
+	STA $151
+	STA $650
+
+	LDX #$A
+TEST_JSREdgeCases_Loop:
+	LDA JSREdgeCases_160, X
+	STA $160, X
+	DEX
+	BPL TEST_JSREdgeCases_Loop
+	LDY #0
+	JSR $160 ; run the test here.
+	CPY #1
+	BNE FAIL_JSREdgeCases
+	INC <ErrorCode
+
+	;;; Test 3 [JSR Edge Cases]: Open bus pre-requisite ;;;
 	LDA $4000
 	CMP #$40
 	BNE FAIL_JSREdgeCases
@@ -14007,14 +14054,7 @@ TEST_JSREdgeCases:
 	BNE FAIL_JSREdgeCases
 	INC <ErrorCode
 
-	;;; Test 3 [JSR Edge Cases]: What value is on the data bus after JSR? ;;;
-	; Here are all the cycles of JSR. (Simplified. JSR is actually a super odd instruction. I recommend looking at it in visual 6502 some time.)
-	; 1: Read the opcode.
-	; 2: Read the first operand.
-	; 3: Dummy read from stack.
-	; 4: Push PC High to the stack.
-	; 5: Push PC Low to the stack.
-	; 6: Read the second operand, and update the program counter.
+	;;; Test 4 [JSR Edge Cases]: What value is on the data bus after JSR? ;;;
 	
 	; This test will do the following at address $005E. JSR $4000
 	; If pass, it will run RTI.
