@@ -17072,7 +17072,7 @@ RunTest_AllTestSkipNMI:
 	LDA <suitePointerList+1,X     ; read the high byte of where to store the test results.
 	STA <TestResultPointer+1      ; and store it in RAM next to the low byte.
 	
-	LDA <TestResultPointer        ; draw tests cannot be marked to be skipped,
+	LDA <TestResultPointer+1        ; draw tests cannot be marked to be skipped,
 	CMP #3                        ; but address $3FF is uninitialized, and might be $FF. 
 	BEQ RunTest_SkipSkip          ; So we make sure we never skip Draw tests.
 	
