@@ -13454,6 +13454,7 @@ TEST_ControllerClocking:
 	
 	;;; Test 2 [Controller Clocking]: Reading $4016 while the controllers are being strobed does not update the shift register inside the controller. ;;;
 	; The shift register is constantly being reloaded while it is strobed, so until clearing the strobe, the shift register always returns the A register.
+	; This test will fail if ANY button other than A is being pressed. Do not press any other buttons during this test, thanks. :)
 
 	STA $4016 ; A=1, strobe the controller.
 	LDX #8
