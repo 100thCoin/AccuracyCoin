@@ -311,11 +311,7 @@ result_BranchDummyRead = $48B
 result_2004_Stress = $48C
 result_2002FlagClearTiming = $48D
 
-result_PowOn_CPURAM = $03FC	; page 3 omits the test from the all-test-result-table.
-result_PowOn_CPUReg = $03FD ; page 3 omits the test from the all-test-result-table.
-result_PowOn_PPURAM = $03FE ; page 3 omits the test from the all-test-result-table.
-result_PowOn_PPUPal = $03FF ; page 3 omits the test from the all-test-result-table.
-result_PowOn_PPUReset = $03FD ; page 3 omits the test from the all-test-result-table.
+result_DrawTest = $03FF	; page 3 omits the test from the all-test-result-table.
 
 ;$500 is dedicated to RAM needed for tests.
 ;$600 is dedicated to the IRQ routine
@@ -701,11 +697,11 @@ Suite_APUTiming:
 	;; Power On State ;;
 Suite_PowerOnState:
 	.byte "Power On State", $FF
-	table "PPU Reset Flag", $FF, result_PowOn_PPUReset, TEST_PowerOnState_PPU_ResetFlag
-	table "CPU RAM",        $FF, result_PowOn_CPURAM,   TEST_PowerOnState_CPU_RAM
-	table "CPU Registers",  $FF, result_PowOn_CPUReg,   TEST_PowerOnState_CPU_Registers
-	table "PPU RAM",        $FF, result_PowOn_PPURAM,   TEST_PowerOnState_PPU_RAM
-	table "Palette RAM",    $FF, result_PowOn_PPUPal,   TEST_PowerOnState_PPU_Palette
+	table "PPU Reset Flag", $FF, result_DrawTest, TEST_PowerOnState_PPU_ResetFlag
+	table "CPU RAM",        $FF, result_DrawTest,   TEST_PowerOnState_CPU_RAM
+	table "CPU Registers",  $FF, result_DrawTest,   TEST_PowerOnState_CPU_Registers
+	table "PPU RAM",        $FF, result_DrawTest,   TEST_PowerOnState_PPU_RAM
+	table "Palette RAM",    $FF, result_DrawTest,   TEST_PowerOnState_PPU_Palette
 	.byte $FF
 	
 	;; PPU Behavior ;;
@@ -17074,6 +17070,10 @@ RunTest_AllTestSkipNMI:
 	STA <TestResultPointer        ; and store it in RAM
 	LDA <suitePointerList+1,X     ; read the high byte of where to store the test results.
 	STA <TestResultPointer+1      ; and store it in RAM next to the low byte.
+	
+	LDA <TestResultPointer        ; draw tests cannot be marked to be skipped,
+	CMP #3                        ; but address $3FF is uninitialized, and might be $FF. 
+	BEQ RunTest_SkipSkip          ; So we make sure we never skip Draw tests.
 	
 	LDY #0                        ; set up Y for the upcoming indirect reads.
 	LDA [TestResultPointer],Y     ; check if this test is marked to be skipped.
