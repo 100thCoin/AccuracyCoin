@@ -436,7 +436,7 @@ ReloadMainMenu: ; There's an option to run every test in the ROM, and it draws a
 	INC <Debug_EC ; 03 -> 04
 	JSR WaitForVBlank
 	INC <Debug_EC ; 04 -> 05
-	JSR TEST_VblankSync_PreTest; ; Initialize result_VblankSync_PreTest
+	JSR TEST_VblankSync_PreTest; Initialize result_VblankSync_PreTest
 	INC <Debug_EC ; 05 -> 06
 	JSR DMASync ; Initialize result_DMADMASync_PreTest
 	
@@ -751,7 +751,6 @@ Suite_PPUMisc:
 	table "BG Serial In",             $FF, result_BGSerialIn,            TEST_BGSerialIn
 	table "Sprites On Scanline 0",    $FF, result_Scanline0Sprites,      TEST_Scanline0Sprites
 	table "$2004 Stress Test",        $FF, result_2004_Stress,           TEST_2004_Stress
-
 
 	;table "RMW $2007 Extra Write", $FF, result_RMW2007, TEST_RMW2007 ; Commented out for now. More research required.
 	;table "Palette Corruption", $FF, result_Unimplemented, DebugTest (I did not write a test for this, because it relies on a specific cpu/ppu clock alignment.)
@@ -2222,7 +2221,8 @@ TEST_BranchDummyRead:
 	; $2000: (opcode: $10 = BPL)
 	; $2001: (operand: $10. BPL $2012)
 	; $2002: (Dummy read. Update PCL. PC = $2012. End of instruction.)
-	; $2012: (opcode: $60 = RTS)
+	; $2012: (BPL $2024)
+	; $2024: (opcode: $60 = RTS)
 	LDA <$50 ; If you failed the test, then you would have executed INC <$50 at $1FA4.
 	BNE FAIL_BranchDummyRead
 	INC <ErrorCode
@@ -9623,10 +9623,10 @@ TEST_IFlagLatency_Test_C:
 	; The plan:
 	; At address $4013
 	; 1.) Read opcode $90
-	; - poll for interrupts, (an interrupt will occur)
+	; - poll for interrupts, (IRQ Level detector is high)
 	; 2.) Read operand $90
 	; 3.) Dummy read $4015 (clearing IRQ flag), move PC
-	; - poll for interrupts, (an interrupt will not occur)
+	; - poll for interrupts, (IRQ Level detector is low)
 	; 4.) Dummy read, update PCH.
 	
 	; This will also branch to $3FA5, reading from PPU Open bus to grab an RTS.
