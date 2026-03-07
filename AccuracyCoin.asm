@@ -1128,12 +1128,12 @@ DMASync48_Loop:
 	STA $4010 
 	LDA <$00  
 	LDA Copy_A
-	JSR Clockslide_100
-	JSR Clockslide_100
-	JSR Clockslide_100
-	JSR Clockslide_50
-	NOP
-	CMP <$C9
+	JSR Clockslide_100 ; Note to self, do not try to optimize with ClockslideFromWord, as write cycles throw off the DMA timing.
+	JSR Clockslide_100 ; ^
+	JSR Clockslide_100 ; ^
+	JSR Clockslide_50  ; ^
+	NOP                ; ^
+	CMP <$C9           ; ^
 	RTS
 ;;;;;;;
 	
@@ -1162,12 +1162,12 @@ DMASync60_Loop:
 	STA $4010 
 	LDA <$00  
 	LDA Copy_A
-	JSR Clockslide_100
-	JSR Clockslide_100
-	JSR Clockslide_100
-	JSR Clockslide_50
-	NOP
-	CMP <$C9
+	JSR Clockslide_100 ; Note to self, do not try to optimize with ClockslideFromWord, as write cycles throw off the DMA timing.
+	JSR Clockslide_100 ; ^
+	JSR Clockslide_100 ; ^	
+	JSR Clockslide_50  ; ^
+	NOP                ; ^
+	CMP <$C9           ; ^
 	RTS
 ;;;;;;;
 	
@@ -1196,12 +1196,12 @@ DMASyncA5_Loop:
 	STA $4010 
 	LDA <$00  
 	LDA Copy_A
-	JSR Clockslide_100
-	JSR Clockslide_100
-	JSR Clockslide_100
-	JSR Clockslide_50
-	NOP
-	CMP <$C9
+	JSR Clockslide_100 ; Note to self, do not try to optimize with ClockslideFromWord, as write cycles throw off the DMA timing.
+	JSR Clockslide_100 ; ^
+	JSR Clockslide_100 ; ^
+	JSR Clockslide_50  ; ^
+	NOP                ; ^
+	CMP <$C9           ; ^
 	RTS
 ;;;;;;;
 	
@@ -1230,12 +1230,12 @@ DMASync68_Loop:
 	STA $4010 
 	LDA <$00  
 	LDA Copy_A
-	JSR Clockslide_100
-	JSR Clockslide_100
-	JSR Clockslide_100
-	JSR Clockslide_50
-	NOP
-	CMP <$C9
+	JSR Clockslide_100 ; Note to self, do not try to optimize with ClockslideFromWord, as write cycles throw off the DMA timing.
+	JSR Clockslide_100 ; ^
+	JSR Clockslide_100 ; ^
+	JSR Clockslide_50  ; ^
+	NOP                ; ^
+	CMP <$C9           ; ^
 	RTS
 ;;;;;;;
 	
@@ -1276,12 +1276,12 @@ DMASync90_Loop:
 	STA $4010 
 	LDA <$00  
 	LDA Copy_A
-	JSR Clockslide_100
-	JSR Clockslide_100
-	JSR Clockslide_100
-	JSR Clockslide_50
-	NOP
-	CMP <$C9
+	JSR Clockslide_100 ; Note to self, do not try to optimize with ClockslideFromWord, as write cycles throw off the DMA timing.
+	JSR Clockslide_100 ; ^
+	JSR Clockslide_100 ; ^
+	JSR Clockslide_50  ; ^
+	NOP                ; ^
+	CMP <$C9           ; ^
 	RTS
 ;;;;;;;
 	
@@ -1310,12 +1310,10 @@ DMASync05_Loop:
 	STA $4010 
 	LDA <$00  
 	LDA Copy_A
-	JSR Clockslide_100
-	JSR Clockslide_100
-	JSR Clockslide_100
-	JSR Clockslide_50
-	NOP
-	CMP <$C9
+	JSR Clockslide_300 ; Note to self, do not try to optimize with ClockslideFromWord, as write cycles throw off the DMA timing.
+	JSR Clockslide_50  ; ^
+	NOP                ; ^
+	CMP <$C9           ; ^
 	RTS
 ;;;;;;;
 	
@@ -2000,13 +1998,9 @@ TEST_SuddenlyResizeSprite:
 	; Since we're at the end of HBlank scanline 0, we have 14 full scanlines - 1 HBlank to go.
 	; We've got approx. 4710 ppu cycles until we're ready, or 1570 CPU cycles.
 	
-	JSR Clockslide_1000 ; 570 cycles to go
-	JSR Clockslide_500  ; 70 cycles to go
-	JSR Clockslide_50   ; 20 cycles to go
-	NOP                 ; 18 cycles to go
-	NOP                 ; 16 cycles to go
-	NOP                 ; 14 cycles to go
-	NOP                 ; 12 cycles to go
+	JSR ClockslideFromWord
+	.word 1558
+	
 	LDA #$18            ; 10 cycles to go
 	LDX #$23            ; 8 cycles to go
 	STA $2001           ; 4 cycles to go
@@ -2035,10 +2029,8 @@ TEST_SuddenlyResizeSprite:
 	; Since we're at the end of HBlank scanline 0, we have 14 full scanlines - 1 HBlank to go.
 	; We've got approx. 4710 ppu cycles until we're ready, or 1570 CPU cycles.
 	
-	JSR Clockslide_1000 ; 570 cycles to go
-	JSR Clockslide_500  ; 70 cycles to go
-	JSR Clockslide_50   ; 20 cycles to go
-	JSR Clockslide_14   ; 6 cycles to go
+	JSR ClockslideFromWord
+	.word 1564
 	LDA #$18            ; 4 cycles to go
 	LDX #$23            ; 2 cycles to go
 	STA $2001           ; -2 cycles to go
@@ -2069,10 +2061,8 @@ TEST_SuddenlyResizeSprite:
 	STA $2005
 	
 	JSR Sync_ToLine0Dot1 ; 1791 cycles to go
-	JSR Clockslide_1000  ; 791 cycles to go
-	JSR Clockslide_700   ; 91 cycles to go
-	JSR Clockslide_50    ; 41 cycles to go
-	JSR Clockslide_35    ; 6 cycles to go
+	JSR ClockslideFromWord
+	.word 1785
 	LDA #3               ; 4 cycles to go
 	STA $2000            ; 0 cycles to go
 
@@ -2087,10 +2077,8 @@ TEST_SuddenlyResizeSprite:
 	LDA #$23
 	STA $2000
 	JSR Sync_ToLine0Dot1 ; 1791 cycles to go
-	JSR Clockslide_1000  ; 791 cycles to go
-	JSR Clockslide_700   ; 91 cycles to go
-	JSR Clockslide_50    ; 41 cycles to go
-	JSR Clockslide_40    ; 1 cycle to go
+	JSR ClockslideFromWord
+	.word 1790           ; 1 cycle to go
 	LDA #3               ; -1 cycles to go
 	STA $2000            ; -5 cycles to go
 
@@ -2135,7 +2123,8 @@ TEST_Rendering2007Read:
 	JSR Clockslide_2000
 	LDA $2007 ; this is what we are testing for. What happens to v?
 	; The correct answer is, v+= $1001
-	JSR Clockslide_26352 ; wait until vblank. (without the potential for vblank suppression)
+	JSR ClockslideFromWord
+	.word 26352 ; wait until vblank. (without the potential for vblank suppression)
 	LDA $2002
 	AND #$40
 	BEQ FAIL2_SuddenlyResizeSprite ; if the was no sprite zero hit, fail the test.
@@ -2256,11 +2245,9 @@ TEST_BranchDummyRead:
 
 
 ReadFrom2002WithExactTiming:
-	; stall for 29560 cycles.
-	JSR Clockslide_20000
-	JSR Clockslide_9000
-	JSR Clockslide_500
-	JSR Clockslide_50
+	; stall for 29550 cycles.
+	JSR ClockslideFromWord
+	.word 29550
 
 	LDY $2002 ; The first time this runs, we're reading from $2002 on scanline 260, dot 339. And each time this runs, the read will be one dot later.
 	; Okay, now we're at dot 0 of the pre-render line (the first time this runs)
@@ -2292,15 +2279,9 @@ Sync_ToSpriteFlagsClearing:
 	JSR DisableRendering
 	; Assume we're on scanline 245, dot 336.
 	; Aim for the end of the CPU read occuring on scanline 0 dot 1.
-	; let's wait for 1820 cycles. We should be at most on dot 0.
-	JSR Clockslide_1816 ; Cool, I can leech off an existing clockslide.
-	NOP
-	NOP	
 	
-	JSR Clockslide_100Minus12
-	NOP
-	NOP
-	NOP
+	JSR ClockslideFromWord
+	.word 1914
 	LDA <$00
 	LDX #0
 Sync_ToSpriteFlagsClearingLoop:
@@ -2334,25 +2315,21 @@ Sync_TSFC_Get:
 
 Test_2004_SpecificStallsForRenderingStuff:
 	; All this math was at one point not inside a subroutine. So for the most part, the numbers in the comments are likely off by 6 CPU cycles.
-	JSR Clockslide_10000
-	JSR Clockslide_3000
+	JSR ClockslideFromWord
+	.word 13000
 	; I went a little overboard. We are now on scanline 244, dot 227 + Y
 	LDA #0
 	STA $2001 ; disable rendering.
 	; We want to re-enable this as close to scanline 0, dot 320 as possible.
 	; in other words, we have exactly 2071 CPU cycles until we want to re-enable rendering.
-	JSR Clockslide_2000
-	JSR Clockslide_44 ; before moving this to a subroutine, this was 50, so I removed 6 CPU cycles (and added them later to the clockslide at the end before the RTS.)
-	JSR Clockslide_16
+	JSR ClockslideFromWord
+	.word 2060
 	; 5 cycles to go.
 	LDA #$10 ; 3 cycles to go
 	STA $2001 ; cool.
 	; okay, now scanline $80 dot 1 is 14438 CPU cycles away,
-	JSR Clockslide_10000
-	JSR Clockslide_4000
-	JSR Clockslide_400
-	JSR Clockslide_24
-
+	JSR ClockslideFromWord
+	.word 14424
 	RTS
 
 Test_2004_Stress_Delay:
@@ -2370,11 +2347,8 @@ Test_2004_Stress_Delay:
 	; let's wait for, say, scanline $80.
 	; we need to wait for exactly 13874 CPU cycles.
 	; But we also want the first read from $2004 to END on dot 0, so let's actually stall for 13870 cycles.
-	JSR Clockslide_10000
-	JSR Clockslide_3000
-	JSR Clockslide_800
-	JSR Clockslide_50
-	JSR Clockslide_12
+	JSR ClockslideFromWord
+	.word 13862
 	RTS
 
 Test_2004_Stress_RunTest:
@@ -2476,13 +2450,11 @@ TEST_2004_StressLoop:
 TEST_2004_Stress_DataComplete:
 	; Real quick, let's do this one more time, just to get the dot that would land right before dot 0 of the target scanline. (in case we're misaligned due to CPU/PPU clock alignment junk.)
 	JSR Test_2004_SpecificStallsForRenderingStuff
-	JSR Clockslide_200
-	JSR Clockslide_50
-	JSR Clockslide_23
+	JSR ClockslideFromWord
+	.word 273
 	JSR Test_2004_SpecificStallsForRenderingStuff
-	JSR Clockslide_200
-	JSR Clockslide_50
-	JSR Clockslide_22
+	JSR ClockslideFromWord
+	.word 272
 	JSR Test_2004_SpecificStallsForRenderingStuff	
 	LDA $2004
 	STA $7FF ; Hold on to this for later, in case we're on cpu/ppu clock alignment 1.
@@ -3116,8 +3088,8 @@ Test_2002_FlagSet_Loop:
 	; We are current on scanline 130, dot 101 + Y
 	; so VBlank is in 37409 ppu cycles, or 12469.66 ppu cycles.
 
-	JSR Clockslide_10000
-	JSR Clockslide_3000
+	JSR ClockslideFromWord
+	.word 13000
 	; I went a little overboard. We are now on scanline 244, dot 227 + Y
 	LDA #0
 	STA $2001 ; disable rendering.
@@ -3128,18 +3100,14 @@ Test_2002_FlagSet_Loop:
 	STA $2006
 	; We want to re-enable this as close to scanline 0, dot 320 as possible.
 	; in other words, we have exactly 2071 CPU cycles until we want to re-enable rendering.
-	JSR Clockslide_2000
-	JSR Clockslide_50 
-	NOP
-	NOP
+	JSR ClockslideFromWord
+	.word 2054
 	; 5 cycles to go.
 	LDA #$18 ; 3 cycles to go
 	STA $2001 ; cool.
 	; okay, now scanline $80 dot 1 is 14438 CPU cycles away,
-	JSR Clockslide_10000
-	JSR Clockslide_4000
-	JSR Clockslide_400
-	JSR Clockslide_36
+	JSR ClockslideFromWord
+	.word 14436
 	JMP Test_2002_FlagSet_Loop
 
 TEST_2002_FlagSet_DataComplete:
@@ -3677,6 +3645,7 @@ TEST_DummyReads_BMIFail: ; I ran out of bytes so the branches here are a bit cur
 	JSR Clockslide_29750 ; Wait (slightly less than) a frame so the VBlank flag gets set
 	LDA [$0050],Y  ; The dummy read does NOT happen because a page boundary was not crossed.
 	LDA $2002 ; The dummy read didn't occur, so bit 7 should be set.
+TEST_DummyReads_BPLFail2:
 	BPL TEST_DummyReads_BPLFail 
 	INC <ErrorCode 	
 	
@@ -3709,7 +3678,7 @@ TEST_DummyReads_BMIFail: ; I ran out of bytes so the branches here are a bit cur
 	LDX #0
 	JSR Clockslide_29750 ; Wait (slightly less than) a frame so the VBlank flag gets set
 	LDA [$50,X]
-	BPL TEST_DummyReads_BPLFail ; If bit 7 of A is set, then we pass the test. The dummy read was at $0050, which we can't test for.
+	BPL TEST_DummyReads_BPLFail2 ; If bit 7 of A is set, then we pass the test. The dummy read was at $0050, which we can't test for.
 	INC <ErrorCode 	
 	
 	;;; Test B [Dummy Read Cycles]: STA ($2002,X) does not dummy-read $2002 ;;;
@@ -3717,7 +3686,7 @@ TEST_DummyReads_BMIFail: ; I ran out of bytes so the branches here are a bit cur
 	JSR Clockslide_29780 ; Wait a frame so the VBlank flag gets set
 	STA [$50,X]
 	LDA $2002	 ; If bit 7 of A gets set, then $2002 was not read during the STA
-	BPL TEST_DummyReads_BPLFail ; If bit 7 of A is set, then we pass the test. The dummy read was at $0050, which we can't test for.	
+	BPL TEST_DummyReads_BPLFail2 ; If bit 7 of A is set, then we pass the test. The dummy read was at $0050, which we can't test for.	
 	;; END OF TEST ;;
 	LDA #1
 	RTS
@@ -6334,7 +6303,8 @@ TEST_VBlank_Beginning_Loop:
 	JSR VblSync_Plus_A
 	; This next CPU cycle is synced with PPU cycle 0+A for this frame.
 	; Let's "subtract" 5 CPU cycles.
-	JSR Clockslide_29776
+	JSR ClockslideFromWord
+	.word 29776
 	LDX $2002
 	LDY $2002
 	; Here's how this test works.
@@ -6406,7 +6376,8 @@ TEST_VBlank_End_Loop:
 	; This next CPU cycle is synced with PPU cycle 0+A for this frame.
 	; VBlank ends in about 2273.333 CPU cycles.
 	; So let's stall for 2273-4 cycles, as this upcoming LDA takes 4 cycles.
-	JSR Clockslide_2269
+	JSR ClockslideFromWord
+	.word 2269
 	LDA $2002
 	; Here's how this test works.
 	; When A=0, the LDA instruction occurs before VBlank ends.
@@ -6460,7 +6431,8 @@ TEST_NMI_Control:
 	
 	;;; Test 2 [NMI Control]: The NMI should occur at VBlank when enabled. ;;;
 	; Again, reaching this test would be impossible without the NMI occurring, so I have a hunch it won't fail this one.
-	JSR Clockslide_2269 ; wait long enough that VBlank should be over.
+	JSR ClockslideFromWord
+	.word 2269 ; wait long enough that VBlank should be over.
 	JSR EnableNMI
 	; X is still zero.
 	JSR Clockslide_29780 ; Wait 1 frame.
@@ -6483,7 +6455,8 @@ TEST_NMI_Control:
 	LDX #0
 	JSR WaitForVBlank ; Wait for VBlank reads $2002, clearing the VBlank flag
 	JSR EnableNMI
-	JSR Clockslide_2269 ; wait long enough that VBlank should be over.
+	JSR ClockslideFromWord
+	.word 2269 ; wait long enough that VBlank should be over.
 	CPX #0
 	BNE FAIL_NMI_Control1
 	INC <ErrorCode
@@ -6568,7 +6541,8 @@ TEST_NMI_Timing_Loop:
 	LDY #1
 	JSR VblSync_Plus_A
 	; This next CPU cycle is synced with PPU cycle 0+A for this frame.
-	JSR Clockslide_29700 ; stall until 80 CPU cycles until VBlank
+	JSR ClockslideFromWord
+	.word 29700 ; stall until 80 CPU cycles until VBlank
 	; Here's how this test works.
 	; The NMI stores the value of Y somewhere.
 	; Here's a series of INY instructions. The NMI will happen in the middle of these.
@@ -6624,7 +6598,8 @@ TEST_NMI_Suppression_Loop:
 	LDY #0
 	JSR VblSync_Plus_A
 	; This next CPU cycle is synced with PPU cycle 0+A for this frame.
-	JSR Clockslide_29700 ; stall until 80 CPU cycles until VBlank
+	JSR ClockslideFromWord
+	.word 29700 ; stall until 80 CPU cycles until VBlank
 	JSR EnableNMI ; This takes 31 cycles.
 	JSR Clockslide_45; NMI should be in 0 cycle.	
 	LDA $2002
@@ -6681,7 +6656,8 @@ TEST_NMI_VBL_End_Loop:
 	; This next CPU cycle is synced with PPU cycle 0+A for this frame.
 	; VBlank ends in about 2273.333 CPU cycles.
 	; So let's stall for 2200 cycles.
-	JSR Clockslide_2252
+	JSR ClockslideFromWord
+	.word 2252
 	JSR EnableNMI	; NMI enable in 21 cycles.
 	TYA
 	STA <$50,X	; store in $50,X	
@@ -6700,8 +6676,8 @@ TEST_NMI_VBL_End_Loop2:
 	; This next CPU cycle is synced with PPU cycle 0+A for this frame.
 	; VBlank ends in about 2273.333 CPU cycles.
 	; So let's stall for 2200 cycles.
-	JSR Clockslide_2252
-	JSR Clockslide_15
+	JSR ClockslideFromWord
+	.word 2267
 	LDA #$80
 	STA $2000
 	NOP
@@ -6744,7 +6720,8 @@ TEST_NMI_Disabled_VBL_Start_Loop:
 	LDY #0
 	JSR VblSync_Plus_A
 	; This next CPU cycle is synced with PPU cycle 0+A for this frame.
-	JSR Clockslide_29700 ; NMI in ~80 cycles
+	JSR ClockslideFromWord
+	.word 29700 ; NMI in ~80 cycles
 	JSR EnableNMI ; this takes 31 cycles
 	JSR Clockslide_29	
 	JSR DisableNMI	; NMI disabled in 21 cycles.
@@ -7026,7 +7003,8 @@ TEST_Sprite0Hit_Behavior_Continued:
 	; 2585.33 CPU cycles until the sprite zero hit.
 	STX $4014 ; OAM DMA ; 4 + 514 CPU cycles. 2067.33 CPU cycles left.
 	JSR EnableRendering ; +30 CPU cycles. 2037.33 CPU cycles left.
-	JSR Clockslide_2032 ; 5.33 CPU cycles left.
+	JSR ClockslideFromWord
+	.word 2032 ; 5.33 CPU cycles left.
 	LDA $2002	; This should read 1 CPU cycles *BEFORE* the sprite zero hit flag is set.
 	AND #$40
 	BNE FAIL_Sprite0Hit_Behavior2
@@ -7034,7 +7012,8 @@ TEST_Sprite0Hit_Behavior_Continued:
 	JSR VblSync_Plus_A
 	STX $4014 ; OAM DMA ; + 514 CPU cycles. 2071.33 CPU cycles left.
 	JSR EnableRendering ; +30 CPU cycles. 2041.33 CPU cycles left.
-	JSR Clockslide_2032 ; 5.33 CPU cycles left.
+	JSR ClockslideFromWord
+	.word 2032 ; 5.33 CPU cycles left.
 	NOP ; 3.33 CPU cycles left.
 	NOP ; 1.33 CPU cycles left. (I chose to add an extra NOP here, in case CPU/PPU alignment affects the timing of this flag when reading $2002.)
 	LDA $2002	; This should read 2 CPU cycles *AFTER* the sprite zero hit flag is set.
@@ -7151,7 +7130,8 @@ TEST_ArbitrarySpriteZeroLoop:
 	LDA #32*4					; (+2 CPU cycles) Load A with 32*4 (128, or $80) which is the OAM address for the object we initialized.
 	JSR EnableRendering			; (+30 CPU cycles) Enable rendering of both the background and sprites, so the sprite zero hit can occur.
 								; After setting up sprite 8 and running the OAM DMA, we have 1596 CPU cycles remaining before cycle 0 of scanline 0.
-	JSR Clockslide_1830			; (+1830 CPU cycles) This function just stalls for 1830 CPU cycles, so we should be slightly after cycle 0 of scanline 0.
+	JSR ClockslideFromWord
+	.word 1830			; (+1830 CPU cycles) This function just stalls for 1830 CPU cycles, so we should be slightly after cycle 0 of scanline 0.
 	STA $2003					; Store A ($80) at PPUOAMAddress. (and probably copy 8 instances of $FF from OAM[$00] to OAM[$20], which won't break anything)
 								; Now, the sprite evaluation will occur with sprite 8 getting processed first.
 								; Since this object is the first one processed, PPU cycle 66 will check if it is in range of the current scanline.
@@ -7196,7 +7176,8 @@ Address2004_SpriteZeroTest:     ; I also re-use this code in the $2004 behavior 
 	STA $4014					; Same as above. Run the OAM DMA with page 2.
 	LDA #$81					; Load A with $81, which we will write to $2003 to offset the OAM address.
 	JSR EnableRendering			; Same as above. Enable rendering sprites + background.
-	JSR Clockslide_1830			; Same as above, except we're 1 CPU cycle earlier than last time. (3 PPU cycles)
+	JSR ClockslideFromWord
+	.word 1830			; Same as above, except we're 1 CPU cycle earlier than last time. (3 PPU cycles)
 	STA $2003					; Store A ($81) at a mirror of PPUOAMAddress. (and probably copy 8 instances of $FF from OAM[$00] to OAM[$20], which won't break anything)
 	JSR Clockslide_500			; Same as above. Wait a few scanline for this entire sprite to be drawn
 	LDA $2002					; Read PPUSTATUS
@@ -7315,7 +7296,8 @@ MisalignedOAM_Test:
 	LDA #02
 	STA $4014
 	JSR EnableRendering
-	JSR Clockslide_1816
+	JSR ClockslideFromWord
+	.word 1816
 	RTS
 ;;;;;;;
 
@@ -7855,10 +7837,8 @@ TEST_Address2004_Behavior:
 	LDA #02
 	STA $4014
 	JSR EnableRendering
-	JSR Clockslide_1830
-	; we have about 17 PPU cycles until dot 0 of scanline 0
-	NOP	; +6 cycles
-	NOP	; +6 cycles
+	JSR ClockslideFromWord
+	.word 1834
 	LDA $2004	; +9 cycles before the read.
 	CMP #$FF
 	BNE FAIL_Address2004_Behavior1	; Despite OAM Address $00 being $5A, the PPU is busy clearing Secondary-OAM to $FF, so this will read $FF.
@@ -7873,10 +7853,8 @@ TEST_Address2004_Behavior:
 	LDA #02
 	STA $4014
 	JSR DisableRendering
-	JSR Clockslide_1830
-	; we have about 17 PPU cycles until dot 0 of scanline 0
-	NOP	; +6 cycles
-	NOP	; +6 cycles
+	JSR ClockslideFromWord
+	.word 1834
 	LDA $2004	; +9 cycles before the read.
 	CMP #$5A
 	BNE FAIL_Address2004_Behavior1	; Despite being between cycle 1 and 64 of a visible scanline, since rendering is disabled, it reads $5A.
@@ -7898,10 +7876,8 @@ TEST_Address2004_Behavior_Continue:
 	LDA #02
 	STA $4014
 	JSR EnableRendering
-	JSR Clockslide_1816
-	NOP			;+6
-	NOP			;+6
-	NOP			;+6
+	JSR ClockslideFromWord
+	.word 1822
 	LDA <$00	;+9	(This was originally a NOP, +6 cycles, but if your $2004 instruction doesn't have a delay of a few PPU cycles, then you would fail this test here, and that's not what this test is testing for.)
 	LDA #0		;+6
 	STA $2004	;+9 before write (+3 after). write with 20 ppu cycles until dot 0. (the CPU write occurs on dot 321 of the pre-render line)
@@ -7940,10 +7916,9 @@ TEST_Address2004_Behavior_loop:			; Set up page 2 so every value is essentially 
 	LDA #02
 	STA $4014
 	JSR EnableRendering
-	JSR Clockslide_1830
-	; we have about 17 PPU cycles until dot 0 of scanline 0
-	; Let's aim for about dot 130. (130 + 17 = 147. 147/3 = 49 CPU cycles. (-3 more since the read happens after 3 more CPU cycles)
-	JSR Clockslide_46
+	; Let's aim for about dot 130 of scanline 0.
+	JSR ClockslideFromWord
+	.word 1876
 	LDA $2004
 	BEQ FAIL_Address2004_Behavior1	; It definitely shouldn't be $00.
 	CMP #$FF
@@ -7960,12 +7935,9 @@ TEST_Address2004_Behavior_loop:			; Set up page 2 so every value is essentially 
 	LDA #02
 	STA $4014
 	JSR EnableRendering
-	JSR Clockslide_1830
-	; we have about 17 PPU cycles until dot 0 of scanline 0
-	; Let's aim for about dot 310. (310 + 17 = 327. 327/3 = 109 CPU cycles. (-3 more since the read happens after 3 more CPU cycles)
-	JSR Clockslide_40
-	JSR Clockslide_40
-	JSR Clockslide_26	; = 106 cycles of clocksliding.
+	; Let's aim for about dot 310 of scanline 0.
+	JSR ClockslideFromWord
+	.word 1936
 	LDA $2004
 	CMP #$FF
 	BNE FAIL_Address2004_Behavior2	; This reads $FF. (I'll need to look into why, but I know this is the case.)
@@ -7982,10 +7954,8 @@ TEST_Address2004_Behavior_loop:			; Set up page 2 so every value is essentially 
 	LDA #$02
 	STA $4014
 	JSR EnableRendering
-	JSR Clockslide_1816
-	NOP
-	NOP
-	NOP
+	JSR ClockslideFromWord
+	.word 1822
 	LDX #5
 	LDA #1
 	STA $2006, X ; PPU OAM is 1.	
@@ -8074,8 +8044,8 @@ TEST_APURegActivation:
 	SEI ; If the frame interrupt flag is set without this, we can get stuck in an infinite loop of BRK instructions.
 	LDA #0
 	STA $4017	; enable the frame counter Interrupt flag.
-	JSR Clockslide_29780 ; wait for the frame interrupt flag.
-	JSR Clockslide_100
+	JSR ClockslideFromWord
+	.word 29880 ; wait for the frame interrupt flag.
 	LDA $4015
 	AND #$40
 FAIL_APURegActivation_slide:
@@ -8096,8 +8066,8 @@ FAIL_APURegActivation_slide:
 	; This test will write $40 to $4014, running an OAM DMA that will read from address $4000 to $40FF.
 	; However, the APU registers are not active! So every value read by the DMA will be open bus.
 	
-	JSR Clockslide_29780 ; wait for the frame interrupt flag.
-	JSR Clockslide_100
+	JSR ClockslideFromWord
+	.word 29880 ; wait for the frame interrupt flag
 	LDA #$40
 	STA $4014	; OAM DMA with page $40.
 	; This does *NOT* read from the APU Registers!
@@ -8464,8 +8434,8 @@ TEST_DMA_Plus_4015R:
 	SEI
 	LDA #$00
 	STA $4017
-	JSR Clockslide_29780
-	JSR Clockslide_100
+	JSR ClockslideFromWord
+	.word 29880
 	BIT $4015	; If the frame interrupt flag is set, bit 6 will be set. (set the overflow flag)
 	BVC FAIL_DMA_Timing
 	INC <ErrorCode
@@ -9651,15 +9621,15 @@ TEST_IFlagLatency_Test_C:
 	; [DMC DMA. This takes 4 cycles, next CPU cycle is a "put" cycle.]
 	; Run a 4-byte DMC DMA every 432 CPU cycles. Unless of course, it lands on a write cycle, in which case it is delayed and only lasts 3 cycles.
 	; We need to make sure a DMC DMA will occur somewhere between 0 and 5 CPU cycles before the Frame Counter IRQ Flag is set and polled.
-	JSR Clockslide_300
-	JSR Clockslide_50
-	JSR Clockslide_43
+	JSR Clockslide_300 ; NOTE: do not optimize with ClockslideFromWord, as write cycles throw off the DMC DMA timing.
+	JSR Clockslide_50  ; ^
+	JSR Clockslide_43  ; ^
 	LDA #$00
 	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
-	JSR Clockslide_20000
-	JSR Clockslide_9000
-	JSR Clockslide_500
-	JSR Clockslide_41
+	JSR Clockslide_20000 ; NOTE: do not optimize with ClockslideFromWord, as write cycles throw off the DMC DMA timing.
+	JSR Clockslide_9000  ; ^
+	JSR Clockslide_500   ; ^
+	JSR Clockslide_41    ; ^
 	LDA #$60
 	STA $2002 ; Set ppu read buffer to RTS
 	CLC
@@ -9757,7 +9727,8 @@ TEST_NmiAndBrkLoop:
 	STX <Copy_X
 	LDA #0
 	JSR VblSync_Plus_A
-	JSR Clockslide_29700
+	JSR ClockslideFromWord
+	.word 29700
 	; 80 CPU cycles until VBlank.
 	JSR EnableNMI ; +31 CPU cycles. (49 cycles until VBlank)
 	LDX <Copy_X	  ; +3
@@ -9874,7 +9845,8 @@ TEST_NmiAndIrqLoop:
 	STX <Copy_X
 	LDA #0
 	JSR VblSync_Plus_A
-	JSR Clockslide_29700
+	JSR ClockslideFromWord
+	.word 29700
 	; 80 CPU cycles until VBlank.
 	JSR EnableNMI ; +31 CPU cycles. (49 cycles until VBlank)
 	LDA Copy_X	  ; +3
@@ -10258,9 +10230,8 @@ TEST_FrameCounterIRQ:
 	STA $4017 ; 4-step mode, enable IRQ (The CPU was on "get" cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	; the flag should be enabled in 29830 CPU cycles.
 	; So let's stall for 29826 cycles, and read $4015 to see if the flag was set. That should be 1 cycle too early.
-	JSR Clockslide_29700
-	JSR Clockslide_100
-	JSR Clockslide_26
+	JSR ClockslideFromWord
+	.word 29826
 	LDA $4015 ; If the flag *is* set, it was set too early, so you fail the test.
 	BNE FAIL_FrameCounterIRQ2
 	INC <ErrorCode
@@ -10282,9 +10253,8 @@ TEST_FrameCounterIRQ_Continue:
 	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	; the flag should be enabled in 29830 CPU cycles.
 	; So let's stall for 29827 cycles, and read $4015 to see if the flag was set. That should be 1 cycle too early.
-	JSR Clockslide_29700
-	JSR Clockslide_100
-	JSR Clockslide_27
+	JSR ClockslideFromWord
+	.word 29827
 	LDA $4015 ; If the flag is *not* set, it was set too late, so you fail the test.
 	BEQ FAIL_FrameCounterIRQ2
 	INC <ErrorCode
@@ -10300,9 +10270,8 @@ TEST_FrameCounterIRQ_Continue:
 	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
 	; So let's stall for 29827 cycles, and read $4015 to see if the flag was set. That should be 1 cycle too early.
-	JSR Clockslide_29700
-	JSR Clockslide_100
-	JSR Clockslide_27
+	JSR ClockslideFromWord
+	.word 29827
 	LDA $4015 ; If the flag *is* set, it was set too early, so you fail the test.
 	BNE FAIL_FrameCounterIRQ2
 	INC <ErrorCode
@@ -10318,9 +10287,8 @@ TEST_FrameCounterIRQ_Continue:
 	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
 	; So let's stall for 29828 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
-	JSR Clockslide_29700
-	JSR Clockslide_100
-	JSR Clockslide_28
+	JSR ClockslideFromWord
+	.word 29828
 	LDA $4015 ; If the flag is *not* set, it was set too late, so you fail the test.
 	BEQ FAIL_FrameCounterIRQ2
 	INC <ErrorCode
@@ -10334,9 +10302,8 @@ TEST_FrameCounterIRQ_Continue:
 	STA $4017 ; 4-step mode, clear IRQ flag
 	LDA #$00	
 	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
-	JSR Clockslide_29700
-	JSR Clockslide_100
-	JSR Clockslide_27
+	JSR ClockslideFromWord
+	.word 29827
 	LDA $4015 ; Read on the same cycle the IRQ flag is set.
 	LDA $4015 ; Read again! But it won't be cleared, since the IRQ flag gets set again.
 	BEQ FAIL_FrameCounterIRQ3
@@ -10351,9 +10318,8 @@ TEST_FrameCounterIRQ_Continue:
 	STA $4017 ; 4-step mode, clear IRQ flag
 	LDA #$00	
 	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
-	JSR Clockslide_29700
-	JSR Clockslide_100
-	JSR Clockslide_28
+	JSR ClockslideFromWord
+	.word 29828
 	LDA $4015 ; Read on the same cycle the IRQ flag is set.
 	LDA $4015 ; Read again! But it won't be cleared, since the IRQ flag gets set again.
 	BEQ FAIL_FrameCounterIRQ3
@@ -10368,9 +10334,8 @@ TEST_FrameCounterIRQ_Continue:
 	STA $4017 ; 4-step mode, clear IRQ flag
 	LDA #$00	
 	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
-	JSR Clockslide_29700
-	JSR Clockslide_100
-	JSR Clockslide_29
+	JSR ClockslideFromWord
+	.word 29829
 	LDA $4015 ; Read on the same cycle the IRQ flag is set.
 	LDA $4015 ; Read again! But it won't be cleared, since the IRQ flag gets set again.
 	BEQ FAIL_FrameCounterIRQ3
@@ -10385,9 +10350,8 @@ TEST_FrameCounterIRQ_Continue:
 	STA $4017 ; 4-step mode, clear IRQ flag
 	LDA #$00	
 	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
-	JSR Clockslide_29700
-	JSR Clockslide_100
-	JSR Clockslide_30
+	JSR ClockslideFromWord
+	.word 29830
 	LDA $4015 ; Read on the same cycle the IRQ flag is set.
 	LDA $4015 ; Read again! But it will be cleared.
 	BNE FAIL_FrameCounterIRQ3
@@ -10416,9 +10380,8 @@ TEST_FrameCounterIRQ_Continue2:
 	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
 	; So let's stall for 29827 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
-	JSR Clockslide_29700
-	JSR Clockslide_100
-	JSR Clockslide_27
+	JSR ClockslideFromWord
+	.word 29827
 	LDA $4015
 	AND #$40
 	BNE FAIL_FrameCounterIRQ3
@@ -10433,9 +10396,8 @@ TEST_FrameCounterIRQ_Continue2:
 	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
 	; So let's stall for 29828 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
-	JSR Clockslide_29700
-	JSR Clockslide_100
-	JSR Clockslide_28
+	JSR ClockslideFromWord
+	.word 29828
 	LDA $4015
 	AND #$40
 	BEQ FAIL_FrameCounterIRQ3
@@ -10449,10 +10411,9 @@ TEST_FrameCounterIRQ_Continue2:
 	LDA #$40
 	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
-	; So let's stall for 29828 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
-	JSR Clockslide_29700
-	JSR Clockslide_100
-	JSR Clockslide_29
+	; So let's stall for 29829 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
+	JSR ClockslideFromWord
+	.word 29829
 	LDA $4015
 	AND #$40
 	BEQ FAIL_FrameCounterIRQ4
@@ -10467,9 +10428,8 @@ TEST_FrameCounterIRQ_Continue2:
 	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
 	; So let's stall for 29830 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
-	JSR Clockslide_29700
-	JSR Clockslide_100
-	JSR Clockslide_30
+	JSR ClockslideFromWord
+	.word 29830
 	LDA $4015
 	AND #$40
 	BNE FAIL_FrameCounterIRQ4
@@ -10487,9 +10447,8 @@ TEST_FrameCounterIRQ_Continue2:
 	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
 	; So let's stall for 29828 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
-	JSR Clockslide_29700
-	JSR Clockslide_100
-	JSR Clockslide_27
+	JSR ClockslideFromWord
+	.word 29827
 	CLI
 	SEI	;[Read Opcode] [Poll for interrupts, and Dummy Read cycle]
 	LDA <$50
@@ -10505,9 +10464,8 @@ TEST_FrameCounterIRQ_Continue2:
 	LDA #$00
 	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the IRQ should occur in 29834 CPU cycles.
-	JSR Clockslide_29700
-	JSR Clockslide_100
-	JSR Clockslide_24
+	JSR ClockslideFromWord
+	.word 29824
 	CLI
 	LDX #0
 	INX
@@ -10532,9 +10490,8 @@ TEST_FrameCounterIRQ_Continue3:
 	LDA #$00
 	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the IRQ should occur in 29833 CPU cycles.
-	JSR Clockslide_29700
-	JSR Clockslide_100
-	JSR Clockslide_25
+	JSR ClockslideFromWord
+	.word 29825
 	CLI
 	LDX #0
 	INX
@@ -10572,7 +10529,8 @@ TEST_FrameCounter4Step:
 	STA $4017 ; 4-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	NOP  ; stall for frame counter to be reset.
 	; Okay, the first time the length counters get clocked is in 14913 CPU cycles.
-	JSR Clockslide_14900 ; 13 cycles to go.
+	JSR ClockslideFromWord
+	.word 14900 ; 13 cycles to go.
 	NOP ; 11 cycles to go
 	NOP ; 9 cycles to go
 	NOP ; 7 cycles to go
@@ -10595,7 +10553,8 @@ TEST_FrameCounter4Step:
 	STA $4017 ; 4-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	NOP  ; stall for frame counter to be reset.
 	; Okay, the first time the length counters get clocked is in 14913 CPU cycles.
-	JSR Clockslide_14900 ; 13 cycles to go.
+	JSR ClockslideFromWord
+	.word 14900 ; 13 cycles to go.
 	NOP ; 11 cycles to go
 	NOP ; 9 cycles to go
 	NOP ; 7 cycles to go
@@ -10615,7 +10574,8 @@ TEST_FrameCounter4Step:
 	STA $4017 ; 4-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	NOP  ; stall for frame counter to be reset.
 	; Okay, the second time the length counters get clocked is in 29829 CPU cycles.
-	JSR Clockslide_29820 ; 9 cycle to go
+	JSR ClockslideFromWord
+	.word 29820 ; 9 cycle to go
 	NOP ; 7 cycles to go
 	LDA <$00  ; 4 cycles to go
 	LDA $4015 ; the pulse channel should still be playing for 1 more cycle.
@@ -10632,7 +10592,8 @@ TEST_FrameCounter4Step:
 	STA $4017 ; 4-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	NOP  ; stall for frame counter to be reset.
 	; Okay, the second time the length counters get clocked is in 29829 CPU cycles.
-	JSR Clockslide_29820 ; 9 cycles to go
+	JSR ClockslideFromWord
+	.word 29820 ; 9 cycles to go
 	NOP ; 7 cycles to go
 	NOP ; 5 cycles to go
 	NOP ; 3 cycles to go
@@ -10655,7 +10616,8 @@ TEST_FrameCounter4Step:
 	STA $4017 ; 4-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	NOP  ; stall for frame counter to be reset.
 	; Okay, the third time the length counters get clocked is in 44743 CPU cycles.
-	JSR Clockslide_44730 ; 13 cycles to go.
+	JSR ClockslideFromWord
+	.word 44730 ; 13 cycles to go.
 	NOP ; 11 cycles to go
 	NOP ; 9 cycles to go
 	NOP ; 7  cycles to go
@@ -10678,7 +10640,8 @@ TEST_FrameCounter4Step:
 	STA $4017 ; 4-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	NOP  ; stall for frame counter to be reset.
 	; Okay, the third time the length counters get clocked is in 44743 CPU cycles.
-	JSR Clockslide_44730 ; 13 cycles to go.
+	JSR ClockslideFromWord
+	.word 44730 ; 13 cycles to go.
 	NOP ; 11 cycles to go
 	NOP ; 9 cycles to go
 	NOP ; 7 cycles to go
@@ -10702,7 +10665,8 @@ TEST_FrameCounterSyncDMC:
 	STA $4017
 	LDA #$00        ; mode 0, frame IRQ enabled
 	STA $4017
-	JSR Clockslide_29820 ; 7
+	JSR ClockslideFromWord
+	.word 29820 ; 7
 	LDA <$00
 	NOP
 	NOP
@@ -10733,7 +10697,8 @@ TEST_FrameCounter5Step:
 	STA $4017 ; 5-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	LDA <$00  ; stall for 3 CPU cycles.
 	; Okay, the first time the length counters get clocked is in 14912 CPU cycles.
-	JSR Clockslide_14900 ; 12 cycles to go.
+	JSR ClockslideFromWord
+	.word 14900 ; 12 cycles to go.
 	NOP ; 10 cycles to go
 	NOP ; 8 cycles to go
 	NOP ; 6 cycles to go
@@ -10754,7 +10719,8 @@ TEST_FrameCounter5Step:
 	STA $4017 ; 5-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	LDA <$00  ; stall for 3 CPU cycles.
 	; Okay, the first time the length counters get clocked is in 14912 CPU cycles.
-	JSR Clockslide_14900 ; 12 cycles to go.
+	JSR ClockslideFromWord
+	.word 14900 ; 12 cycles to go.
 	NOP ; 10 cycles to go
 	NOP ; 8 cycles to go
 	NOP ; 6 cycles to go
@@ -10776,7 +10742,8 @@ TEST_FrameCounter5Step:
 	STA $4017 ; 5-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	LDA <$00  ; stall for 3 CPU cycles.
 	; Okay, the second time the length counters get clocked is in 37280 CPU cycles.
-	JSR Clockslide_37270 ; 10 cycles to go.
+	JSR ClockslideFromWord
+	.word 37270 ; 10 cycles to go.
 	NOP ; 8 cycles to go
 	NOP ; 6 cycles to go
 	NOP ; 4 cycles
@@ -10797,7 +10764,8 @@ TEST_FrameCounter5Step:
 	STA $4017 ; 5-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	LDA <$00  ; stall for 3 CPU cycles.
 	; Okay, the second time the length counters get clocked is in 37280 CPU cycles.
-	JSR Clockslide_37270 ; 10 cycles to go.
+	JSR ClockslideFromWord
+	.word 37270 ; 10 cycles to go.
 	NOP ; 8 cycles to go
 	NOP ; 6 cycles to go
 	LDA <$00 ; 3 cycle to go
@@ -10817,7 +10785,8 @@ TEST_FrameCounter5Step:
 	STA $4017 ; 5-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	LDA <$00  ; stall for 3 CPU cycles.
 	; Okay, the third time the length counters get clocked is in 52194 CPU cycles.
-	JSR Clockslide_52180 ; 14 cycles to go.
+	JSR ClockslideFromWord
+	.word 52180 ; 14 cycles to go.
 	NOP ; 12 cycles to go
 	NOP ; 10 cycles to go
 	NOP ; 8 cycles to go
@@ -10838,7 +10807,8 @@ TEST_FrameCounter5Step:
 	STA $4017 ; 5-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	LDA <$00  ; stall for 3 CPU cycles.
 	; Okay, the third time the length counters get clocked is in 52194 CPU cycles.
-	JSR Clockslide_52180 ; 14 cycles to go.
+	JSR ClockslideFromWord
+	.word 52180 ; 14 cycles to go.
 	NOP ; 12 cycles to go
 	NOP ; 10 cycles to go
 	NOP ; 8 cycles to go
@@ -10876,6 +10846,7 @@ TEST_DeltaModulationChannel:
 	AND #$10
 	BEQ FAIL_DeltaModulationChannel	; If bit 4 is not set, then fail the test.
 	JSR Clockslide_4320
+
 	LDA $4015	; the DMC should have stopped by now.
 	AND #$10
 	BNE FAIL_DeltaModulationChannel	; If bit 4 is still set, then fail the test.
@@ -10893,7 +10864,8 @@ TEST_DeltaModulationChannel:
 	LDA $4015	; the DMC should still be playing.
 	AND #$10
 	BEQ FAIL_DeltaModulationChannel	; If bit 4 is not set (the sample ended), then fail the test.
-	JSR Clockslide_4320
+	JSR ClockslideFromWord
+	.word 4320
 	LDA $4015	; the DMC should have stopped by now.
 	AND #$10
 	BNE FAIL_DeltaModulationChannel	; If bit 4 is still set, then fail the test.
@@ -10902,11 +10874,13 @@ TEST_DeltaModulationChannel:
 	;;; Test 3 [APU Delta Modulation Channel]: Writing $10 to $4015 should start playing a new sample if the previous one ended. ;;;
 	LDA #$10
 	STA $4015
-	JSR Clockslide_8640	; wait for sample to end.
+	JSR ClockslideFromWord
+	.word 8640	; wait for sample to end.
 	STA $4015	; write $10 to $4015 again.
 	JSR Clockslide_4320
 	LDA $4015	; the DMC should be playing.
 	AND #$10
+FAIL_DeltaModulationChannel_BEQ:
 	BEQ FAIL_DeltaModulationChannel
 	INC <ErrorCode
 	JSR Clockslide_4320
@@ -10919,7 +10893,7 @@ TEST_DeltaModulationChannel:
 	STA $4015	; Write $10 to $4015 again, while the sample is still playing. Nothing changes, don't reload the length or anything.
 	LDA $4015	; the DMC should still be playing.
 	AND #$10
-	BEQ FAIL_DeltaModulationChannel2
+	BEQ FAIL_DeltaModulationChannel_BEQ
 	JSR Clockslide_4320
 	LDA $4015	; the DMC should have stopped by now.
 	AND #$10
@@ -10942,7 +10916,8 @@ TEST_DeltaModulationChannel:
 	STA $4015	; start the sample.
 	LDA #2
 	STA $4013	; 33 byte sample.	
-	JSR Clockslide_8640
+	JSR ClockslideFromWord
+	.word 8640
 	LDA $4015	; the DMC should have stopped by now.
 	AND #$10
 	BNE FAIL_DeltaModulationChannel2
@@ -10951,7 +10926,8 @@ TEST_DeltaModulationChannel:
 	STA $4015
 	LDA #1
 	STA $4013	; set the sample size back to 17.
-	JSR Clockslide_12960
+	JSR ClockslideFromWord
+	.word 12960
 	LDA $4015	; the DMC should still be playing.
 	AND #$10
 	BEQ FAIL_DeltaModulationChannel2
@@ -10968,7 +10944,8 @@ TEST_DeltaModulationChannel:
 	; which, in addition to using the fastest sample rate, disables the DMC IRQ.
 	LDA #$10
 	STA $4015 ; start sample.
-	JSR Clockslide_8640 ; wait for sample to end.
+	JSR ClockslideFromWord
+	.word 8640 ; wait for sample to end.
 	LDA $4015 ; Bit 7 (which sets the Negative flag) is set if the DMC IRQ flag is set.
 	BMI FAIL_DeltaModulationChannel2	; in this case, it should not be set.
 	INC <ErrorCode
@@ -10979,7 +10956,8 @@ TEST_DeltaModulationChannel:
 	STA $4010
 	LDA #$10
 	STA $4015 ; start sample.
-	JSR Clockslide_8640 ; wait for sample to end.
+	JSR ClockslideFromWord
+	.word 8640 ; wait for sample to end.
 	LDA $4015 ; Bit 7 (which sets the Negative flag) is set if the DMC IRQ flag is set.
 	BPL FAIL_DeltaModulationChannel2	; in this case, it should be set.
 	INC <ErrorCode
@@ -11006,7 +10984,8 @@ FAIL_DeltaModulationChannelContinue:
 	;;; Test B [APU Delta Modulation Channel]: Disabling the IRQ flag clears the IRQ flag. ;;;
 	LDA #$10
 	STA $4015 ; start sample.
-	JSR Clockslide_8640 ; wait for sample to end.
+	JSR ClockslideFromWord
+	.word 8640 ; wait for sample to end.
 	; As we have established in test 8, the IRQ flag is currently enabled.
 	LDA #$0F
 	STA $4010	; disable the IRQ flag.
@@ -11048,7 +11027,8 @@ FAIL_DeltaModulationChannelContinue:
 	;;; Test E [APU Delta Modulation Channel]: Clearing the looping flag and then setting it again should keep the sample looping. ;;;
 	LDA #$10
 	STA $4015
-	JSR Clockslide_26352
+	JSR ClockslideFromWord
+	.word 26352
 	LDA #$8F	; Disable loop
 	STA $4010
 	LDA #$CF
@@ -11064,7 +11044,8 @@ FAIL_DeltaModulationChannelContinue:
 	;;; Test F [APU Delta Modulation Channel]: Clearing the looping flag will not immediately end the sample. The sample will then play for it's remaining bytes. ;;;
 	LDA #$10
 	STA $4015
-	JSR Clockslide_26352
+	JSR ClockslideFromWord
+	.word 26352
 	LDA #$8F	; Disable loop
 	STA $4010
 	LDA $4015
@@ -11083,7 +11064,8 @@ FAIL_DeltaModulationChannelContinue:
 	STA $4010
 	LDA #$10
 	STA $4015
-	JSR Clockslide_26352
+	JSR ClockslideFromWord
+	.word 26352
 	LDA #02
 	STA $4013	; sample length is now 33.
 	JSR Clockslide_4320
@@ -11114,7 +11096,8 @@ FAIL_DeltaModulationChannelC2:
 	STA $4013 ; 1-byte sample.
 	LDA #$10
 	STA $4015
-	JSR Clockslide_1728
+	JSR ClockslideFromWord
+	.word 1728
 	LDA $4015	; the DMC should have stopped by now.
 	AND #$10
 	BNE FAIL_DeltaModulationChannel3
@@ -11131,8 +11114,8 @@ FAIL_DeltaModulationChannelC2:
 TEST_DeltaModulationChannelTestILoop:
 	AND $4015 ; Loop until the sample ends.
 	BNE TEST_DeltaModulationChannelTestILoop
-	JSR Clockslide_1728
-	JSR Clockslide_30
+	JSR ClockslideFromWord
+	.word 1758
 	LDA #0
 	STA $4013 ; 1 byte sample.
 	LDA #$10
@@ -11146,7 +11129,8 @@ TEST_DeltaModulationChannelTestILoop:
 	LDA $4015	
 	BEQ FAIL_DeltaModulationChannel3
 	; at this point we are playing audio.
-	JSR Clockslide_1728
+	JSR ClockslideFromWord
+	.word 1728
 	; and now we aren't
 	LDA $4015	
 	AND #$10
@@ -11178,13 +11162,13 @@ TEST_DeltaModulationChannelTestILoop:
 	JSR Clockslide_30
 	; DMA that reloads all the stuff.
 	; Next DMA in 428 cycles
-	JSR Clockslide_400
-	JSR Clockslide_25
+	JSR ClockslideFromWord
+	.word 425
 	; Next DMA in 3 cycles
 TEST_DMC_OverflowLoop: ; DMA every 432 CPU cycles.
 	LDA $4000 ;+3 [DMA start] +5	Read from the DMC DMA's modification to the data bus.
-	JSR Clockslide_400
-	JSR Clockslide_17	
+	JSR ClockslideFromWord
+	.word 417
 	INX	; +2   Increment X for the next loop.
 	CPX #$41 ; +2   If X = $41, we exit the loop.
 	BNE TEST_DMC_OverflowLoop ; +3 if looping. +2 if not. (total outside the clockslide = 29. 432-29 = 403)
@@ -11221,8 +11205,8 @@ TEST_DMC_OverflowLoop: ; DMA every 432 CPU cycles.
 	; +3 cycles from the DMA. [Get Halt] [Put] [Get] ; 
 	; now we wait for the DMA again.
 	; it will occur in 432-5 (=427) cycles.
-	JSR Clockslide_400	; 27 cycles left.
-	JSR Clockslide_24	; 3 cycles left.
+	JSR ClockslideFromWord
+	.word 424	; 3 cycles left.
 	LDA $4000 ; [read opcode] [read operand] [read operand] [DMC DMA] [Read open bus]
 	BNE FAIL_DeltaModulationChannel4
 	INC <ErrorCode
@@ -11251,8 +11235,8 @@ TEST_DMC_OverflowLoop: ; DMA every 432 CPU cycles.
 	; +4 cycles from the DMA. [Put] [Get Halt] [Put] [Get] ; 
 	; now we wait for the DMA again.
 	; it will occur in 432-5 (=427) cycles.
-	JSR Clockslide_400	; 27 cycles left.
-	JSR Clockslide_23	; 3 cycles left.
+	JSR ClockslideFromWord
+	.word 423	; 3 cycles left.
 	LDA $4000 ; [read opcode] [read operand] [read operand] [DMC DMA] [Read open bus]
 	BNE FAIL_DeltaModulationChannel4
 	INC <ErrorCode
@@ -11286,8 +11270,8 @@ FAIL_DeltaModulationChannelC3:
 	; +3 cycles from the DMA. [Get Halt] [Put] [Get]
 	; now we wait for the DMA again.
 	; it will occur in 432-5 (=427) cycles.
-	JSR Clockslide_400	; 27 cycles left.
-	JSR Clockslide_22	; 3 cycles left.
+	JSR ClockslideFromWord
+	.word 422	; 3 cycles left.
 	LDA $4000 ; [read opcode] [read operand] [read operand] [DMC DMA] [Read open bus]
 	BNE FAIL_DeltaModulationChannel4
 	
@@ -11355,8 +11339,8 @@ TEST_DMABusConflict:
 	; Next DMA in 428 cycles
 	LDA #$00
 	STA $4017	; Keep the interrupt flag set, but refresh the timer.
-	JSR Clockslide_400
-	JSR Clockslide_19
+	JSR ClockslideFromWord
+	.word 419
 	; Next DMA in 3 cycles
 TEST_DMC_ConflictLoop: ; DMA every 432 CPU cycles.
 	LDA $4000 ;+3 [DMA start] +5	Read from the DMC DMA's modification to the data bus.
@@ -11464,14 +11448,16 @@ TEST_VblankSync_PreTest:
 	; This will take a minimum of 3 frames to exit, and a maximum of 24 frames.
 	; If it takes longer than 24 frames, it can be assumed the frame timing has the wrong number of CPU/PPU cycles, and could never use my VBlank sync routines.
 	LDX #0 ; +2 cycles.
-	JSR Clockslide_29765
+	JSR ClockslideFromWord
+	.word 29765
 TEST_VblSyncPreTest_Loop:
 	LDA $2002	;+3 [VBlank happens here?] +1
 	BMI TEST_VblSyncPreTest_GoodEnding; +2
 	INX; +2
 	CPX #25 ; +2
 	BEQ TEST_VblSyncPreTest_BadEnding ; +2
-	JSR Clockslide_29766
+	JSR ClockslideFromWord
+	.word 29766
 	JMP TEST_VblSyncPreTest_Loop;+3
 	
 TEST_VblSyncPreTest_GoodEnding:
@@ -11568,7 +11554,7 @@ Test_ImpliedDummyRead_WaitForFrameCounterFlag:
 	STA $4010			; +4 cycles. Make this sample loop.
 	LDA #$00			; +2 cycles.
 	STA $4017			; +4 cycles. reset the frame counter.
-	JSR Clockslide_29780; +29780
+	JSR Clockslide_29780; +29780. NOTE: Do not optimize with ClockslideFromWord! Write cycles throw off the DMA.
 	JSR Clockslide_100	; +100. wait long enough for the frame counter to be set.
 	; so far, we've ran 29898 cycles since leaving our "DMA Sync in 50 CPU cycles." subroutine.
 	; Luckily, I set the DMA to loop every 432 CPU cycles.
@@ -11641,8 +11627,8 @@ TEST_ImpliedDummyRead:
 	;;; Test 2 [Implied Dummy Reads]: Prerequisite check. Does the frame counter interrupt flag get set if we enable it? ;;;
 	LDA #0
 	STA $4017
-	JSR Clockslide_29780
-	JSR Clockslide_100
+	JSR ClockslideFromWord
+	.word 29880
 	LDA #0
 	LDA $4015
 	CMP #$40
@@ -11679,15 +11665,14 @@ TEST_ImpliedDummyReadPreReqContinue:
 	STA $4010			; +4 cycles. Make this sample loop.
 	LDA #$00			; +2 cycles.
 	STA $4017			; +4 cycles. reset the frame counter.
-	JSR Clockslide_29780; +29780
+	JSR Clockslide_29780; +29780 (Note to self, do not optimize with ClockslideFromWord. The read cycles throw off the DMAs)
 	JSR Clockslide_100	; +100. wait long enough for the frame counter to be set.
 	LDA #$0F			; +2 cycles.
 	STA $4010			; +4 cycles. Make this stop looping.
 	NOP	; stall for 2 cycles.
 	SEI ; set interrupt flag.
 	; 107 cycles until DMA
-	JSR Clockslide_50
-	JSR Clockslide_50;  8 cycles until DMA
+	JSR Clockslide_100;  8 cycles until DMA
 	LDA #$A5 ; 6 cycles until DMA
 	LDA $4000
 	CMP #$48
@@ -12901,9 +12886,8 @@ CalculateDMADuration_Loop:
 	; 576 cycles between each DMA.
 	; 576 - 15 = 561
 	; if I stall for 560 cycles, I can read from open bus 1 cycle earlier in relation to the DMA each loop.
-	JSR Clockslide_500
-	JSR Clockslide_30
-	JSR Clockslide_30
+	JSR ClockslideFromWord
+	.word 560
 	INY	; +2
 	JMP CalculateDMADuration_Loop ;+3
 CalculateDMADuration_End:
@@ -13556,16 +13540,12 @@ TEST_ControllerClocking_Exit3:
 	LDA #$4F	;+2
 	STA $4010	;+4 fastest rate. (also loop, so it refreshes the address and length)
 	LDX #$0	;+2
-	JSR Clockslide_30
-	JSR Clockslide_400
-	JSR Clockslide_26
+	JSR ClockslideFromWord
+	.word 456
 	; Next DMA in 4 cycles
 TEST_ControllerClocking_Loop4: ; DMA every 432 CPU cycles.
-	NOP
-	NOP
-	NOP
-	JSR Clockslide_400
-	JSR Clockslide_15
+	JSR ClockslideFromWord
+	.word 421
 	INX	; +2   Increment X for the next loop.
 	CPX #$16 ; +2   If X = $40, we exit the loop.
 	BNE TEST_ControllerClocking_Loop4 ; +3 if looping. +2 if not. (total outside the clockslide = 29. 432-29 = 403)
@@ -13670,18 +13650,13 @@ Sync_ToPreRenderDot324:
 	; (89342 - (341+205)) = 88796 PPU Cycles, or 29598.66 CPU cycles (ODD FRAME)
 	; (89342 - (341+208)) = 88793 PPU Cycles, or 29597.66 CPU cycles (EVEN FRAME)
 	; So let's stall for 29595 Cycles and go from there.
-	JSR Clockslide_20000
-	JSR Clockslide_9000
-	JSR Clockslide_500
-	JSR Clockslide_50
-	JSR Clockslide_45
+	JSR ClockslideFromWord
+	.word 29595
 	; 2.66 or 3.66 cycles to go.
 	LDA $2002
 	PHA
-	JSR Clockslide_1000
-	JSR Clockslide_700
-	JSR Clockslide_50
-	JSR Clockslide_41
+	JSR ClockslideFromWord
+	.word 1791
 
 	PLA
 	BPL Sync_ToLine0Dot1_Odd
@@ -13707,8 +13682,8 @@ Sync_ToLine0Dot1_Odd:
 	; 11.33 CPU cycles
 	NOP
 	NOP
-	JSR Clockslide_29780
-	JSR Clockslide_29780
+	JSR ClockslideFromWord
+	.word 59560
 	; Current objective: Determine if we are on a "get" or "put" cycle.
 	LDA #0
 	LDX #0
@@ -13875,9 +13850,9 @@ TEST_OAM_Corruption:
 	LDA <$00 ; stall for 3 cycles
 	LDA #0	 ; Write #0 to $2001 to disable rendering.
 	STA $2001; Pending OAM Corruption. Once rendering is re-enabled, it will occur.
-	JSR Clockslide_20000	; Stall
-	JSR Clockslide_7000		; Until
-	JSR Clockslide_400		; VBlank
+	; Stall until VBlank
+	JSR ClockslideFromWord
+	.word 27400
 	; we're in VBlank now.
 	LDA #$10	; 
 	STA $2001	; Enable rendering. (OAM won't actually become corrupt until dot 0 of the pre-render line.)
@@ -13912,9 +13887,9 @@ TEST_OAM_Corruption:
 	LDA <$00 ; stall for 3 cycles
 	LDA #0	 ; Write #0 to $2001 to disable rendering.
 	STA $2001; Pending OAM Corruption.
-	JSR Clockslide_20000	; Stall
-	JSR Clockslide_7000		; Until
-	JSR Clockslide_400		; VBlank
+	; Stall until VBlank
+	JSR ClockslideFromWord
+	.word 27400
 	; we're in VBlank now.
 	LDA #$10	; 
 	STA $2001	; Enable rendering. (OAM won't actually become corrupt until dot 0 of the pre-render line.)
@@ -14833,9 +14808,8 @@ TEST_INC4014_BNEFAIL: ; I ran out of bytes to branch from the bottom of this tes
 	; So the NMI is in about 29261 CPU cycles. (if the test passed)
 	; If it failed, the NMI is in about 28747 cycles.
 	
-	JSR Clockslide_20000
-	JSR Clockslide_8000
-	JSR Clockslide_800
+	JSR ClockslideFromWord
+	.word 28800
 	JSR DisableNMI ; If it failed, the NMI has already occured.
 	LDA <$50
 	BNE TEST_INC4014_BNEFAIL	
@@ -15120,9 +15094,9 @@ Test_StaleShiftRegisters_Run:
 	; The PPU is now synced with the CPU.
 	; The following instruction will begin on dot 1 of scanline 0.
 	
-	JSR Clockslide_700 ; And we stall until HBlank of scanline 6.
-	JSR Clockslide_50
-	JSR Clockslide_17
+	; And we stall until HBlank of scanline 6.
+	JSR ClockslideFromWord
+	.word 767
 	LDA #0
 	NOP
 	NOP
@@ -15156,9 +15130,8 @@ RunScanline0Sprite_NMI:
 	STA $2001 ; Enable rendering
 	LDA #2
 	STA $4014 ; OAM DMA with page 2.
-	JSR Clockslide_1000 ; Wait for 1918 cpu cycles.
-	JSR Clockslide_900
-	JSR Clockslide_18
+	JSR ClockslideFromWord ; wait for 1918 cycles
+	.word 1918
 	
 	JSR TEST_Scanline0Sprites_TimeItRight ; Time it right to toggle rendering a bunch such that sprite zero appears on scanline 0.
 	STA $500, X	
@@ -15182,10 +15155,8 @@ TEST_Scanline0Sprites_DMALoop:
 	DEX
 	BNE TEST_Scanline0Sprites_DMALoop ; 56 instances of OAM DMA.
 	
-	JSR Clockslide_300 ; And stall for 354 more cycles
-	JSR Clockslide_50
-	NOP
-	NOP
+	JSR ClockslideFromWord ; stall for 354 more cycles
+	.word 354
 
 	LDA #$1E
 	STA $2001 ; Enable rendering briefly after dot 66 on the pre-render line.
@@ -17338,18 +17309,15 @@ SetUpNMIRoutineForMainMenu:	; This sets up the values at $700 in RAM to be a JMP
 DMASync_50CyclesRemaining:	; Sync the CPU and the DMA, such that the DMA runs exactly 50 CPU cycles after the RTS instruction ends.
 	JSR DMASync
 	; the DMA is in 406 cycles;
-	JSR Clockslide_300 ; 406 -> 106
-	JSR Clockslide_50  ; 106 -> 56
+	JSR ClockslideFromWord
+	.word 350
 	RTS ; 56 -> 50 cycles after this RTS, a DMA will occur.
 	
 DMASync_50MinusACyclesRemaining: ; Sync the CPU and the DMA, such that the DMA runs exactly 50-A CPU cycles after the RTS instruction ends.
 	JSR DMASync
 	; the DMA is in 400 cycles;
-	JSR Clockslide_100 ; 406 -> 306
-	JSR Clockslide_100 ; 306 -> 206
-	JSR Clockslide_50 ; 206 -> 156
-	JSR Clockslide_40 ; 156 -> 116
-	JSR Clockslide_21 ; 116 -> 95
+	JSR ClockslideFromWord
+	.word 311
 	LDA <Test_UnOp_CycleDelayPostDMA ; 95 -> 92
 	JSR Clockslide37_Plus_A	; 92 -> (56-A)
 	RTS ; (56-A) -> (50-A) cycles after this RTS, a DMA will occur.
@@ -17417,13 +17385,10 @@ Clockslide_100:
 ;;;;;;;
 
 ;A frame has about 29780 cycles, so let's make a few around that number.
-Clockslide_29700:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_600	;700
-	JSR Clockslide_9000 ;9700
-	JSR Clockslide_20000;29700
-	RTS
-;;;;;;;
+; I use these clockslides enough that it actually saves bytes to do this.
+; NOTE: Don't optimize these using ClockslideFromWord.
+; Some tests rely on an interrupt occuring during the clocksldie and changing some registers,
+; while ClockslideFromWord resotres the registers at the end.
 Clockslide_29750:
 	JSR Clockslide_100Minus12
 	JSR Clockslide_50	;150
@@ -17442,188 +17407,9 @@ Clockslide_29781:
 	JSR Clockslide_19   ; 29781
 	RTS
 ;;;;;;;
-Clockslide_29776:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_50	;150
-	JSR Clockslide_26	;176
-	JSR Clockslide_600	;776
-	JSR Clockslide_9000 ;9776
-	JSR Clockslide_20000;29776
-	RTS
-;;;;;;;
-Clockslide_2269:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_50	;150
-	JSR Clockslide_19	;169
-	JSR Clockslide_100	;269
-	JSR Clockslide_2000 ;2269
-	RTS
-;;;;;;;
-
-Clockslide_2252:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_50	;150
-	NOP					;152
-	JSR Clockslide_100	;252
-	JSR Clockslide_2000 ;2252
-	RTS
-;;;;;;;
-
-Clockslide_2032:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_32	;132
-	JSR Clockslide_900	;1032
-	JSR Clockslide_1000 ;2032
-	RTS
-;;;;;;;
-
-Clockslide_1830:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_30	;130
-	JSR Clockslide_700	;830
-	JSR Clockslide_1000	;1830
-	RTS
-;;;;;;;
-
-Clockslide_1816:	   ;=6
-	JSR Clockslide_100Minus12
-	JSR Clockslide_16	;116
-	JSR Clockslide_700	;816
-	JSR Clockslide_1000	;1816
-	RTS
-;;;;;;;
-
-Clockslide_14900:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_800	;900
-	JSR Clockslide_4000 ;4900
-	JSR Clockslide_10000;14900
-	RTS
-;;;;;;;
-
-Clockslide_29820:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_20	;120
-	JSR Clockslide_700	;820
-	JSR Clockslide_9000 ;9820
-	JSR Clockslide_20000;29820
-	RTS
-;;;;;;;
-
-Clockslide_44730:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_30	;130
-	JSR Clockslide_600	;730
-	JSR Clockslide_4000 ;4730
-	JSR Clockslide_40000;44730
-	RTS
-;;;;;;;
-
-Clockslide_37270:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_50	;150
-	JSR Clockslide_20	;170
-	JSR Clockslide_100	;270
-	JSR Clockslide_7000 ;7270
-	JSR Clockslide_30000;37270
-	RTS
-;;;;;;;
-
-Clockslide_52180:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_50	;150
-	JSR Clockslide_30	;180
-	JSR Clockslide_2000 ;2180
-	JSR Clockslide_50000;52180
-	RTS
-;;;;;;;
-
 Clockslide_4320:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_20	;120
-	JSR Clockslide_200  ;320
-	JSR Clockslide_4000 ;4320
-	RTS
-;;;;;;;
-
-Clockslide_432:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_32	;132
-	JSR Clockslide_300  ;420
-	RTS
-;;;;;;;
-
-Clockslide_8640:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_40	;140
-	JSR Clockslide_500  ;640
-	JSR Clockslide_8000 ;8640
-	RTS
-;;;;;;;
-
-Clockslide_12960:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_40	;140
-	JSR Clockslide_20	;160
-	JSR Clockslide_800  ;960
-	JSR Clockslide_2000 ;2960
-	JSR Clockslide_10000 ;2960
-	RTS
-;;;;;;;
-
-Clockslide_26352:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_40	;140
-	JSR Clockslide_12	;152
-	JSR Clockslide_200  ;352
-	JSR Clockslide_6000 ;6352
-	JSR Clockslide_20000;26352
-	RTS
-;;;;;;;
-
-Clockslide_1728:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_28	;128
-	JSR Clockslide_600  ;728
-	JSR Clockslide_1000 ;1728
-	RTS
-;;;;;;;
-
-Clockslide_29766:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_50	;150
-	JSR Clockslide_16	;166
-	JSR Clockslide_600	;766
-	JSR Clockslide_9000	;9766
-	JSR Clockslide_20000;29766
-	RTS
-;;;;;;;
-
-Clockslide_29765:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_50	;150
-	JSR Clockslide_15	;165
-	JSR Clockslide_600	;765
-	JSR Clockslide_9000	;9765
-	JSR Clockslide_20000;29765
-	RTS
-;;;;;;;
-
-Clockslide_3395:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_50	;150
-	JSR Clockslide_45	;194
-	JSR Clockslide_200	;394
-	JSR Clockslide_3000	;3394
-	RTS
-;;;;;;;
-
-Clockslide_3380:
-	JSR Clockslide_100Minus12
-	JSR Clockslide_50   ;150
-	JSR Clockslide_30   ;180
-	JSR Clockslide_200	;380
-	JSR Clockslide_3000	;3380
+	JSR ClockslideFromWord
+	.word 4320-12
 	RTS
 ;;;;;;;
 
@@ -17646,14 +17432,117 @@ Clockslide64_Minus_A:;+6
 ;;;;;;;;;;;;;;;;;
 
 VblSync_Plus_A_End: ; Moved here for space. This is the end of the VblSync_Plus_A subroutine.
-	JSR Clockslide_29780
-	JSR Clockslide_29750
-	NOP
-	NOP
-	NOP
+	JSR ClockslideFromWord
+	.word 59536
 	BIT $2002
 	RTS
 ;;;;;;;
+
+	.org $FD00
+;;;;;;;;;;;;;;;;;;;;; The clockslide here must be page-aligned.
+CSTable:            ; This is a clockslide.
+    .byte $C9       ; Jumping to this byte here will take 17 cycles to reach that JMP CSTableSync.
+    .byte $C9       ; Jumping to this byte here will take 16 cycles to reach that JMP CSTableSync.
+    .byte $C9       ; And jumping here will take 15 cycles, and so on.
+    .byte $C9       ; The purpose is to create a way to stall for a precise number of cycles.
+    .byte $C9       ; I use this to stall for exactly 0 to 15 cycles (plus 2) depending on...
+    .byte $C9       ; ... the lowest nybble of the .word following a JSR to ClockslideFromWord.
+    .byte $C9       ; For instance, if the .word was $1003, then the lowest nybble of 3 would...
+    .byte $C9       ; ... result in this routine stalling for 3 more cycles than if the value was $1000.
+    .byte $C9       ;
+    .byte $C9       ;
+    .byte $C9       ;
+    .byte $C9       ;
+    .byte $C9       ;
+    .byte $C9       ; If this is executed, the $C5 is the operand. +2 cycles. (4 cycles until the JMP)
+    .byte $C5       ; If this is executed, the $EA is the operand. +3 cycles. (3 cycles until the JMP)
+    .byte $EA       ; NOP (no operands) +2 cycles
+    JMP CSTableSync ; +3 cycles
+                    ;
+ClockslideFromWord: ; Delay somewhere between 256 and 65536 CPU cycles.
+    STA <$FF        ; I overwrite A, X, and Y during this subroutine
+    STY <$FE        ; So I store them here temporarily and read them back at the end of the routine.
+    STX <$FD        ;
+                    ; I cannot use CopyReturnAddressToByte0 because it can take a variable amount of cycles depending on the return address.
+    TSX             ; So I need to spend a few bytes doing this without the subroutine.
+                    ; Grab the return address from the stack pointer, copy it to [$0000] and increment the one in the stack by 2.
+    CLC             ; CLC for the upcoming ADC
+    LDA $101,X      ; Load the return address low byte
+    STA <$00        ; Store it in address $0000 for an upcoming LDA (Indirect), Y
+    ADC #2          ; The .word after the JSR to ClockslideFromWord takes up 2 bytes, so add 2 to the return address.
+    STA $101,X      ; Overwrite the return address low byte
+    LDA $102,X      ; Load the return address high byte
+    STA <$01        ; Store it in address $0001 for the upcoming LDA (Indirect), Y
+    ADC #0          ; Add carry to high byte in case it was set when adding 2 to the low byte.
+    STA $102,X      ; And overwrite the return address high byte.
+                    ;
+    LDA #1          ; starting at the old return address +1, read the two bytes that followed the JSR to ClockslideFromWord.
+    CLC             ; Clear the carry flag for the upcoming ADC. We want to make sure emulators that handle JSR incorrectly can still run this.
+    ADC <IncorrectReturnAddressOffset ; Add the value from address $003C that was set from a test around power on.
+    TAY             ; Transfer the result to Y. At this point Y should equal 1 on an accurate emulator, and 2+ on an inaccurate one.
+    LDA [$0000],Y   ; a JSR to ClockslideFromWord should be followed with a 16 bit .word
+    STA <$20        ; We just read the low byte of this .word, and store it at address $20.
+    INY             ; Increment Y
+    LDA [$0000],Y   ; And read the high byte of this .word
+    STA <$21        ; Store it at address $21.
+                    ; This .word we just read will be the number of CPU cycles to spend inside this subroutine.
+                    ; First deal with the lowest nybble.
+    LDA <$20        ; Load the Low Byte from the .word
+    AND #$0F        ; Mask away the upper nybble.
+    EOR #$0F        ; Flip the bits in the lower nybble
+    STA <$00        ; And store this to $0000 for the upcoming JMP (indirect)
+    LDA #HIGH(CSTable) ; Load the high byte for the upcoming JMP (indirect)
+    STA <$01        ; And store it to $0001.
+    JMP [$0000]     ; Jump to CSTable_xF through CSTable_x0 in order to waste precisely the lowest nybble from .word worth of CPU cycles.
+CSTableSync:        ; The clockslide there jumps here:
+                    ; Now we've wasted precisely the low nybble + some overhead. We'll resolve the overhead later.
+                    ; Now we take care of nybble 1.
+    LDA <$20        ; Load the low byte
+    LSR A           ; And shift it over four times.
+    LSR A           ;
+    LSR A           ;
+    LSR A           ;
+    TAX             ; We're going to run a loop that wastes 16 * X CPU cycles.
+    JMP CSXMid      ; Jump to the middle of the loop in case X = 0.
+CSXLoop:            ;
+    PHP             ; +3 (this saves bytes over using LDA <$00 to spend an odd number of cycles.)
+    PLP             ; +4
+    NOP             ; +2
+    NOP             ; +2
+CSXMid:             ;
+    DEX             ; +2
+    BPL CSXLoop     ; +3
+                    ; = 16*X + some overhead which we will resolve later.
+                    ; Now wasting the high byte of the .word worth of CPU cycles is a bit tricky.
+                    ; It's worth noting that (due to all the overhead with this subroutine) there is a minimum of 256 CPU cycles we can waste here.
+    LDX <$21        ; X = the high byte of the .word
+    JMP CSZYLoop_Mid; Just like with nybble 1, we skip ahead in case X=0.
+CSZYLoop:           ; Writing a loop to waste 249 cycles makes this routine easier to copy/paste into other projects, rather than needing an existing clockslide.
+    LDY #49         ; Waste exactly 249 cycles by running this loop 26 times.
+CSWaste249Cy:       ; This loop (plus the LDY #49, and following LDA <$0) takes 249 cycles.
+    DEY             ; With the DEX, NOP, and BNE back into this loop, the whole thing takes 256 cycles per iteration.
+    BNE CSWaste249Cy;
+    LDA <$00        ;
+CSZYLoop_Mid:       ;
+    DEX             ; Decrement X
+    NOP             ; If X is not equal to zero...
+    BNE CSZYLoop    ; keep running this loop.
+                    ;
+                    ; Since we ran that "waste 256 cycles" loop 1 less than the .word would suggest, we would have 256 cycles missing!
+                    ; That's where the overhead comes in. We actually only have 110 cycles to make up.
+                    ; This can easily be wasted with another loop.
+    LDX #21         ; We're pretty much just going to run a loop decrementing X until X hits zero.
+CSWaste110Cy:       ;
+    DEX             ; X--
+    BNE CSWaste110Cy; Loop until X = 0.
+    NOP             ; And waste 4 more cycles.
+    NOP             ; ^
+                    ; 
+    LDX <$FD        ; Now the remaining instructions restore the A, X, and Y registers.
+    LDY <$FE        ; ^
+    LDA <$FF        ; ^
+    RTS             ; We're done here.
+;;;;;;;;;;;;;;;;;;;;;
 
 	.org $FDF3
 TEST_IFlagLatency_PageBoundaryTest:
@@ -17691,18 +17580,15 @@ New_VBL_Sync:
 New_VBL_Sync_Loop1:
 	LDA $2002
 	BMI New_VBL_Sync_Loop1
-	JSR Clockslide_29700
-	JSR Clockslide_21 ; This might be able to be 22 before errors start occuring? I'll keep it at 21 just to be safe.
+	JSR ClockslideFromWord
+	.word 29721
 New_VBL_Sync_Loop2:
-	JSR Clockslide_29750	; +29750
-	JSR Clockslide_24		; +24
+	JSR ClockslideFromWord
+	.word 29774
 	LDA $2002				; +4
 	BPL New_VBL_Sync_Loop2	; +3 = 29781
-	JSR Clockslide_29766
-	NOP
-	NOP
-	NOP
-	JSR Clockslide_29780
+	JSR ClockslideFromWord
+	.word 59552
 	RTS
 ;;;;;;;
 
@@ -17732,13 +17618,12 @@ DMASync40_Loop:
 	STA $4010 
 	LDA <$00  
 	LDA Copy_A
-	JSR Clockslide_100
-	JSR Clockslide_100
-	JSR Clockslide_100
-	JSR Clockslide_50
-	; Let's also set the triangle channel to play something, so the APU STATUS isn't #$00
-	NOP
-	CMP <$C9
+	JSR Clockslide_100 ; Note to self, do not try to optimize with ClockslideFromWord, as write cycles throw off the DMA timing.
+	JSR Clockslide_100 ; ^
+	JSR Clockslide_100 ; ^
+	JSR Clockslide_50  ; ^
+	NOP                ; ^
+	CMP <$C9           ; ^
 	RTS 
 	; so we have 50 cycles to go.
 		
@@ -17811,7 +17696,8 @@ dma_sync_first:
 
 	LDA #$0F
 	STA $4010 ; disable the DMC IRQ, set the speed to the fastest.
-    JSR Clockslide_3380
+	JSR ClockslideFromWord
+	.word 3380
 	NOP
 	LDA #$10
     STA $4015
@@ -17994,8 +17880,8 @@ VblSync_Loop1:
 	LDA $2002
 	BPL VblSync_Loop1
 	
-	JSR Clockslide_29750
-	JSR Clockslide_21	
+	JSR ClockslideFromWord
+	.word 19771
 
 	LDA $2002
 	BMI VblSync_skip4
@@ -18032,13 +17918,13 @@ VblSync_Plus_A: ; In this context, the value of A will translate to 1 additional
 	PLA
 	JSR VblSync	; Sync to VBlank
 VblSync_Plus_A_Loop:   
-	JSR Clockslide_29750 ; wait 29774 cycles
-	JSR Clockslide_24
+	JSR ClockslideFromWord
+	.word 29774
 	CLC						; + 2
 	ADC #$FF 				; + 2
 	BCS VblSync_Plus_A_Loop ; + 3 if looping, 2 otherwise. (29781 CPU cycles if looping. Each frame is 29780.67 CPU cycles long, so this advances 1 PPU cycle)
 	JMP VblSync_Plus_A_End	; I ran out of space, so I moved it up there.
-	
+	NOP
 	;.org $FFF5
 TEST_AddrMode_Relative_FFF5:
 	; This is part of test 2 of TEST_AddrMode_Relative
