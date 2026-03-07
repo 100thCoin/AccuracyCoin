@@ -1384,39 +1384,11 @@ PTNSkipSuiteName:
 	LDA #$40
 	STA $2006	
 	LDA #$24
+	LDX #33
+PrintTestNameLoop:
 	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007
-	STA $2007	
+	DEX
+	BPL PrintTestNameLoop
 	JSR PrintTextCentered
 	JSR ResetScroll
 	LDA <menuCursorYPos
@@ -17477,8 +17449,8 @@ ClockslideFromWord: ; Delay somewhere between 256 and 65536 CPU cycles.
     STA $102,X      ; And overwrite the return address high byte.
                     ;
     LDA #1          ; starting at the old return address +1, read the two bytes that followed the JSR to ClockslideFromWord.
-    CLC             ; Clear the carry flag for the upcoming ADC. We want to make sure emulators that handle JSR incorrectly can still run this.
-    ADC <IncorrectReturnAddressOffset ; Add the value from address $003C that was set from a test around power on.
+    SEC             ; set the carry flag for the upcoming SBC. We want to make sure emulators that handle JSR incorrectly can still run this.
+    SBC <IncorrectReturnAddressOffset ; Subtract the value from address $003C that was set from a test around power on.
     TAY             ; Transfer the result to Y. At this point Y should equal 1 on an accurate emulator, and 2+ on an inaccurate one.
     LDA [$0000],Y   ; a JSR to ClockslideFromWord should be followed with a 16 bit .word
     STA <$20        ; We just read the low byte of this .word, and store it at address $20.
