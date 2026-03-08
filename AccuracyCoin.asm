@@ -1101,260 +1101,6 @@ PressStartToContinue:
 PressStartToContinue_End:
 	RTI
 ;;;;;;;
-
-	.org $9280
-	
-DMASyncWith48:
-	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
-	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
-	STA <Copy_A
-	LDA #$4F ; loop, max speed.
-	STA $4010
-	LDA #0
-	STA $4011 ; minimum value of DMC
-	LDA #$BC
-	STA $4012 ; Sample address $EF00.
-	LDA #0
-	STA $4013 ; 1 byte length.
-	LDA #$10
-	STA $4015 ; Start the DMC DMA loop
-	NOP
-	NOP
-DMASync48_Loop:
-	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $48 from the DMA.
-	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
-	CMP #$48
-	BNE DMASync48_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
-	LDA #$0F ; don't loop, continue at max speed. +2 (9)
-	STA $4010 
-	LDA <$00  
-	LDA Copy_A
-	JSR Clockslide_100 ; Note to self, do not try to optimize with ClockslideFromWord, as write cycles throw off the DMA timing.
-	JSR Clockslide_100 ; ^
-	JSR Clockslide_100 ; ^
-	JSR Clockslide_50  ; ^
-	NOP                ; ^
-	CMP <$C9           ; ^
-	RTS
-;;;;;;;
-	
-DMASyncWith60:
-	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
-	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
-	STA <Copy_A
-	LDA #$4F ; loop, max speed.
-	STA $4010
-	LDA #0
-	STA $4011 ; minimum value of DMC
-	LDA #$BB
-	STA $4012 ; Sample address $EEC0.
-	LDA #0
-	STA $4013 ; 1 byte length.
-	LDA #$10
-	STA $4015 ; Start the DMC DMA loop
-	NOP
-	NOP
-DMASync60_Loop:
-	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $60 from the DMA.
-	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
-	CMP #$60
-	BNE DMASync60_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
-	LDA #$0F ; don't loop, continue at max speed. +2 (9)
-	STA $4010 
-	LDA <$00  
-	LDA Copy_A
-	JSR Clockslide_100 ; Note to self, do not try to optimize with ClockslideFromWord, as write cycles throw off the DMA timing.
-	JSR Clockslide_100 ; ^
-	JSR Clockslide_100 ; ^	
-	JSR Clockslide_50  ; ^
-	NOP                ; ^
-	CMP <$C9           ; ^
-	RTS
-;;;;;;;
-	
-DMASyncWithA5:
-	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
-	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
-	STA <Copy_A
-	LDA #$4F ; loop, max speed.
-	STA $4010
-	LDA #0
-	STA $4011 ; minimum value of DMC
-	LDA #$BA
-	STA $4012 ; Sample address $EE80.
-	LDA #0
-	STA $4013 ; 1 byte length.
-	LDA #$10
-	STA $4015 ; Start the DMC DMA loop
-	NOP
-	NOP
-DMASyncA5_Loop:
-	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $A5 from the DMA.
-	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
-	CMP #$A5
-	BNE DMASyncA5_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
-	LDA #$0F ; don't loop, continue at max speed. +2 (9)
-	STA $4010 
-	LDA <$00  
-	LDA Copy_A
-	JSR Clockslide_100 ; Note to self, do not try to optimize with ClockslideFromWord, as write cycles throw off the DMA timing.
-	JSR Clockslide_100 ; ^
-	JSR Clockslide_100 ; ^
-	JSR Clockslide_50  ; ^
-	NOP                ; ^
-	CMP <$C9           ; ^
-	RTS
-;;;;;;;
-	
-DMASyncWith68:
-	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
-	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
-	STA <Copy_A
-	LDA #$4F ; loop, max speed.
-	STA $4010
-	LDA #0
-	STA $4011 ; minimum value of DMC
-	LDA #$B9
-	STA $4012 ; Sample address $EE40.
-	LDA #0
-	STA $4013 ; 1 byte length.
-	LDA #$10
-	STA $4015 ; Start the DMC DMA loop
-	NOP
-	NOP
-DMASync68_Loop:
-	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $68 from the DMA.
-	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
-	CMP #$68
-	BNE DMASync68_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
-	LDA #$0F ; don't loop, continue at max speed. +2 (9)
-	STA $4010 
-	LDA <$00  
-	LDA Copy_A
-	JSR Clockslide_100 ; Note to self, do not try to optimize with ClockslideFromWord, as write cycles throw off the DMA timing.
-	JSR Clockslide_100 ; ^
-	JSR Clockslide_100 ; ^
-	JSR Clockslide_50  ; ^
-	NOP                ; ^
-	CMP <$C9           ; ^
-	RTS
-;;;;;;;
-	
-VerifyReturnAddressesAreCorrect:
-	TSX
-	INX
-	LDA $100, X
-	; $02 is the correct value to read here. A value of $03 is wrong. $04 is right out.
-	; Anyway, subtract by 2.
-	SEC
-	SBC #02
-	STA <IncorrectReturnAddressOffset
-	RTS
-;;;;;;;
-	
-DMASyncWith90:
-	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
-	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
-	STA <Copy_A
-	LDA #$4F ; loop, max speed.
-	STA $4010
-	LDA #0
-	STA $4011 ; minimum value of DMC
-	LDA #$B7
-	STA $4012 ; Sample address $EDC0.
-	LDA #0
-	STA $4013 ; 1 byte length.
-	LDA #$10
-	STA $4015 ; Start the DMC DMA loop
-	NOP
-	NOP
-DMASync90_Loop:
-	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $90 from the DMA.
-	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
-	CMP #$90
-	BNE DMASync90_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
-	LDA #$0F ; don't loop, continue at max speed. +2 (9)
-	STA $4010 
-	LDA <$00  
-	LDA Copy_A
-	JSR Clockslide_100 ; Note to self, do not try to optimize with ClockslideFromWord, as write cycles throw off the DMA timing.
-	JSR Clockslide_100 ; ^
-	JSR Clockslide_100 ; ^
-	JSR Clockslide_50  ; ^
-	NOP                ; ^
-	CMP <$C9           ; ^
-	RTS
-;;;;;;;
-	
-DMASyncWith05:
-	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
-	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
-	STA <Copy_A
-	LDA #$4F ; loop, max speed.
-	STA $4010
-	LDA #0
-	STA $4011 ; minimum value of DMC
-	LDA #$B5
-	STA $4012 ; Sample address $EDC0.
-	LDA #0
-	STA $4013 ; 1 byte length.
-	LDA #$10
-	STA $4015 ; Start the DMC DMA loop
-	NOP
-	NOP
-DMASync05_Loop:
-	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $05 from the DMA.
-	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
-	CMP #$05
-	BNE DMASync05_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
-	LDA #$0F ; don't loop, continue at max speed. +2 (9)
-	STA $4010 
-	LDA <$00  
-	LDA Copy_A
-	JSR Clockslide_300 ; Note to self, do not try to optimize with ClockslideFromWord, as write cycles throw off the DMA timing.
-	JSR Clockslide_50  ; ^
-	NOP                ; ^
-	CMP <$C9           ; ^
-	RTS
-;;;;;;;
-	
-MarkTestToSkip:
-	STX <Copy_X
-	LDX <menuCursorYPos           ; X = which test from the current suite
-	TXA
-	ASL A				          ; Double X, since we're reading a 2-byte word from a list of 2-byte words.
-	TAX
-	
-	LDA <suitePointerList+1,X
-	CMP #3	; if the page used to store the results is page 3 instead of page 4, it's a DRAW test. Forbid skipping it.
-	BEQ MarkTestToSkip_RTS
-	
-	LDA <suitePointerList,X	      ; read the low byte of where to store the test results.
-	STA <TestResultPointer        ; and store it in RAM
-	LDA <suitePointerList+1,X     ; read the high byte of where to store the test results.
-	STA <TestResultPointer+1      ; and store it in RAM next to the low byte.
-	
-	LDY #0                        ; set up Y for the upcoming indirect reads.
-	LDA [TestResultPointer],Y     ; check if this test is already marked to be skipped.
-	CMP #$FF                      ; If the "test results" are $FF, we need to clear it to zero.
-	BEQ MarkTestToUnSkip
-	LDA #$FF                      ; Mark this test to be skipped by storing $FF in the results.
-	STA [TestResultPointer],Y
-	BNE MarkTestToSkip_UpdateNametable	
-MarkTestToUnSkip:
-	LDA #0                        ; Mark this test as not-yet-ran.
-	STA [TestResultPointer],Y
-MarkTestToSkip_UpdateNametable:
-	LDX <menuCursorYPos
-	JSR DrawTEST
-	JSR UpdateTESTAttributes
-	LDA <AutomateTestSuite        ; I use AutomateTestSuite when pressing B to mark all tests on a suite to be skipped.
-	BNE MarkTestToSkip_RTS
-	JSR HighlightTest
-MarkTestToSkip_RTS:
-	LDX <Copy_X
-	RTS
-;;;;;;;
 	
 PrintTestName:
 	TXA
@@ -1407,399 +1153,7 @@ SkipFindingNextName:
 	RTS
 ;;;;;;;
 
-SkipSuiteName:
-	LDA [AllTestMenuTestNameOffsetLo],Y ; Read from the pointer
-	INY
-	CMP #$FF
-	BNE SkipSuiteName
-	TYA
-	CLC
-	ADC <AllTestMenuTestNameOffsetLo
-	STA <AllTestMenuTestNameOffsetLo
-	BCC SkipSuiteName0
-	INC <AllTestMenuTestNameOffsetHi ; If needed, INC the high byte
-SkipSuiteName0:
-	RTS
-;;;;;;;
 
-AddYToNameOffset: ; This function adds the A register to the word at $0000
-	TYA
-	CLC
-	ADC #4
-	BCC AddYToNameOffset0
-	INC <AllTestMenuTestNameOffsetHi ; If needed, INC the high byte
-AddYToNameOffset0:
-	CLC
-	ADC <AllTestMenuTestNameOffsetLo
-	STA <AllTestMenuTestNameOffsetLo
-	BCC AddYToNameOffset1
-	INC <AllTestMenuTestNameOffsetHi ; If needed, INC the high byte
-AddYToNameOffset1:
-	RTS
-;;;;;;;
-	
-ClearNametable2_With24:
-	LDA #$24
-	PHA
-	BNE ClearNametable2_s
-ClearNametable2:
-	LDA #0
-	PHA
-ClearNametable2_s:
-	JSR SetPPUADDRFromWord
-	.byte $2C, $00
-	PLA
-	LDY #$C0
-	LDX #4
-TEST_RMW2007_ClearNametable2Loop:
-	STA $2007
-	DEY
-	BNE TEST_RMW2007_ClearNametable2Loop
-	DEX
-	BNE TEST_RMW2007_ClearNametable2Loop
-	LDA #$FF
-	LDY #$40
-	TEST_RMW2007_ClearNT2Loop2:
-	STA $2007
-	DEY
-	BNE TEST_RMW2007_ClearNT2Loop2	
-	RTS
-;;;;;;;
-	
-SetUpSpriteZero:
-	JSR CopyReturnAddressToByte0
-	LDY #0
-SetUpSpriteZero_Loop:
-	LDA [$0000], Y
-	STA $200, Y
-	INY
-	CPY #$4
-	BNE SetUpSpriteZero_Loop
-	JSR FixRTS
-	RTS
-;;;;;;;
-
-SetPPUSCROLLFromWord:	; pretty much the same as SetPPUADDRFromWord, but it writes to $2005.
-	STA <$FF
-	STY <$FE
-	JSR CopyReturnAddressToByte0
-	LDA $2002
-	LDY #0
-	LDA [$0000],Y
-	STA $2005
-	INY
-	LDA [$0000],Y
-	STA $2005
-	INY
-	JSR FixRTS
-	LDY <$FE
-	LDA <$FF
-	RTS
-;;;;;;;
-
-AsciiToCHR:					; This table converts the ASCII values stored in the ROM to the indexes into the pattern table I made.
-	.byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
-	.byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
-	.byte $24, $26, $24, $24, $35, $24, $24, $24, $24, $24, $32, $30, $29, $31, $25, $33
-	.byte $00, $01, $02, $03, $04, $05, $06, $07, $08, $09, $28, $24, $24, $34, $24, $27
-	.byte $24, $0A, $0B, $0C, $0D, $0E, $0F, $10, $11, $12, $13, $14, $15, $16, $17, $18
-	.byte $19, $1A, $1B, $1C, $1D, $1E, $1F, $20, $21, $22, $23, $24, $24, $24, $24, $24
-	.byte $24, $0A, $0B, $0C, $0D, $0E, $0F, $10, $11, $12, $13, $14, $15, $16, $17, $18
-	.byte $19, $1A, $1B, $1C, $1D, $1E, $1F, $20, $21, $22, $23;, $24, $24, $24, $24, $24
-
-TEST_RunSHASHS_AddrInitAXYFS:
-	;.word TargetAddress
-	;.byte Initial, A, X, Y, Flags, StackPointer
-	;.word ResultAddress
-	;.byte result, r_A, r_X, r_Y, r_Flags, r_StackPointer
-	STA <$FF
-	JSR CopyReturnAddressToByte0
-	LDY #0
-	LDX #0
-TEST_RunSHASHS_PreLoop:
-	LDA [$0000],Y
-	STA <Test_UnOp_OperandTargetAddrLo,X
-	INY
-	INX
-	CPX #16 ; Set up $28 through $2F
-	BNE TEST_RunSHASHS_PreLoop
-	; With the variables all set up, let's prep the test:
-	JSR FixRTS
-	LDX <Test_UnOp_ExpectedResultAddrLo
-	JSR WriteFFOnEachPageOffsetX
-	JSR TEST_UnOpRunTest
-	LDX <Test_UnOp_ExpectedResultAddrLo
-	JSR RestoreTestResultFromBehavior3
-	; Evaluating the test.
-	LDA <initialSubTest
-	STA <ErrorCode
-	JSR Test_UnOpSHASHS_Behavior3
-	; If you made it this far, we passed this test!
-	; (not necessarily the entire suite, but this specific test, at least)
-	LDA UnOpTest_Opcode ; reset this value before the next test, assuming another one follows
-	RTS
-;;;;;;;
-
-Test_UnOpSHASHS_Behavior3:
-	LDX <Test_UnOp_ExpectedResultAddrLo
-	JSR ANDByteOnEachPageOffsetX
-	CMP <Test_UnOp_ValueAtAddressResult
-	BNE FAIL_SHASHS3_Test ; Error code 1: The result at the expected address was incorrect
-	INC <ErrorCode
-	LDA <Copy_A
-	CMP <Test_UnOp_CMP
-	BNE FAIL_SHASHS3_Test ; Error code 2: The result of the A register was incorrect
-	INC <ErrorCode
-	LDX <Copy_X
-	CPX <Test_UnOp_CPX
-	BNE FAIL_SHASHS3_Test ; Error code 3: The result of the X register was incorrect
-	INC <ErrorCode
-	LDY <Copy_Y
-	CPY <Test_UnOp_CPY
-	BNE FAIL_SHASHS3_Test ; Error code 4: The result of the Y register was incorrect
-	INC <ErrorCode
-	LDA <Copy_Flags
-	CMP <Test_UnOp_CM_Flags
-	BNE FAIL_SHASHS3_Test ; Error code 5: The result of the flags were incorrect
-	INC <ErrorCode
-	LDA <Copy_SP2
-	CMP <Test_UnOp_CPS
-	BNE FAIL_SHASHS3_Test ; Error code 6: The result of the stack pointer was incorrect
-	RTS ; Pass!
-FAIL_SHASHS3_Test:
-	PLA	; Pull of the Return Address
-	PLA	;
-	PLA
-	PLA
-	JMP TEST_Fail ; and fail the test.
-
-ANDByteOnEachPageOffsetX:
-	; The idea here is that all of these except for one have the value $FF.
-	; Therefore, by the time we hit RTS, we read the value we're looking for in A.
-	LDA #$FF
-	AND <$00, X
-	AND $100, X
-	AND $200, X
-	AND $300, X
-	AND $400, X
-	AND $500, X
-	AND $600, X
-	AND $700, X
-	RTS
-;;;;;;;
-
-WriteFFOnEachPageOffsetX:
-	; Initialize stuff for these "behavior 3" tests.
-	; Oh hey wait- this overwrites page 4. That's not good.
-	; But like- behavior 3 assumes that writing to page 4 is a possibility, so...
-	LDA $400, X
-	; Where would this never write to?
-	STA $7FF ; Pretty sure I never use $FF as the address low byte.
-	; This would also pollute page 3, the uninitialized RAM data.
-	LDA $300, X
-	STA $7FE
-	
-	LDA #$FF
-	STA <$00, X
-	STA $100, X
-	STA $200, X
-	STA $300, X
-	STA $400, X
-	STA $500, X
-	STA $600, X
-	STA $700, X
-	RTS
-;;;;;;;
-
-RestoreTestResultFromBehavior3:
-	LDA $7FF
-	STA $400, X
-	LDA $7FE
-	STA $300, X
-	RTS
-;;;;;;;
-
-TEST_SHS_Behavior3_9B
-	PHA ; just used to prevent issues with the PLA in ErrorCodeF
-	LDX #0
-	JSR ANDByteOnEachPageOffsetX
-	CMP #$FF
-	BEQ FAIL_SHA_SHS_ErrorCodeF
-	JMP TEST_SHS_Behavior3
-
-
-
-TEST_SHA_Behavior3_93:
-	LDA #$93
-	PHA ; push the opcode. This just lets me re-use the upcoming code.
-	
-	LDA <RunningAllTests
-	BNE TEST_SHA_JMPto_Behavior3
-	
-	LDA #0
-	STA <dontSetPointer
-	JSR PrintTextCentered
-	.word $22B0
-	.byte " SHA Behavior 3", $FF
-	JSR ResetScrollAndWaitForVBlank
-TEST_SHA_JMPto_Behavior3:
-	JMP TEST_SHA_Behavior3
-	
-FAIL_SHA_SHS_ErrorCodeF:
-	PLA ; pull off the opcode of the test.
-	LDA #$3E ; (Error code F) 
-	RTS	
-	
-TEST_SHA_Behavior3_9F:
-	LDA #$9F
-	PHA ; push the opcode. This just lets me re-use the upcoming code.
-	LDA <RunningAllTests
-	BNE TEST_SHA_Behavior3
-	
-	LDA #0
-	STA <dontSetPointer
-	JSR PrintTextCentered
-	.word $22B0
-	.byte " SHA Behavior 3", $FF
-	JSR ResetScrollAndWaitForVBlank
-	
-TEST_SHA_Behavior3:
-	; Okay, so your CPU decided to make this as difficult as possible by introducing a magic number into the ABH corruption.
-	; When the SHA instruction's indexing crosses a page boundary, the typical result is `ABH = (ABH+1) & A`, or perhaps `ABH = (ABH+1) & A & X`.
-	; However, it would appear this console's (or emulator's) result is actually `ABH = (ABH+1) & (A | MAGIC)`. Or maybe there's an X in there too, I have no idea.
-	; and since it's impossible on an NROM cartridge to actually know exactly what address / mirror was specifically written to, we cannot know, nor make assumptions.
-	; therefore, all we know is the low byte of the target address.
-	; We're not actually able to calculate this "MAGIC" value, because we cannot actually know which address / mirror gets written to.
-	; in other words, we're going to simply check $0xx, $1xx, $2xx, $3xx, $4xx, $5xx, $6xx, and $7xx after every test.
-
-	; Final checks. If every one of these addresses ($000, $100, $200...) is still $FF, then fail the test.
-	LDX #0
-	JSR ANDByteOnEachPageOffsetX
-	CMP #$FF
-	BEQ FAIL_SHA_SHS_ErrorCodeF
-	
-	; The worst part about all of this is the magic number could cancel out the bitwise AND entirely, nullifying the ABH corruption, but *oh well*.
-	; I guess if you didn't even implement the ABH corruption into your emulator you get to pass the SHA and SHS instructions, but I will judge you. Heh.
-	PLA
-	JSR TEST_UnOp_Setup; Set the opcode
-	; This test for "behavior 3" differs from all know documentation, and is honestly annoying to work with, and was a nightmare to reserach.
-	; Special thanks to SNS_Dominic for their Verilog reserach allowing us to discover there's a magic number affecting ABH.
-	; Write: A & (X | Magic) & H
-	; Hi = Hi & (X | Magic) ; NOTE: this magic number is not the same magic number used in the value written
-	
-	; We can not make any assumptions on what "magic" is. Therefore, X needs to always be FF.
-	JSR TEST_RunSHASHS_AddrInitAXYFS
-	.word $0555
-	.byte $FF
-	.byte $FF, $FF, $00, (flag_i), $80
-	.word $0555
-	.byte $06
-	.byte $FF, $FF, $00, (flag_i), $80
-	
-	JSR TEST_RunSHASHS_AddrInitAXYFS
-	.word $1D60
-	.byte $FF
-	.byte $03, $FF, $00, (flag_i), $80
-	.word $0560
-	.byte $02
-	.byte $03, $FF, $00, (flag_i), $80
-	
-	; Now to make the high byte go unstable.
-	JSR TEST_RunSHASHS_AddrInitAXYFS
-	.word $1F50 ; $1E90 will be the operand.
-	.byte $FF
-	.byte $0A, $FF, $80, (flag_i | flag_c | flag_z | flag_v), $80
-	.word $0750
-	.byte $0A
-	.byte $0A, $FF, $80, (flag_i | flag_c | flag_z | flag_v), $80
-	; the high byte will only be ANDed with X (FF in this case)
-	
-	; And now to test if the value written is still ANDed with H if the cycle before the write had a DMA.
-	PHA
-	LDA #$20
-	STA $0580
-	LDA #Low(DMASync_50MinusACyclesRemaining)
-	STA $0581
-	LDA #High(DMASync_50MinusACyclesRemaining)
-	STA $0582	
-	LDA #$7
-	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 6 is probably the only one that will show up.
-	PLA
-	
-	JSR TEST_RunSHASHS_AddrInitAXYFS
-	.word $0568
-	.byte $5A
-	.byte $8F, $FF, $00, (flag_i), $80
-	.word $0568
-	.byte $8F	; H isn't part of the equation anymore.
-	.byte $8F, $FF, $00, (flag_i), $80
-	
-	;; END OF TEST ;;
-	LDA #13	; Pass, "code 3"
-	RTS
-;;;;;;;
-
-TEST_SHS_Behavior3:
-	PLA
-	LDA <RunningAllTests
-	BNE TEST_SHS_Behavior3_Skip
-	LDA #0
-	STA <dontSetPointer
-	JSR PrintTextCentered
-	.word $22D0
-	.byte " SHS Behavior 3", $FF
-	JSR ResetScrollAndWaitForVBlank
-TEST_SHS_Behavior3_Skip:
-	
-	LDA #$9B
-	JSR TEST_UnOp_Setup; Set the opcode
-	JSR TEST_RunSHASHS_AddrInitAXYFS
-	.word $0555
-	.byte $FF
-	.byte $FF, $FF, $00, (flag_i), $FF
-	.word $0555
-	.byte $06
-	.byte $FF, $FF, $00, (flag_i), $FF
-	
-	JSR TEST_RunSHASHS_AddrInitAXYFS
-	.word $1D00
-	.byte $FF
-	.byte $03, $FF, $00, (flag_i), $ff
-	.word $0500
-	.byte $02
-	.byte $03, $FF, $00, (flag_i), $03
-	
-	JSR TEST_RunSHASHS_AddrInitAXYFS
-	.word $1F60 ; $1E90 will be the operand.
-	.byte $FF
-	.byte $0A, $FF, $80, (flag_i | flag_c | flag_z | flag_v), $5E
-	.word $0760
-	.byte $0A
-	.byte $0A, $FF, $80, (flag_i | flag_c | flag_z | flag_v), $0A
-
-	PHA
-	LDA #$20
-	STA $0580
-	LDA #Low(DMASync_50MinusACyclesRemaining)
-	STA $0581
-	LDA #High(DMASync_50MinusACyclesRemaining)
-	STA $0582	
-	LDA #$7
-	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 7 is probably the only one that will show up.
-	PLA
-	
-	JSR TEST_RunSHASHS_AddrInitAXYFS
-	.word $0568
-	.byte $5A
-	.byte $8F, $FF, $00, (flag_i), $9F
-	.word $0568
-	.byte $8F
-	.byte $8F, $FF, $00, (flag_i), $8F
-
-;; END OF TEST ;;
-	LDA #13	; Pass "code 2"
-	RTS
-;;;;;;;
 	
 	
 TEST_DMA_Plus_2002R:
@@ -1895,42 +1249,6 @@ Test_DMA_Plus_2002_Cleanup:
 	STA $4017
 	RTS
 ;;;;;;;
-	
-VerifySpriteZeroHits:
-	                           ; STEP ONE: Intentionally miss a sprite zero hit.
-	JSR DisableRendering       ; Disable rendering so the following can happen even out of vblank.
-	JSR ClearNametable2_With24 ; Clear nametable 2 with tile $24 (empty tiles)
-	JSR ClearPage2             ; Clear Page 2 with all $FFs
-	JSR SetUpSpriteZero        ; Prepare sprite zero with the following values:
-	.byte $04, $C0, $03, $08   ; Single dot on scanline 4, X = 08
-	JSR PrintCHR               ; Update nametable
-	.word $2C21                ; Single dot to overlap the sprite. (we're intentionally missing this one though.)
-	.byte $C0, $FF             ; This will trigger the sprite zero hit.
-	JSR SetPPUADDRFromWord     ; Update t
-	.byte $2C, $00             ; This is also needed for the sprite zero hit.
-	LDA #2                     ; Page 2 for the OAM DMA
-	STA $4014                  ; Trigger the OAM DMA
-	JSR WaitForVBlank          ; Wait for vblank
-	JSR EnableRendering        ; Draw both the background and sprites.	
-	JSR WaitForVBlank          ; Wait for vblank
-	LDA $2002                  ; Read PPUSTATUS
-	AND #$40                   ; Mask away everything except the sprite zero hit flag.
-	BNE VerifySpriteZeroHits_F ; Fail the test if the sprite zero hit occured.
-	INC $200                   ; Move this sprite to scanline 5.
-	LDA #2                     ; Page 2 for the OAM DMA
-	STA $4014                  ; Trigger the OAM DMA
-	JSR WaitForVBlank          ; Wait for vblank
-	JSR EnableRendering        ; Draw both the background and sprites.	
-	JSR WaitForVBlank          ; Wait for vblank
-	LDA $2002                  ; Read PPUSTATUS
-	AND #$40                   ; Mask away everything except the sprite zero hit 
-	RTS                        ; and return.
-;;;;;;;
-VerifySpriteZeroHits_F:
-	LDA #0
-	RTS
-;;;;;;;
-
 	
 FAIL_SuddenlyResizeSprite:
 	JMP TEST_Fail
@@ -2257,56 +1575,6 @@ ReadFrom2002WithExactTiming:
 	; and we re-enable rendering exactly one scanline from now.
 	JSR Clockslide_50
 	JSR Clockslide_31
-	RTS
-;;;;;;;
-
-
-
-Sync_ToSpriteFlagsClearing:
-	; see TEST_2002FlagTiming
-	SEI
-	LDA #$00
-	STA $4017 ; enable the frame counter IRQ. (Used to determine get/put cycle later)
-	; We actually want to sync to the moment the sprite flags are cleared, rather than vblank beginning.
-	; This will be a lot easier if we use the sprite overflow flag, rather than sprite zero hit.
-	; Right now, page 7 should be all zeroes, which is convenient, because if used a OAM data that would set the sprite overflow flag.
-	JSR WaitForVBlank ; rough VBL sync. We are somewhere between dot 25, and dot 47. Assume 47 since that's the extreme that's ahead.
-	LDA #7
-	STA $4014
-	JSR DisableRendering
-	; Assume we're on scanline 245, dot 336.
-	; Aim for the end of the CPU read occuring on scanline 0 dot 1.
-	
-	JSR ClockslideFromWord
-	.word 1914
-	LDA <$00
-	LDX #0
-Sync_ToSpriteFlagsClearingLoop:
-	LDA #$08
-	NOP
-	STA $2001 ; rendering enabled on dot 321 of scanline 0. (this first time this is ran, at least.)
-	JSR ReadFrom2002WithExactTiming
-	TYA
-	AND #$20
-	STA <$50 ; stalling for 3 cycles without changing flags.
-	NOP
-	NOP
-	NOP
-	NOP
-	BNE Sync_ToSpriteFlagsClearingLoop
-	
-	LDA #0
-	LDX #0
-	.byte $1F
-	.word $4015 ; SLO $4015, X
-	; if this next cycle is a "get", A = $00. If this next cycle is a "put" A = $80.
-	; if the write to $4014 is on a "get" cycle, then there's a 1 cycle delay.
-	PHA
-	LDA #2
-	STA $4014
-	PLA
-	BMI Sync_TSFC_Get
-Sync_TSFC_Get:	
 	RTS
 ;;;;;;;
 
@@ -3343,7 +2611,7 @@ TEST_OpenBus:
 	LDA $5501
 	CMP #$55
 	BNE TEST_Fail
-	LDA $4020
+	LDA $4018
 	CMP #$40
 	BNE TEST_Fail
 	LDA $5FFF
@@ -8478,7 +7746,6 @@ TEST_APURegActivation_YSkip3:
 	JMP TEST_APURegActivation_Finale ; I moved this part because it contains a lot of bytes, and ruined a bunch of branches.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 FAIL_APURegActivation2:
 	LDA #$40
 	STA $4017
@@ -8486,11 +7753,6 @@ FAIL_APURegActivation2:
 	STA $4015
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
-
-	.bank 2	; If I don't do this, the ROM won't compile.
-	.org $C000
-	; and 33 00s in a row for a nice and neat silent DPCM sample.
-	.byte $00,  $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 
 FAIL_DMA_Timing:
 	LDA #$40
@@ -8533,8 +7795,40 @@ TEST_DMA_Plus_4015R:
 	RTS
 ;;;;;;;
 
-
+TEST_APURegActivation_Finale:
+	LDA #0
+	STA $4015
+	; The controller ports might not have been visible by the OAM DMA, but did the controller ports get clocked?
+	; This used to be an error code, but different consoles behave differently, so let's just print if it did or not.
+	LDA #0
+	STA <dontSetPointer ; prep this, since we're drawing stuff.
+	LDA $4016
+	LDA $4016	; it is assumed the B button is not pressed during the test.
+	LSR A
+	BCS TEST_APURegActivation_ConflictClocked	
+	; And the controller ports were NOT clocked here!
+	LDA <RunningAllTests
+	BNE TEST_APURegActivation_Res1
+	JSR PrintTextCentered
+	.word $2350
+	.byte "OAM DMA Bus Conflict no Clock", $FF
+	JSR ResetScroll
+TEST_APURegActivation_Res1:
+	LDA #5 ; Success Code 1
+	RTS
 	
+TEST_APURegActivation_ConflictClocked:
+	; Bingo! Look at that. The controller ports *were* clocked, but did not appear in OAM!
+	LDA <RunningAllTests
+	BNE TEST_APURegActivation_Res2
+	JSR PrintTextCentered
+	.word $2350
+	.byte "OAM DMA Bus Conflict Clocks", $FF
+	JSR ResetScroll
+TEST_APURegActivation_Res2:
+	LDA #9 ; Success Code 2
+	RTS
+;;;;;;;
 
 TEST_DMA_Plus_4016R:
 	;;; Test 1 [DMA + $4016 Read]: Does the DMA Update the read-sensitive controller port? (also doubles as a test for DMA timing) ;;;
@@ -8578,6 +7872,12 @@ TEST_DMA_Plus_4016R_SkipText1:
 	LDA #5 ; Success code 1. NES / AV Famicom.
 	RTS
 ;;;;;;;
+	; It's a bit silly putting the new bank right here in the middle of this test, but hey- we can branch around this audio sample...
+	.bank 2	; If I don't do this, the ROM won't compile.
+	.org $C000
+	; and 33 00s in a row for a nice and neat silent DPCM sample.
+	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+
 DMA_Plus_4016R_TryFamicomControllerBehavior:
 	LDA <$51
 	ORA #7
@@ -8597,6 +7897,8 @@ TEST_DMA_Plus_4016R_SkipText2:
 	LDA #9 ; Success code 2. Famicom.
 	RTS
 ;;;;;;;
+
+
 
 FAIL_DMA_Plus_4016R:
 FAIL_ControllerStrobing:
@@ -8659,41 +7961,6 @@ TEST_ControllerStrobing:
 	
 	;; END OF TEST ;;
 	LDA #1
-	RTS
-;;;;;;;
-
-TEST_APURegActivation_Finale:
-	LDA #0
-	STA $4015
-	; The controller ports might not have been visible by the OAM DMA, but did the controller ports get clocked?
-	; This used to be an error code, but different consoles behave differently, so let's just print if it did or not.
-	LDA #0
-	STA <dontSetPointer ; prep this, since we're drawing stuff.
-	LDA $4016
-	LDA $4016	; it is assumed the B button is not pressed during the test.
-	LSR A
-	BCS TEST_APURegActivation_ConflictClocked	
-	; And the controller ports were NOT clocked here!
-	LDA <RunningAllTests
-	BNE TEST_APURegActivation_Res1
-	JSR PrintTextCentered
-	.word $2350
-	.byte "OAM DMA Bus Conflict no Clock", $FF
-	JSR ResetScroll
-TEST_APURegActivation_Res1:
-	LDA #5 ; Success Code 1
-	RTS
-	
-TEST_APURegActivation_ConflictClocked:
-	; Bingo! Look at that. The controller ports *were* clocked, but did not appear in OAM!
-	LDA <RunningAllTests
-	BNE TEST_APURegActivation_Res2
-	JSR PrintTextCentered
-	.word $2350
-	.byte "OAM DMA Bus Conflict Clocks", $FF
-	JSR ResetScroll
-TEST_APURegActivation_Res2:
-	LDA #9 ; Success Code 2
 	RTS
 ;;;;;;;
 
@@ -12048,7 +11315,7 @@ TEST_ImpliedDummyRead_Continue2:
 	; [Read opcode from $4015. Hopefully, a JSR.]
 	;
 	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed3, which sets $60 and jumps to TEST_ImpliedDummyRead_PostPHP.
-	.org $D73D	; PHP should push $3C to the stack, so the RTS instruction would return here:
+	.org $D53D	; PHP should push $3C to the stack, so the RTS instruction would return here:
 TEST_ImpliedDummyRead_PostPHP:
 	LDA <$60
 	BEQ FAIL_ImpliedDummyRead4
@@ -13475,6 +12742,302 @@ TEST_ImplicitDMAAbort_AltKey2:
 TEST_ImplicitDMAAbort_AltKey3:
 	.byte $00, $00, $00, $00, $00, $00, $00, $00, $04, $04, $04, $04, $04, $04, $04, $04
 	
+TEST_RunSHASHS_AddrInitAXYFS:
+	;.word TargetAddress
+	;.byte Initial, A, X, Y, Flags, StackPointer
+	;.word ResultAddress
+	;.byte result, r_A, r_X, r_Y, r_Flags, r_StackPointer
+	STA <$FF
+	JSR CopyReturnAddressToByte0
+	LDY #0
+	LDX #0
+TEST_RunSHASHS_PreLoop:
+	LDA [$0000],Y
+	STA <Test_UnOp_OperandTargetAddrLo,X
+	INY
+	INX
+	CPX #16 ; Set up $28 through $2F
+	BNE TEST_RunSHASHS_PreLoop
+	; With the variables all set up, let's prep the test:
+	JSR FixRTS
+	LDX <Test_UnOp_ExpectedResultAddrLo
+	JSR WriteFFOnEachPageOffsetX
+	JSR TEST_UnOpRunTest
+	LDX <Test_UnOp_ExpectedResultAddrLo
+	JSR RestoreTestResultFromBehavior3
+	; Evaluating the test.
+	LDA <initialSubTest
+	STA <ErrorCode
+	JSR Test_UnOpSHASHS_Behavior3
+	; If you made it this far, we passed this test!
+	; (not necessarily the entire suite, but this specific test, at least)
+	LDA UnOpTest_Opcode ; reset this value before the next test, assuming another one follows
+	RTS
+;;;;;;;
+
+Test_UnOpSHASHS_Behavior3:
+	LDX <Test_UnOp_ExpectedResultAddrLo
+	JSR ANDByteOnEachPageOffsetX
+	CMP <Test_UnOp_ValueAtAddressResult
+	BNE FAIL_SHASHS3_Test ; Error code 1: The result at the expected address was incorrect
+	INC <ErrorCode
+	LDA <Copy_A
+	CMP <Test_UnOp_CMP
+	BNE FAIL_SHASHS3_Test ; Error code 2: The result of the A register was incorrect
+	INC <ErrorCode
+	LDX <Copy_X
+	CPX <Test_UnOp_CPX
+	BNE FAIL_SHASHS3_Test ; Error code 3: The result of the X register was incorrect
+	INC <ErrorCode
+	LDY <Copy_Y
+	CPY <Test_UnOp_CPY
+	BNE FAIL_SHASHS3_Test ; Error code 4: The result of the Y register was incorrect
+	INC <ErrorCode
+	LDA <Copy_Flags
+	CMP <Test_UnOp_CM_Flags
+	BNE FAIL_SHASHS3_Test ; Error code 5: The result of the flags were incorrect
+	INC <ErrorCode
+	LDA <Copy_SP2
+	CMP <Test_UnOp_CPS
+	BNE FAIL_SHASHS3_Test ; Error code 6: The result of the stack pointer was incorrect
+	RTS ; Pass!
+FAIL_SHASHS3_Test:
+	PLA	; Pull of the Return Address
+	PLA	;
+	PLA
+	PLA
+	JMP TEST_Fail ; and fail the test.
+
+ANDByteOnEachPageOffsetX:
+	; The idea here is that all of these except for one have the value $FF.
+	; Therefore, by the time we hit RTS, we read the value we're looking for in A.
+	LDA #$FF
+	AND <$00, X
+	AND $100, X
+	AND $200, X
+	AND $300, X
+	AND $400, X
+	AND $500, X
+	AND $600, X
+	AND $700, X
+	RTS
+;;;;;;;
+
+WriteFFOnEachPageOffsetX:
+	; Initialize stuff for these "behavior 3" tests.
+	; Oh hey wait- this overwrites page 4. That's not good.
+	; But like- behavior 3 assumes that writing to page 4 is a possibility, so...
+	LDA $400, X
+	; Where would this never write to?
+	STA $7FF ; Pretty sure I never use $FF as the address low byte.
+	; This would also pollute page 3, the uninitialized RAM data.
+	LDA $300, X
+	STA $7FE
+	
+	LDA #$FF
+	STA <$00, X
+	STA $100, X
+	STA $200, X
+	STA $300, X
+	STA $400, X
+	STA $500, X
+	STA $600, X
+	STA $700, X
+	RTS
+;;;;;;;
+
+RestoreTestResultFromBehavior3:
+	LDA $7FF
+	STA $400, X
+	LDA $7FE
+	STA $300, X
+	RTS
+;;;;;;;
+
+TEST_SHS_Behavior3_9B
+	PHA ; just used to prevent issues with the PLA in ErrorCodeF
+	LDX #0
+	JSR ANDByteOnEachPageOffsetX
+	CMP #$FF
+	BEQ FAIL_SHA_SHS_ErrorCodeF
+	JMP TEST_SHS_Behavior3
+
+
+
+TEST_SHA_Behavior3_93:
+	LDA #$93
+	PHA ; push the opcode. This just lets me re-use the upcoming code.
+	
+	LDA <RunningAllTests
+	BNE TEST_SHA_JMPto_Behavior3
+	
+	LDA #0
+	STA <dontSetPointer
+	JSR PrintTextCentered
+	.word $22B0
+	.byte " SHA Behavior 3", $FF
+	JSR ResetScrollAndWaitForVBlank
+TEST_SHA_JMPto_Behavior3:
+	JMP TEST_SHA_Behavior3
+	
+FAIL_SHA_SHS_ErrorCodeF:
+	PLA ; pull off the opcode of the test.
+	LDA #$3E ; (Error code F) 
+	RTS	
+	
+TEST_SHA_Behavior3_9F:
+	LDA #$9F
+	PHA ; push the opcode. This just lets me re-use the upcoming code.
+	LDA <RunningAllTests
+	BNE TEST_SHA_Behavior3
+	
+	LDA #0
+	STA <dontSetPointer
+	JSR PrintTextCentered
+	.word $22B0
+	.byte " SHA Behavior 3", $FF
+	JSR ResetScrollAndWaitForVBlank
+	
+TEST_SHA_Behavior3:
+	; Okay, so your CPU decided to make this as difficult as possible by introducing a magic number into the ABH corruption.
+	; When the SHA instruction's indexing crosses a page boundary, the typical result is `ABH = (ABH+1) & A`, or perhaps `ABH = (ABH+1) & A & X`.
+	; However, it would appear this console's (or emulator's) result is actually `ABH = (ABH+1) & (A | MAGIC)`. Or maybe there's an X in there too, I have no idea.
+	; and since it's impossible on an NROM cartridge to actually know exactly what address / mirror was specifically written to, we cannot know, nor make assumptions.
+	; therefore, all we know is the low byte of the target address.
+	; We're not actually able to calculate this "MAGIC" value, because we cannot actually know which address / mirror gets written to.
+	; in other words, we're going to simply check $0xx, $1xx, $2xx, $3xx, $4xx, $5xx, $6xx, and $7xx after every test.
+
+	; Final checks. If every one of these addresses ($000, $100, $200...) is still $FF, then fail the test.
+	LDX #0
+	JSR ANDByteOnEachPageOffsetX
+	CMP #$FF
+	BEQ FAIL_SHA_SHS_ErrorCodeF
+	
+	; The worst part about all of this is the magic number could cancel out the bitwise AND entirely, nullifying the ABH corruption, but *oh well*.
+	; I guess if you didn't even implement the ABH corruption into your emulator you get to pass the SHA and SHS instructions, but I will judge you. Heh.
+	PLA
+	JSR TEST_UnOp_Setup; Set the opcode
+	; This test for "behavior 3" differs from all know documentation, and is honestly annoying to work with, and was a nightmare to reserach.
+	; Special thanks to SNS_Dominic for their Verilog reserach allowing us to discover there's a magic number affecting ABH.
+	; Write: A & (X | Magic) & H
+	; Hi = Hi & (X | Magic) ; NOTE: this magic number is not the same magic number used in the value written
+	
+	; We can not make any assumptions on what "magic" is. Therefore, X needs to always be FF.
+	JSR TEST_RunSHASHS_AddrInitAXYFS
+	.word $0555
+	.byte $FF
+	.byte $FF, $FF, $00, (flag_i), $80
+	.word $0555
+	.byte $06
+	.byte $FF, $FF, $00, (flag_i), $80
+	
+	JSR TEST_RunSHASHS_AddrInitAXYFS
+	.word $1D60
+	.byte $FF
+	.byte $03, $FF, $00, (flag_i), $80
+	.word $0560
+	.byte $02
+	.byte $03, $FF, $00, (flag_i), $80
+	
+	; Now to make the high byte go unstable.
+	JSR TEST_RunSHASHS_AddrInitAXYFS
+	.word $1F50 ; $1E90 will be the operand.
+	.byte $FF
+	.byte $0A, $FF, $80, (flag_i | flag_c | flag_z | flag_v), $80
+	.word $0750
+	.byte $0A
+	.byte $0A, $FF, $80, (flag_i | flag_c | flag_z | flag_v), $80
+	; the high byte will only be ANDed with X (FF in this case)
+	
+	; And now to test if the value written is still ANDed with H if the cycle before the write had a DMA.
+	PHA
+	LDA #$20
+	STA $0580
+	LDA #Low(DMASync_50MinusACyclesRemaining)
+	STA $0581
+	LDA #High(DMASync_50MinusACyclesRemaining)
+	STA $0582	
+	LDA #$7
+	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 6 is probably the only one that will show up.
+	PLA
+	
+	JSR TEST_RunSHASHS_AddrInitAXYFS
+	.word $0568
+	.byte $5A
+	.byte $8F, $FF, $00, (flag_i), $80
+	.word $0568
+	.byte $8F	; H isn't part of the equation anymore.
+	.byte $8F, $FF, $00, (flag_i), $80
+	
+	;; END OF TEST ;;
+	LDA #13	; Pass, "code 3"
+	RTS
+;;;;;;;
+
+TEST_SHS_Behavior3:
+	PLA
+	LDA <RunningAllTests
+	BNE TEST_SHS_Behavior3_Skip
+	LDA #0
+	STA <dontSetPointer
+	JSR PrintTextCentered
+	.word $22D0
+	.byte " SHS Behavior 3", $FF
+	JSR ResetScrollAndWaitForVBlank
+TEST_SHS_Behavior3_Skip:
+	
+	LDA #$9B
+	JSR TEST_UnOp_Setup; Set the opcode
+	JSR TEST_RunSHASHS_AddrInitAXYFS
+	.word $0555
+	.byte $FF
+	.byte $FF, $FF, $00, (flag_i), $FF
+	.word $0555
+	.byte $06
+	.byte $FF, $FF, $00, (flag_i), $FF
+	
+	JSR TEST_RunSHASHS_AddrInitAXYFS
+	.word $1D00
+	.byte $FF
+	.byte $03, $FF, $00, (flag_i), $ff
+	.word $0500
+	.byte $02
+	.byte $03, $FF, $00, (flag_i), $03
+	
+	JSR TEST_RunSHASHS_AddrInitAXYFS
+	.word $1F60 ; $1E90 will be the operand.
+	.byte $FF
+	.byte $0A, $FF, $80, (flag_i | flag_c | flag_z | flag_v), $5E
+	.word $0760
+	.byte $0A
+	.byte $0A, $FF, $80, (flag_i | flag_c | flag_z | flag_v), $0A
+
+	PHA
+	LDA #$20
+	STA $0580
+	LDA #Low(DMASync_50MinusACyclesRemaining)
+	STA $0581
+	LDA #High(DMASync_50MinusACyclesRemaining)
+	STA $0582	
+	LDA #$7
+	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 7 is probably the only one that will show up.
+	PLA
+	
+	JSR TEST_RunSHASHS_AddrInitAXYFS
+	.word $0568
+	.byte $5A
+	.byte $8F, $FF, $00, (flag_i), $9F
+	.word $0568
+	.byte $8F
+	.byte $8F, $FF, $00, (flag_i), $8F
+
+;; END OF TEST ;;
+	LDA #13	; Pass "code 2"
+	RTS
+;;;;;;;
+	
+	.bank 3
+	.org $E000
 
 TEST_ControllerClocking_Strobe:
 	LDA #1
@@ -13483,10 +13046,6 @@ TEST_ControllerClocking_Strobe:
 	STA $4016 ; Write 0 to $4016 to finish strobing the controller.
 	RTS
 ;;;;;;;
-
-
-	.bank 3
-	.org $E000
 
 TEST_ControllerClocking_JMP_Famicom:
 	JMP TEST_ControllerClocking_FamicomBehavior
@@ -13680,103 +13239,6 @@ TEST_ControllerClocking_FamicomBehavior:
 	JSR ResetScroll
 TEST_ControllerClocking_SkipT2:
 	LDA #9 ; success code 2. (Famicom)
-	RTS
-;;;;;;;
-
-
-Sync_ToPreRenderDot324:
-	; Syncing the CPU to dot 1 of Line 0 is not very easy, since there's the even/odd frame skipping dot 0 issue.
-	SEI
-	LDA #$00
-	STA $4017 ; enable the frame counter IRQ. (Used to determine get/put cycle later)
-	JSR WaitForVBlank
-	JSR New_VBL_Sync
-	; (this function syncs to cycle 0 of scanline 241)
-	; However, we do not know if this is an even or an odd frame.
-	; If this is an even frame and rendering is enabled, dot 0 is skipped, which means the next VBlank would be 1 dot earlier.
-	; VBlank flag is set on cycle 1 of scanline 241.
-	; Each scanline has 341 cycles, and there are 262 scanlines. 341*262 = 89342
-	; Which means there is either 29780.33 or 29780.66 CPU cycles until next VBlank.
-	; So to verify if this is an even or odd frame, we [enable rendering, wait 1 frame, disable rendering, wait 1 frame] 3 times.
-	; At which point, the VBlank flag will be set exactly 1 CPU cycle later on odd frames than on an even frame.
-	; This tells us what the alignment is, at which point we can stall for precise amounts of CPU cycles to line things up depending on if this is even or odd.
-	JSR EnableRendering
-	JSR Clockslide_29780
-	JSR DisableRendering
-	JSR Clockslide_29780
-	
-	JSR EnableRendering
-	JSR Clockslide_29780
-	JSR DisableRendering
-	JSR Clockslide_29780
-
-	JSR EnableRendering
-	JSR Clockslide_29780
-	JSR DisableRendering
-	JSR Clockslide_29780
-	; Okay, after all that has occurred, we are either on:
-	; Scanline 241, cycle 205 (ODD FRAME)
-	; Scanline 241, cycle 208 (EVEN FRAME)
-	;
-	; Keep rendering disabled.
-	; Wait until a few cycles before VBlank, then read from $2002.
-	; There's either:
-	; (89342 - (341+205)) = 88796 PPU Cycles, or 29598.66 CPU cycles (ODD FRAME)
-	; (89342 - (341+208)) = 88793 PPU Cycles, or 29597.66 CPU cycles (EVEN FRAME)
-	; So let's stall for 29595 Cycles and go from there.
-	JSR ClockslideFromWord
-	.word 29595
-	; 2.66 or 3.66 cycles to go.
-	LDA $2002
-	PHA
-	JSR ClockslideFromWord
-	.word 1791
-
-	PLA
-	BPL Sync_ToLine0Dot1_Odd
-Sync_ToLine0Dot1_Even:
-	; 13.33 CPU cycles
-	LDA <$00
-	; Current objective: Determine if we are on a "get" or "put" cycle.
-	LDA #0
-	LDX #0
-	.byte $1F
-	.word $4015 ; SLO $4015, X
-	; if this next cycle is a "get", A = $00. If this next cycle is a "put" A = $80.
-	; if the write to $4014 is on a "get" cycle, then there's a 1 cycle delay.
-	PHA
-	LDA #2
-	STA $4014
-	PLA
-	BMI Sync_ToLine0Dot1_Get
-Sync_ToLine0Dot1_Get:
-	JSR EnableRendering
-	RTS
-Sync_ToLine0Dot1_Odd:
-	; 11.33 CPU cycles
-	NOP
-	NOP
-	JSR ClockslideFromWord
-	.word 59560
-	; Current objective: Determine if we are on a "get" or "put" cycle.
-	LDA #0
-	LDX #0
-	.byte $1F
-	.word $4015 ; SLO $4015, X
-	; if this next cycle is a "get", A = $00. If this next cycle is a "put" A = $80.
-	; if the write to $4014 is on a "get" cycle, then there's a 1 cycle delay.
-	PHA
-	LDA #2
-	STA $4014
-	PLA
-	BMI Sync_ToLine0Dot1_Get2
-Sync_ToLine0Dot1_Get2:
-	JSR EnableRendering
-	RTS
-;;;;;;;
-
-Sync_ToLine0Dot1:
-	JSR Sync_ToPreRenderDot324
 	RTS
 ;;;;;;;
 	
@@ -15541,10 +15003,107 @@ DPCM_Sample_05:
 	.byte $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05
 	.byte $05
 		
+MarkTestToSkip:
+	STX <Copy_X
+	LDX <menuCursorYPos           ; X = which test from the current suite
+	TXA
+	ASL A				          ; Double X, since we're reading a 2-byte word from a list of 2-byte words.
+	TAX
+	
+	LDA <suitePointerList+1,X
+	CMP #3	; if the page used to store the results is page 3 instead of page 4, it's a DRAW test. Forbid skipping it.
+	BEQ MarkTestToSkip_RTS
+	
+	LDA <suitePointerList,X	      ; read the low byte of where to store the test results.
+	STA <TestResultPointer        ; and store it in RAM
+	LDA <suitePointerList+1,X     ; read the high byte of where to store the test results.
+	STA <TestResultPointer+1      ; and store it in RAM next to the low byte.
+	
+	LDY #0                        ; set up Y for the upcoming indirect reads.
+	LDA [TestResultPointer],Y     ; check if this test is already marked to be skipped.
+	CMP #$FF                      ; If the "test results" are $FF, we need to clear it to zero.
+	BEQ MarkTestToUnSkip
+	LDA #$FF                      ; Mark this test to be skipped by storing $FF in the results.
+	STA [TestResultPointer],Y
+	BNE MarkTestToSkip_UpdateNametable	
+MarkTestToUnSkip:
+	LDA #0                        ; Mark this test as not-yet-ran.
+	STA [TestResultPointer],Y
+MarkTestToSkip_UpdateNametable:
+	LDX <menuCursorYPos
+	JSR DrawTEST
+	JSR UpdateTESTAttributes
+	LDA <AutomateTestSuite        ; I use AutomateTestSuite when pressing B to mark all tests on a suite to be skipped.
+	BNE MarkTestToSkip_RTS
+	JSR HighlightTest
+MarkTestToSkip_RTS:
+	LDX <Copy_X
+	RTS
+;;;;;;;
+
+SkipSuiteName:
+	LDA [AllTestMenuTestNameOffsetLo],Y ; Read from the pointer
+	INY
+	CMP #$FF
+	BNE SkipSuiteName
+	TYA
+	CLC
+	ADC <AllTestMenuTestNameOffsetLo
+	STA <AllTestMenuTestNameOffsetLo
+	BCC SkipSuiteName0
+	INC <AllTestMenuTestNameOffsetHi ; If needed, INC the high byte
+SkipSuiteName0:
+	RTS
+;;;;;;;
+
+AddYToNameOffset: ; This function adds the A register to the word at $0000
+	TYA
+	CLC
+	ADC #4
+	BCC AddYToNameOffset0
+	INC <AllTestMenuTestNameOffsetHi ; If needed, INC the high byte
+AddYToNameOffset0:
+	CLC
+	ADC <AllTestMenuTestNameOffsetLo
+	STA <AllTestMenuTestNameOffsetLo
+	BCC AddYToNameOffset1
+	INC <AllTestMenuTestNameOffsetHi ; If needed, INC the high byte
+AddYToNameOffset1:
+	RTS
+;;;;;;;
+		
 	.org $EDC0	
 DPCM_Sample_90:
 	.byte $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90
 	.byte $90
+	
+DMASyncWithXX_Start: ; I moved this to a subroutien so I can save bytes.
+	PHA
+	LDA #$4F ; loop, max speed.
+	STA $4010
+	LDA #0
+	STA $4011 ; minimum value of DMC
+	PLA
+	STA $4012 ; Sample address.
+	LDA #0
+	STA $4013 ; 1 byte length.
+	LDA #$14
+	STA $4015 ; Start the DMC DMA loop
+	RTS
+;;;;;;;
+DMASyncWithXX_End: ; I moved this to a subroutine so I can save bytes.
+	LDA #$0F ; don't loop, continue at max speed. +2 (9)
+	STA $4010 
+	LDA <$00  
+	LDA Copy_A
+	JSR Clockslide_100 ; Note to self, do not try to optimize with ClockslideFromWord, as write cycles throw off the DMA timing.
+	JSR Clockslide_100 ; ^
+	JSR Clockslide_100 ; ^
+	JSR Clockslide_38  ; ^
+	NOP                ; ^
+	CMP <$C9           ; ^
+	RTS
+;;;;;;;
 
 	.org $EE40	
 DPCM_Sample_68:
@@ -15556,15 +15115,151 @@ DPCM_Sample_A5:
 	.byte $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5
 	.byte $A5
 	
+SetPPUSCROLLFromWord:	; pretty much the same as SetPPUADDRFromWord, but it writes to $2005.
+	STA <$FF
+	STY <$FE
+	JSR CopyReturnAddressToByte0
+	LDA $2002
+	LDY #0
+	LDA [$0000],Y
+	STA $2005
+	INY
+	LDA [$0000],Y
+	STA $2005
+	INY
+	JSR FixRTS
+	LDY <$FE
+	LDA <$FF
+	RTS
+;;;;;;;
+	
 	.org $EEC0	
 DPCM_Sample_60:
 	.byte $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60
 	.byte $60
+	
+SetUpSpriteZero:
+	JSR CopyReturnAddressToByte0
+	LDY #0
+SetUpSpriteZero_Loop:
+	LDA [$0000], Y
+	STA $200, Y
+	INY
+	CPY #$4
+	BNE SetUpSpriteZero_Loop
+	JSR FixRTS
+	RTS
+;;;;;;;
 
 	.org $EF00	
 DPCM_Sample_48:
 	.byte $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48
 	.byte $48
+	
+DMASyncWith40:
+	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
+	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
+	STA <Copy_A
+	LDA #$F8 ; Sample address $FE00.
+	JSR DMASyncWithXX_Start
+DMASync40_Loop:
+	LDA $5000 ; Open bus! Either we will read $40 from the high byte, or $00 from the DMA.
+	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
+	CMP #$40
+	BNE DMASync40_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
+	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
+	RTS 
+;;;;;;;
+
+DMASyncWith48:
+	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
+	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
+	STA <Copy_A	
+	LDA #$BC ; Sample address $EF00.
+	JSR DMASyncWithXX_Start
+DMASync48_Loop:
+	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $48 from the DMA.
+	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
+	CMP #$48
+	BNE DMASync48_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
+	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
+	RTS
+;;;;;;;
+	
+DMASyncWith60:
+	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
+	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
+	STA <Copy_A
+	LDA #$BB ; Sample address $EEC0.
+	JSR DMASyncWithXX_Start
+DMASync60_Loop:
+	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $60 from the DMA.
+	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
+	CMP #$60
+	BNE DMASync60_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
+	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
+	RTS
+;;;;;;;
+	
+DMASyncWithA5:
+	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
+	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
+	STA <Copy_A
+	LDA #$BA ; Sample address $EE80.
+	JSR DMASyncWithXX_Start
+DMASyncA5_Loop:
+	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $A5 from the DMA.
+	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
+	CMP #$A5
+	BNE DMASyncA5_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
+	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
+	RTS
+;;;;;;;
+	
+DMASyncWith68:
+	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
+	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
+	STA <Copy_A
+	LDA #$B9 ; Sample address $EE40.
+	JSR DMASyncWithXX_Start
+DMASync68_Loop:
+	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $68 from the DMA.
+	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
+	CMP #$68
+	BNE DMASync68_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
+	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
+	RTS
+;;;;;;;
+	
+DMASyncWith90:
+	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
+	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
+	STA <Copy_A
+	LDA #$B7 ; Sample address $EDC0.
+	JSR DMASyncWithXX_Start
+DMASync90_Loop:
+	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $90 from the DMA.
+	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
+	CMP #$90
+	BNE DMASync90_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
+	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
+	RTS
+;;;;;;;
+	
+DMASyncWith05:
+	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
+	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
+	STA <Copy_A
+	LDA #$B5 ; Sample address $EDC0.
+	JSR DMASyncWithXX_Start
+DMASync05_Loop:
+	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $05 from the DMA.
+	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
+	CMP #$05
+	BNE DMASync05_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
+	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
+	RTS
+;;;;;;;
 	
 	.org $EFC0
 TEST_DMC_ConflictsSample:
@@ -15572,7 +15267,7 @@ TEST_DMC_ConflictsSample:
 	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	.byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
 	.byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
-
+	; yes, the sample does technically include the first byte at $F000, but the test that uses this sample doesn't care.
 ; Just a ton of helper functions letting me save some bytes in the tests, and also key functions for loading and navigating the main menu.
 	.org $F000
 
@@ -15805,7 +15500,7 @@ PTloop:
 	CMP #$FF
 	BEQ PTpostLoop
 	TAX
-	LDA AsciiToCHR, X ; convert from ascii to my 0123456789ABCDEFGHI... format
+	LDA AsciiToCHR-32, X ; convert from ascii to my 0123456789ABCDEFGHI... format
 	LDX <HighlightTextPrinted
 	BEQ PT_SkipHighlight
 	ORA #$80
@@ -15875,7 +15570,7 @@ PTCloop:
 	CMP #$FF
 	BEQ PTCpostLoop
 	TAX
-	LDA AsciiToCHR, X ; convert from ASCII to my 0123456789ABCDEFGHI... format
+	LDA AsciiToCHR-32, X ; convert from ASCII to my 0123456789ABCDEFGHI... format
 	LDX <HighlightTextPrinted
 	BEQ PTC_SkipHighlight
 	ORA #$80
@@ -16384,25 +16079,25 @@ DrawTEST_Print:
 	TAY
 	LDA TestPassFailBlend,Y
 	TAY
-	LDA AsciiToCHR,Y
+	LDA AsciiToCHR-32,Y
 	STA $2007
 	TXA
 	TAY
 	LDA TestPassFailBlend+6,Y
 	TAY
-	LDA AsciiToCHR,Y
+	LDA AsciiToCHR-32,Y
 	STA $2007
 	TXA
 	TAY
 	LDA TestPassFailBlend+12,Y
 	TAY
-	LDA AsciiToCHR,Y
+	LDA AsciiToCHR-32,Y
 	STA $2007
 	TXA
 	TAY
 	LDA TestPassFailBlend+18,Y
 	TAY
-	LDA AsciiToCHR,Y
+	LDA AsciiToCHR-32,Y
 	STA $2007
 	TXA
 	AND #$3
@@ -17511,6 +17206,185 @@ VblSync_Plus_A_End: ; Moved here for space. This is the end of the VblSync_Plus_
 	RTS
 ;;;;;;;
 
+VerifySpriteZeroHits:
+	                           ; STEP ONE: Intentionally miss a sprite zero hit.
+	JSR DisableRendering       ; Disable rendering so the following can happen even out of vblank.
+	JSR ClearNametable2_With24 ; Clear nametable 2 with tile $24 (empty tiles)
+	JSR ClearPage2             ; Clear Page 2 with all $FFs
+	JSR SetUpSpriteZero        ; Prepare sprite zero with the following values:
+	.byte $04, $C0, $03, $08   ; Single dot on scanline 4, X = 08
+	JSR PrintCHR               ; Update nametable
+	.word $2C21                ; Single dot to overlap the sprite. (we're intentionally missing this one though.)
+	.byte $C0, $FF             ; This will trigger the sprite zero hit.
+	JSR SetPPUADDRFromWord     ; Update t
+	.byte $2C, $00             ; This is also needed for the sprite zero hit.
+	LDA #2                     ; Page 2 for the OAM DMA
+	STA $4014                  ; Trigger the OAM DMA
+	JSR WaitForVBlank          ; Wait for vblank
+	JSR EnableRendering        ; Draw both the background and sprites.	
+	JSR WaitForVBlank          ; Wait for vblank
+	LDA $2002                  ; Read PPUSTATUS
+	AND #$40                   ; Mask away everything except the sprite zero hit flag.
+	BNE VerifySpriteZeroHits_F ; Fail the test if the sprite zero hit occured.
+	INC $200                   ; Move this sprite to scanline 5.
+	LDA #2                     ; Page 2 for the OAM DMA
+	STA $4014                  ; Trigger the OAM DMA
+	JSR WaitForVBlank          ; Wait for vblank
+	JSR EnableRendering        ; Draw both the background and sprites.	
+	JSR WaitForVBlank          ; Wait for vblank
+	LDA $2002                  ; Read PPUSTATUS
+	AND #$40                   ; Mask away everything except the sprite zero hit 
+	RTS                        ; and return.
+;;;;;;;
+VerifySpriteZeroHits_F:
+	LDA #0
+	RTS
+;;;;;;;
+
+Sync_ToSpriteFlagsClearing:
+	; see TEST_2002FlagTiming
+	SEI
+	LDA #$00
+	STA $4017 ; enable the frame counter IRQ. (Used to determine get/put cycle later)
+	; We actually want to sync to the moment the sprite flags are cleared, rather than vblank beginning.
+	; This will be a lot easier if we use the sprite overflow flag, rather than sprite zero hit.
+	; Right now, page 7 should be all zeroes, which is convenient, because if used a OAM data that would set the sprite overflow flag.
+	JSR WaitForVBlank ; rough VBL sync. We are somewhere between dot 25, and dot 47. Assume 47 since that's the extreme that's ahead.
+	LDA #7
+	STA $4014
+	JSR DisableRendering
+	; Assume we're on scanline 245, dot 336.
+	; Aim for the end of the CPU read occuring on scanline 0 dot 1.
+	
+	JSR ClockslideFromWord
+	.word 1914
+	LDA <$00
+	LDX #0
+Sync_ToSpriteFlagsClearingLoop:
+	LDA #$08
+	NOP
+	STA $2001 ; rendering enabled on dot 321 of scanline 0. (this first time this is ran, at least.)
+	JSR ReadFrom2002WithExactTiming
+	TYA
+	AND #$20
+	STA <$50 ; stalling for 3 cycles without changing flags.
+	NOP
+	NOP
+	NOP
+	NOP
+	BNE Sync_ToSpriteFlagsClearingLoop
+	
+	LDA #0
+	LDX #0
+	.byte $1F
+	.word $4015 ; SLO $4015, X
+	; if this next cycle is a "get", A = $00. If this next cycle is a "put" A = $80.
+	; if the write to $4014 is on a "get" cycle, then there's a 1 cycle delay.
+	PHA
+	LDA #2
+	STA $4014
+	PLA
+	BMI Sync_TSFC_Get
+Sync_TSFC_Get:	
+	RTS
+;;;;;;;
+
+Sync_ToPreRenderDot324:
+	; Syncing the CPU to dot 1 of Line 0 is not very easy, since there's the even/odd frame skipping dot 0 issue.
+	SEI
+	LDA #$00
+	STA $4017 ; enable the frame counter IRQ. (Used to determine get/put cycle later)
+	JSR WaitForVBlank
+	JSR New_VBL_Sync
+	; (this function syncs to cycle 0 of scanline 241)
+	; However, we do not know if this is an even or an odd frame.
+	; If this is an even frame and rendering is enabled, dot 0 is skipped, which means the next VBlank would be 1 dot earlier.
+	; VBlank flag is set on cycle 1 of scanline 241.
+	; Each scanline has 341 cycles, and there are 262 scanlines. 341*262 = 89342
+	; Which means there is either 29780.33 or 29780.66 CPU cycles until next VBlank.
+	; So to verify if this is an even or odd frame, we [enable rendering, wait 1 frame, disable rendering, wait 1 frame] 3 times.
+	; At which point, the VBlank flag will be set exactly 1 CPU cycle later on odd frames than on an even frame.
+	; This tells us what the alignment is, at which point we can stall for precise amounts of CPU cycles to line things up depending on if this is even or odd.
+	JSR EnableRendering
+	JSR Clockslide_29780
+	JSR DisableRendering
+	JSR Clockslide_29780
+	
+	JSR EnableRendering
+	JSR Clockslide_29780
+	JSR DisableRendering
+	JSR Clockslide_29780
+
+	JSR EnableRendering
+	JSR Clockslide_29780
+	JSR DisableRendering
+	JSR Clockslide_29780
+	; Okay, after all that has occurred, we are either on:
+	; Scanline 241, cycle 205 (ODD FRAME)
+	; Scanline 241, cycle 208 (EVEN FRAME)
+	;
+	; Keep rendering disabled.
+	; Wait until a few cycles before VBlank, then read from $2002.
+	; There's either:
+	; (89342 - (341+205)) = 88796 PPU Cycles, or 29598.66 CPU cycles (ODD FRAME)
+	; (89342 - (341+208)) = 88793 PPU Cycles, or 29597.66 CPU cycles (EVEN FRAME)
+	; So let's stall for 29595 Cycles and go from there.
+	JSR ClockslideFromWord
+	.word 29595
+	; 2.66 or 3.66 cycles to go.
+	LDA $2002
+	PHA
+	JSR ClockslideFromWord
+	.word 1791
+
+	PLA
+	BPL Sync_ToLine0Dot1_Odd
+Sync_ToLine0Dot1_Even:
+	; 13.33 CPU cycles
+	LDA <$00
+	; Current objective: Determine if we are on a "get" or "put" cycle.
+	LDA #0
+	LDX #0
+	.byte $1F
+	.word $4015 ; SLO $4015, X
+	; if this next cycle is a "get", A = $00. If this next cycle is a "put" A = $80.
+	; if the write to $4014 is on a "get" cycle, then there's a 1 cycle delay.
+	PHA
+	LDA #2
+	STA $4014
+	PLA
+	BMI Sync_ToLine0Dot1_Get
+Sync_ToLine0Dot1_Get:
+	JSR EnableRendering
+	RTS
+Sync_ToLine0Dot1_Odd:
+	; 11.33 CPU cycles
+	NOP
+	NOP
+	JSR ClockslideFromWord
+	.word 59560
+	; Current objective: Determine if we are on a "get" or "put" cycle.
+	LDA #0
+	LDX #0
+	.byte $1F
+	.word $4015 ; SLO $4015, X
+	; if this next cycle is a "get", A = $00. If this next cycle is a "put" A = $80.
+	; if the write to $4014 is on a "get" cycle, then there's a 1 cycle delay.
+	PHA
+	LDA #2
+	STA $4014
+	PLA
+	BMI Sync_ToLine0Dot1_Get2
+Sync_ToLine0Dot1_Get2:
+	JSR EnableRendering
+	RTS
+;;;;;;;
+
+Sync_ToLine0Dot1:
+	JSR Sync_ToPreRenderDot324
+	RTS
+;;;;;;;
+
 	.org $FD00
 ;;;;;;;;;;;;;;;;;;;;; The clockslide here must be page-aligned.
 CSTable:            ; This is a clockslide.
@@ -17624,6 +17498,15 @@ CSWaste94Cy:        ;
     RTS             ; We're done here.
 ;;;;;;;;;;;;;;;;;;;;;
 
+AsciiToCHR:; This table converts the ASCII values stored in the ROM to the indexes into the pattern table I made. 
+	; (I omit the first 32 byte values, so when reading from this table you want to offset this by -32)
+	.byte $24, $26, $24, $24, $35, $24, $24, $24, $24, $24, $32, $30, $29, $31, $25, $33
+	.byte $00, $01, $02, $03, $04, $05, $06, $07, $08, $09, $28, $24, $24, $34, $24, $27
+	.byte $24, $0A, $0B, $0C, $0D, $0E, $0F, $10, $11, $12, $13, $14, $15, $16, $17, $18
+	.byte $19, $1A, $1B, $1C, $1D, $1E, $1F, $20, $21, $22, $23, $24, $24, $24, $24, $24
+	.byte $24, $0A, $0B, $0C, $0D, $0E, $0F, $10, $11, $12, $13, $14, $15, $16, $17, $18
+	.byte $19, $1A, $1B, $1C, $1D, $1E, $1F, $20, $21, $22, $23;, $24, $24, $24, $24, $24
+
 	.org $FDF3
 TEST_IFlagLatency_PageBoundaryTest:
 	;;; Test B [Interrupt Flag Latency]: Do branches poll for interrupts before cycle 4? (They should) ;;;
@@ -17673,39 +17556,7 @@ New_VBL_Sync_Loop2:
 ;;;;;;;
 
 	.org $FE49	
-DMASyncWith40:
-	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
-	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
-	STA <Copy_A
-	LDA #$4F ; loop, max speed.
-	STA $4010
-	LDA #0
-	STA $4011 ; minimum value of DMC
-	LDA #$F8
-	STA $4012 ; Sample address $FE00.
-	LDA #0
-	STA $4013 ; #1 * 16 + 1 = 17 byte length.
-	LDA #$14
-	STA $4015 ; Start the DMC DMA loop (with triangle playing)
-	NOP
-	NOP
-DMASync40_Loop:
-	LDA $5000 ; Open bus! Either we will read $40 from the high byte, or $00 from the DMA.
-	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
-	CMP #$40
-	BNE DMASync40_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
-	LDA #$0F ; don't loop, continue at max speed. +2 (9)
-	STA $4010 
-	LDA <$00  
-	LDA Copy_A
-	JSR Clockslide_100 ; Note to self, do not try to optimize with ClockslideFromWord, as write cycles throw off the DMA timing.
-	JSR Clockslide_100 ; ^
-	JSR Clockslide_100 ; ^
-	JSR Clockslide_50  ; ^
-	NOP                ; ^
-	CMP <$C9           ; ^
-	RTS 
-	; so we have 50 cycles to go.
+
 		
 DMASyncWithoutOpenBus:
 	; This function *should* exit with exactly 406 CPU cycles until the DMA occurs.
@@ -17791,6 +17642,18 @@ dma_sync_first:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 sync_dmc_fail:
 	RTS	; The DMA timing will be way off on this test, but it was unable to sync anyway, so... Better than infinite looping?
+
+VerifyReturnAddressesAreCorrect:
+	TSX
+	INX
+	LDA $100, X
+	; $02 is the correct value to read here. A value of $03 is wrong. $04 is right out.
+	; Anyway, subtract by 2.
+	SEC
+	SBC #02
+	STA <IncorrectReturnAddressOffset
+	RTS
+;;;;;;;
 
 	.org $FF00
 Clockslide:
@@ -17949,7 +17812,33 @@ TEST_DoesTheDMA_Fail:
 	JMP DMASync
 ;;;;;;;;;;;;;;;	
 
-	.org $FFBE
+ClearNametable2_With24:
+	LDA #$24
+	.byte $2C ; BIT Absolute. (skip the LDA #0)
+ClearNametable2:
+	LDA #0
+ClearNametable2_s:
+	JSR SetPPUADDRFromWord
+	.byte $2C, $00
+	LDY #$C0
+	LDX #4
+TEST_RMW2007_ClearNametable2Loop:
+	STA $2007
+	DEY
+	BNE TEST_RMW2007_ClearNametable2Loop
+	DEX
+	BNE TEST_RMW2007_ClearNametable2Loop
+	LDA #$FF
+	LDY #$40
+	TEST_RMW2007_ClearNT2Loop2:
+	STA $2007
+	DEY
+	BNE TEST_RMW2007_ClearNT2Loop2	
+	RTS
+;;;;;;;
+
+	NOP ; Unused byte.
+	
 VblSync_ABORT:	; This emulator failed the pre-test, implying that this will loop infinitely, so instead of doing that, just don't bother.
 	PLA
 	RTS
