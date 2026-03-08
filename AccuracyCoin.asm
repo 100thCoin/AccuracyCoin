@@ -454,10 +454,11 @@ ReloadMainMenu: ; There's an option to run every test in the ROM, and it draws a
 	INC <Debug_EC ; 08 -> 09
 	JSR WaitForVBlank	; Stall until the PPU is in VBlank.
 	JSR ResetScroll		; Set the ppu 'v' and 't' registers to $2000, and reset the fine scroll values as well.
-	JSR EnableRendering_BG; Enable rendering the background. (We don't need sprites here.)
+	JSR EnableFullRendering; Enable rendering the background.
 	JSR EnableNMI		; Enable the Non Maskable Interrupt.
 	INC <Debug_EC ; 09 -> 0A
 	; If your emulator hangs here, you probably haven't implemented the NMI?
+	
 InfiniteLoop:
 	JMP InfiniteLoop	; This is the spinning loop while I wait for the NMI to occur.
 ;;;;;;;;;;;;;;;;;;;;
@@ -15599,6 +15600,16 @@ EnableRendering_S:; Enables rending sprites. Does not affect the other mask flag
 	PHA
 	LDA <PPUMASK_COPY
 	ORA #$10
+	STA <PPUMASK_COPY
+	STA $2001
+	PLA
+	RTS
+;;;;;;;
+
+EnableFullRendering:; Enables rending both sprites and background, and the 8 pixel mask. Does not affect the other mask flags.
+	PHA
+	LDA <PPUMASK_COPY
+	ORA #$1E
 	STA <PPUMASK_COPY
 	STA $2001
 	PLA
