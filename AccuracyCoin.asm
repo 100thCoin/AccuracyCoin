@@ -1763,12 +1763,12 @@ TEST_2004_Stress:
 	JSR ClearNametable2_With24
 	LDY #$FF
 	TYA
-TEST_2004_Stress_Prep:
 	; So here's the scoop.
 	; I'm going to prepare OAM with the values $FF through $00.
 	; Then, we're going to read from $2004 on every single dot of a chosen scanline. (across several frames)
 	; This test expects your PPU timing to be perfect.
 	
+TEST_2004_Stress_Prep:
 	; Start by preparing OAM.
 	STA $200, X
 	DEY
@@ -1776,31 +1776,42 @@ TEST_2004_Stress_Prep:
 	INX
 	BNE TEST_2004_Stress_Prep
 
+	;;; Test 1 [$2004 Stress Test]: Reads from $2004 return the OAM Buffer. Let's verify the OAM Buffer is correct on every ppu cycle of a scanline ;;;
+	; OAM is set up with the following pattern: $FF to $00 descending.
+	; This will result in less than 8 objects on the taget scanline, so the OAM address will overflow.
+
 	JSR Test_2004_Stress_RunTest  ; Run the test with OAM set up as $FF, $FE, $FD... $01, $00.
-	LDA #$7F                      ; The TEST_2004_Stress_Evaluate subroutine needs to know what value to use...
-	STA <$6A                      ; ... for the "first index into OAM2 evaluated on the previous scanline". Write that here:
 	JSR TEST_2004_Stress_Evaluate ; Evaluate the data.
-	LDA <$61                      ; Address $61 will contain a #1 if all the evaluation steps pass.
-	BEQ FAIL_2004_Stress          ; If address $61 contains a 0, we failed the test.
-
-	LDA #1
-	STA <ErrorCode
-
+	.word Test_2004_Stress_AnswerKey1 ; using this answer key.
+	BEQ FAIL_2004_Stress 
+	
+	INC <ErrorCode
+	;;; Test 2 [$2004 Stress Test]: Reads from $2004 return the OAM Buffer. Let's verify the OAM Buffer is correct on every ppu cycle of a scanline ;;;
+	; OAM is set up with the following pattern: 8 objects in range, then $00 to $BF ascending.
+	; Since there will be 8 objects on the target scanline, we will see the glitchy OAM ADDR increment behavior.
+	
 	LDX #0
 TEST_2004_Stress_Prep2:
-	TXA
+	; prepare OAM with the more interesting data. (this one starts with 8 objects in range...)
+	LDA Test_2004_Stress_OAM, X
 	STA $200, X
 	INX
+	CPX #32
 	BNE TEST_2004_Stress_Prep2
+	; and the remaining $C0 bytes of OAM will just be $00 to $BF incrementing.
+	LDY #0
+TEST_2004_Stress_Prep3:
+	TYA
+	STA $200, X
+	INY
+	INX
+	BNE TEST_2004_Stress_Prep3
 	
-	JSR Test_2004_Stress_RunTest  ; Run the test with OAM set up as $00, $01, $02... $FE, $FF.
-	LDA #$78                      ; The TEST_2004_Stress_Evaluate subroutine needs to know what value to use...
-	STA <$6A                      ; ... for the "first index into OAM2 evaluated on the previous scanline". Write that here:
+	JSR Test_2004_Stress_RunTest  ; Run the test with OAM set up as $FF, $FE, $FD... $01, $00.
 	JSR TEST_2004_Stress_Evaluate ; Evaluate the data.
-	LDA <$61                      ; Address $61 will contain a #1 if all the evaluation steps pass.
-	BEQ FAIL_2004_Stress          ; If address $61 contains a 0, we failed the test.
+	.word Test_2004_Stress_AnswerKey2 ; using this answer key.
+	BEQ FAIL_2004_Stress 
 
-	
 	;; END OF TEST ;;
 
 	LDA #1
@@ -1840,95 +1851,9 @@ Test_2004_Stress_ShiftBy1_Loop:
 	BNE Test_2004_Stress_ShiftBy1_Loop
 	LDA $7FF ; This is where we stored the result of scanline 79, dot 340.
 	STA $500	
-	DEC <$60
+	INC <$6F ; this address is visible in the debug screen, and it's nice to know if we shifted everything.
 	RTS
-;;;;;;;
-	
-TEST_2004_Stress_PairEvaluate:
-	; word ReadPairAt
-	
-	LDA #1
-	STA <$6F ; If this is set to #1 after the RTS, we failed this pair.
-	
-	STX <Copy_X ; make a copy of X
-	STY <Copy_Y ; make a copy of Y	
-
-	LDY #0
-	LDA [$0068], Y ; Copy the byte at address [ReadPairAt], X
-	STA <$6C       ; and store it in RAM.
-	INY
-	LDA [$0068], Y ; Copy the byte at address [ReadPairAt], X + 1
-	STA <$6D       ; and store it in RAM.
-	
-	LDY <Copy_Y
-	LDA $200, Y
-	STA <$6E
-
-	; So now, 
-	; [$006C] contains ReadPairAt, X
- 	; [$006D] contains ReadPairAt, X +1
- 	; [$006E] contains the value to compare teh results with.
-
-
-	; Check if we are reading from an attribute byte.
-	LDA <Copy_Y ; We're always comparing with $200 + Y.
-	AND #$3     ; AND with 3
-	CMP #2      ; If A=2 at this point, we're looking to evaluate an attribute byte of the OAM data.
-	BNE TEST_2004_Stress_PEvNonAttr
-	
-	LDA <$6E    ; Load the value to compare the test results with.
-	AND #$E3    ; and remove the non-existing attribute bits.
-	STA <$6E    ; overwrite the value to compare with.
-	
-TEST_2004_Stress_PEvNonAttr:
-	
-	; So now, at address $6C:
-	; $6C: Result 1
-	; $6D: Result 2
-	; $6E: Correct Result
-	
-	; Read the pair of bytes at [$0068]
-	; They *should* match, but on a specific cpu/ppu clock alignment on SOME consoles (but not all) they won't match.
-	
-	LDA <$6C ; Load result 1.
-	CMP <$6D ; compare result 2.
-	BEQ TEST_2004_Stress_PEvMatch
-	
-	LDA <$60 ; Check if the data needed to be shifter over a byte.
-	BNE TEST_2004_Stress_PEvFail ; If not, fail the test. The bit flips can only occur in situations where the data was shifted over a byte.
-	
-	; They didn't match. Let's verify that all the flipped bits are from 1's to 0's.
-	LDA <$6E ; load the correct asnwer
-	EOR #$FF ; flip every bit.
-	AND <$6C ; AND with the first result in the pair. (only the first byte in the pair should be incorrect)
-	; the result here should be zero.
-	BNE TEST_2004_Stress_PEvFail
-
-TEST_2004_Stress_PEvMatch:
-	
-	LDA <$6D ; load result 2.
-	CMP <$6E ; Compare with the correct answer.
-	BNE TEST_2004_Stress_PEvFail
-
-	LDA #0
-	STA <$6F ; pass for this pair.
-	
-TEST_2004_Stress_PEvFail:
-
-	LDX <Copy_X
-	LDY <Copy_Y
-	
-	INC <$68 ; Increment the pointer used in this subroutine.
-	INC <$68 ; Increment it twice, actually, since we evalaute two bytes at a time.
-	
-	RTS
-;;;;;;;
-
-FAIL_2004_Stress_Eval:
-	DEC <$61
-	RTS
-;;;;;;;
-	
+;;;;;;;	
 
 TEST_2004_Stress_Evaluate:
 
@@ -1967,277 +1892,190 @@ TEST_2004_Stress_Evaluate:
 	; 5.) reads from OAM, where we get 2 cycles per object, starting at $77 and making it's way to $03 before the pattern is broken.
 	; 6.) The PPU continues reading from OAM, but reads from OAM2[OAM2Address] every other cycle. The pattern is the same as section 3, but with $03's every other byte until $9B
 	; 7.) Sprite loading reads 4 bytes from OAM2, with the fourth byte read a total of 5 times. 7F 7E 61 7C 7C 7C 7C 7C 7B 7A 61 78 78 78 78 78.
-	; 8.) one instance of $03 (the final value written to OAM2.) followed by one potentially corrupted instance of $FF. (can't even check this one...)
+	; 8.) one instance of $03 (the final value written to OAM2.) followed by one potentially corrupted instance of $FF.
 	; 9.) 46 instances of $FF. (the remaining bytes in OAM2.)
 	; 10.) 20 instances of $7F. (index 0 into OAM2.)
 	
-	; This test runs twice with different OAM data. Here's the correct data for the second test:
-	; 78 FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF 
+	; Then we run a more interesting arrangement of OAM: see Test_2004_Stress_OAM
+	; 7F FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF 
 	; FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF 
 	; FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF 
 	; FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF 
-	; FF 00 00 04 04 08 08 0C 0C 10 10 14 14 18 18 1C 
-	; 1C 20 20 24 24 28 28 2C 2C 30 30 34 34 38 38 3C 
-	; 3C 40 40 44 44 48 48 4C 4C 50 50 54 54 58 58 5C 
-	; 5C 60 60 64 64 68 68 6C 6C 70 70 74 74 78 78 7C 
-	; 7C 7D 7D 62 62 7F 7F 80 80 81 81 82 82 83 83 84 
-	; 84 88 88 8C 8C 90 90 94 94 98 98 9C 9C A0 A0 A4 
-	; A4 A8 A8 AC AC B0 B0 B4 B4 B8 B8 BC BC C0 C0 C4 
-	; C4 C8 C8 CC CC D0 D0 D4 D4 D8 D8 DC DC E0 E0 E4 
-	; E4 E8 E8 EC EC F0 F0 F4 F4 F8 F8 FC FC 00 FC 04 
-	; FC 08 FC 0C FC 10 FC 14 FC 18 FC 1C FC 20 FC 24 
-	; FC 28 FC 2C FC 30 FC 34 FC 38 FC 3C FC 40 FC 44 
-	; FC 48 FC 4C FC 50 FC 54 FC 58 FC 5C FC 60 FC 64 
-	; FC 7C 7D 62 7F 7F 7F 7F 7F 80 81 82 83 83 83 83 
-	; 83 FC FF FF FF FF FF FF FF FF FF FF FF FF FF FF 
-	; FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF 
-	; FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF 
-	; FF 7C 7C 7C 7C 7C 7C 7C 7C 7C 7C 7C 7C 7C 7C 7C 
-	; 7C 7C 7C 7C 7C	
+	; FF 80 80 00 00 00 00 FF FF 7F 7F 01 01 20 20 EE 
+	; EE 7E 7E 02 02 40 40 DD DD 7D 7D 03 03 60 60 CC 
+	; CC 7C 7C 04 04 80 80 BB BB 7B 7B 05 05 A0 A0 AA 
+	; AA 7A 7A 06 06 C0 C0 99 99 79 79 07 07 E0 E0 88 
+	; 88 00 80 05 80 02 80 0F 80 10 80 15 80 02 80 1F 
+	; 80 20 80 25 80 22 80 2F 80 30 80 35 80 22 80 3F 
+	; 80 40 80 45 80 42 80 4F 80 50 80 55 80 42 80 5F 
+	; 80 60 80 65 80 62 80 6F 80 70 80 75 80 62 80 7F 
+	; 80 80 80 81 80 82 80 80 80 84 80 88 80 8C 80 90 
+	; 80 94 80 98 80 9C 80 A0 80 A4 80 A8 80 AC 80 B0 
+	; 80 B4 80 B8 80 BC 80 C0 80 C4 80 C8 80 CC 80 D0 
+	; 80 D4 80 D8 80 DC 80 80 80 7F 80 7E 80 7D 80 7C 
+	; 80 80 00 00 FF FF FF FF FF 7F 01 20 EE EE EE EE 
+	; EE 7E 02 40 DD DD DD DD DD 7D 03 60 CC CC CC CC 
+	; CC 7C 04 80 BB BB BB BB BB 7B 05 A0 AA AA AA AA 
+	; AA 7A 06 C0 99 99 99 99 99 79 07 E0 88 88 88 88 
+	; 88 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 
+	; 80 80 80 80 80 80
 
-	; and now to validate the test results.
+	
+	; Like the other table, this could be off by one due to a clock alignment.
+	
+	; Anway, looking at that data there, you'll see the following pattern:
+	; 1.) 1 instance of $78 (index 0 into OAM2 from the previous scanline results.)
+	; 2.) 64 instances of $FF (OAM2 is initialized to $FF during this time, so that's the value read.)
+	; 3.) reads from OAM, where the object is in-range. This continues for 64 ppu cycles.
+	; 4.) Alternating reads from Primary and Secondary OAM. (Secondary OAM Address = $00) You'll notice the primary OAMADDR incrementing in an unusual way. (x0, x5, xA, xF. NOTE: the xA shows up as x2 since attribute bits are missing.) 
+	; 5.) An object at Y position of $7F is found in range. Read from primary OAM, but continue reading from secondary OAM.
+	; 6.) Alternating reads from Primary and Secondary OAM. (Secondary OAM Address = $00) You'll notice the primary OAMADDR incrementing like normal. This continues until Sprite Fetch.
+	; 7.) Sprite loading reads 4 bytes from OAM2, with the fourth byte read a total of 5 times, like before.
+	; 8.) 20 instances of $80. (index 0 into OAM2.)
+	
+	JSR CopyReturnAddressToByte0 ; Grab the answer key you want to use.
+	LDY #0                       ;
+	LDA [$0000],Y                ;
+	STA <$60                     ;
+	INY                          ;
+	LDA [$0000],Y                ;
+	STA <$61                     ;
+	INY                          ; Y++, so when we run FixRTS we increment the return address by 2.
+	JSR FixRTS                   ; Fix the return address.
+
+	CLV                                 ; I'll set the overflow flag if we needed to shift the results over...
+	LDY #0                              ;
+	LDA $500, Y                         ; The results might be off-by-one due to clock alignment alignment.
+	CMP #$FF                            ; Let's see if it is.
+	BNE TEST_2004_Stress_Eval_DontShift ; If not, skip ahead.
+	JSR Test_2004_Stress_ShiftBy1       ; Shift the entire table of results over to the right a single byte. Increment $60 to indicate we did this.
+	LDA #$40
+	STA <$00
+	BIT <$00                            ; Set the overflow flag to indicate we had to shift everything over.
+TEST_2004_Stress_Eval_DontShift:
+	LDA [$0060], Y  ; Load the first byte of the answer key.
+	STA <$50                            ; use address $50 as a copy of the previously read value.
+	
+TEST_2004_Stress_Eval1_Loop1:            ; Check the first 256 bytes of the results.
+	LDA $500, Y                          ; Load the data from the test results.
+	BVC TEST_2004_S_Eval1_NoBitFlips     ; There could be bit flips in the results on the alignment that had everything shifted over.
+	                                     ;
+	CMP <$50                             ; Compare with the value from the previous iteration.
+	BEQ TEST_2004_S_Eval1_NoBitFlips     ; If it's the same as last time, then there cannot be bit flips.
+	                                     ; There can be bit flips here, but the bits are only ever flipping from 1 to 0.
+	LDA [$0060], Y   ; Load the expected result.
+	EOR #$FF                             ; Flip all the bits.
+	AND $500, Y                          ; bitwise AND with the value read.
+    BNE TEST_2004_Stress_Eval1_Fail      ; Bitflips can ONLY result in bits going from 1 to 0, so if we have anything in the result here, then you are wrong.
+	BEQ TEST_2004_Stress_Eval1_Continue  ; Skip ahead
+                                         ;
+TEST_2004_S_Eval1_NoBitFlips:            ; If we know there aren't bit flips in the data, then just compare with the asnwer key.
+	CMP [$0060], Y   ;
+	BNE TEST_2004_Stress_Eval1_Fail      ;
+TEST_2004_Stress_Eval1_Continue:         ;
+	LDA [$0060], Y   ; Load the expected result.
+	STA <$50                             ; Update the byte that stores the previously read value.
+	INX                                  ;
+	BNE TEST_2004_Stress_Eval1_Loop1     ;
+	
+	INC <$61 ; Increment the high byte of the pointer.
+	
+TEST_2004_Stress_Eval1_Loop2:                ; Check the next 85 bytes of the results.
+	LDA $600, Y                              ; Load the data from the test results.
+	BVC TEST_2004_S_Eval1_2NoBitFlips        ; There could be bit flips in the results on the alignment that had everything shifted over.
+	                                         ;
+	CMP <$50                                 ; Compare with the value from the previous iteration.
+	BEQ TEST_2004_S_Eval1_2NoBitFlips        ; If it's the same as last time, then there cannot be bit flips.
+	                                         ; There can be bit flips here, but the bits are only ever flipping from 1 to 0.
+	LDA [$0060], Y   ; Load the expected result.
+	EOR #$FF                                 ; Flip all the bits.
+	AND $600, Y                              ; bitwise AND with the value read.
+    BNE TEST_2004_Stress_Eval1_Fail          ; Bitflips can ONLY result in bits going from 1 to 0, so if we have anything in the result here, then you are wrong.
+	BEQ TEST_2004_Stress_Eval1_2Continue     ; Skip ahead
+                                             ;
+TEST_2004_S_Eval1_2NoBitFlips:           ; If we know there aren't bit flips in the data, then just compare with the asnwer key.
+	CMP [$0060], Y   ;
+	BNE TEST_2004_Stress_Eval1_Fail          ;
+TEST_2004_Stress_Eval1_2Continue:            ;
+	LDA [$0060], Y   ; Load the expected result.
+	STA <$50                                 ; Update the byte that stores the previously read value.
+	INX                                      ;
+	CPX #85                                  ; Check until address $341
+	BNE TEST_2004_Stress_Eval1_Loop2         ;
 	
 	LDA #1
-	STA <$60 ; If we shift everything over, this will be decremented.
-	STA <$61 ; If we fail, set this to 0.
-	
-	; 1.)
-TEST_2004_Eval_1:
-	LDA $500             ; the test results begin at address $500.
-	; The value should be index 0 into OAM2 from the previous scanline results.
-	CMP <$6A             ; I specifically write to <$6A with the result here before JSRing to evaluate.
-	BEQ FAIL_2004_Stress_EvalCont ; If that's not the case, fail the test.
-	; If this was wrong, let's check if we were simply off by 1.
-	LDA <$60
-	BEQ FAIL_2004_Stress_Eval
-	JSR Test_2004_Stress_ShiftBy1
-	JMP TEST_2004_Eval_1 ; Check again.	
-	
-FAIL_2004_Stress_EvalCont:
-	
-	LDA <$60
-	BEQ TEST_2004_Eval_1_Post ; if we had to shift the data, this could be anything.
-	; otherwise, it's $FF
-	LDA $501
-	CMP #$FF
-	BNE FAIL_2004_Stress_Eval
-TEST_2004_Eval_1_Post:
-	
-	INC <ErrorCode
-	
-	; 2.)
-	LDX #63              ; Evaluating from $540 to $502 in reverse order, simply to save bytes.
-TEST_2004_Eval_2:
-	LDA $501, X          ; Read from $540 to $502
-	CMP #$FF             ; Address $501 to $540 should hold the value $FF.
-	BNE FAIL_2004_Stress_Eval ; If that's not the case, fail the test.
-	DEX                  ; Decrement X
-	BNE TEST_2004_Eval_2 ; Loop until X=0
-	INC <ErrorCode
-
-	; 3.)	
-	LDA #$41 ; TEST_2004_Stress_PairEvaluate reads from a pointer at address $68
-	STA <$68 ; So I need to prepare this address with the address in RAM where we read the test results from.
-	LDA #$05 ; For instance, if we're areading from $541 until $580, I set this up with $541 and then increment it by 2 each iteration.
-	STA <$69 ; This allows me to reuse the TEST_2004_Stress_PairEvaluate for various steps, and reuse TEST_2004_Stress_Evaluate with different data.
-	
-	LDY #0
-	LDX #0               ; Evaluating from $541 until the first object in range of the scanline. ($580 in the example data provided)
-TEST_2004_Eval_3:
-
-	JSR TEST_2004_Stress_PairEvaluate
-	LDA <$6F                  ; TEST_2004_Stress_PairEvaluate will write #0 here if you pass, and #1 here is you fail. This should be #0.
-	BNE FAIL_2004_Stress_Eval ; If that's not the case, fail the test.
-	
-	INY                       ; Y += 4
-	INY                       ; ^
-	INY                       ; ^
-	INY                       ; ^
-	INX                       ; X += 2
-	INX                       ; ^
-
-	LDA $542, X ; read the next byte. (read the second byte of the pair, otherwise bit flips could break things)
-	STA <$65 ; the final value written ehre will be what gets read during the final 20 ppu cycles of the scanline.
-	SEC
-	SBC #$79 ; we were on scanline $80, which means any object with a Y position of $79 to $80 will be on the following scanline.
-	; by subtracting $79, anything value from $00 to $07 will be on the target scanline
-	CMP #8
-	
-	BCS TEST_2004_Eval_3      ; Loop until the Y position is on the target scanline.
-	INC <ErrorCode
-
-	STY <$64 ; re-use this during OAM2 evaluation. This will be the start of OAM2.
-	
-	; 4.)
-TEST_2004_Eval_4:
-	JSR TEST_2004_Stress_PairEvaluate
-	LDA <$6F                  ; TEST_2004_Stress_PairEvaluate will write #0 here if you pass, and #1 here is you fail. This should be #0.
-	BNE FAIL_2004_Stress_Eval ; If that's not the case, fail the test.
-	
-	INY
-	INX
-	INX
-	TYA
-	AND #$3
-	BNE TEST_2004_Eval_4 ; Loop if X != 0
-	
-	; the next byte will be a Y position.
-	LDA $542, X ; read the next byte. (read the second byte of the pair, otherwise bit flips could break things)
-	SEC
-	SBC #$79 ; we were on scanline $80, which means any object with a Y position of $79 to $80 will be on the following scanline.
-	; by subtracting $79, anything value from $00 to $07 will be on the target scanline
-	CMP #8
-	
-	BCC TEST_2004_Eval_4      ; Loop until the Y position is NOT on the target scanline.
-	
-	INC <ErrorCode
-
-	; 5.)
-TEST_2004_Eval_5:
-	JSR TEST_2004_Stress_PairEvaluate
-	LDA <$6F
-TEST_2004_Eval_BNE_Slide:
-	BNE FAIL_2004_Stress_Eval ; If that's not the case, fail the test.
-	INY
-	INY
-	INY
-	INY
-	INX
-	INX
-	CPX #$8C             ; Check if X=8C
-	BNE TEST_2004_Eval_5 ; Loop until X=8C
-	INC <ErrorCode
-
-	; 6.)
-	LDY #0
-	LDX #0               ; Evaluating from $5CD to $600.
-TEST_2004_Eval_6:
-	TXA                  ; This has different things to check on even/odd bytes
-	LSR A                ; check which one we're on with X.
-	BCC TEST_2004_Eval_6_Even
-TEST_2004_Eval_6_Odd:
-	LDA $5CD, X          ; Read from $5CD to $600
-	CMP $2FC             ; It should equal the Y position of the final object in OAM.
-	BEQ TEST_2004_Eval_6_sync ; If that's not the case, check for logical bit flips.
-	LDA <$60
-	BNE TEST_2004_Eval_BNE_Slide ; if we had to shift the data, this could be anything.
-
-	LDA $2FC
-	EOR #$FF
-	AND $5CD, X
-	BNE TEST_2004_Eval_BNE_Slide
-	
-	BEQ TEST_2004_Eval_6_sync
-TEST_2004_Eval_6_Even:
-	LDA $5CD, X          ; Read from $5CD to $600
-	CMP $200, Y          ; it should read equal the OAM data on page 2.
-	BEQ TEST_2004_Eval_6_sync ; If that's not the case, check for logical bit flips.
-	LDA $200, Y
-	EOR #$FF
-	AND $5CD, X
-	BNE TEST_2004_Eval_BNE_Slide ; If this isn't zero, fail the test. Otherwise, allow it.
-	
-TEST_2004_Eval_6_sync:
-	INY                  ; INY twice here. It will end up incrementing 4 times for every time we need to read from $200, Y
-	INY                  ; ^
-	INX                  ; Increment X
-	CPX #52              ; Check if X=52
-	BNE TEST_2004_Eval_6 ; Loop until X=52
-	INC <ErrorCode
-	
-	; 7.)
-	LDY <$64             ; This address holds the start of OAM2.
-	LDX #0               ; Evaluating from $601 to $610.
-TEST_2004_Eval_7:
-	LDA $200, Y          ; Start by reading the value from page 2.
-	STA <$50             ; And store it in RAM.
-	TXA                  ; We need to check if this is the attribute byte,
-	AND #7               ; get the lowest two bits of X
-	CMP #2               ; and if the result is 2, it's the attribute byte.
-	BNE TEST_2004_Eval_7_SkipAND
-	LDA <$50             ; let's retrieve that value from address $50
-	AND #$E3             ; and bitwise AND with $E3
-	STA <$50	         ; then store it back.
-TEST_2004_Eval_7_SkipAND:
-	LDA $601, X          ; Read from $601 to $610
-	CMP <$50             ; It should be the same as the byte we read from our OAM copy in page 2 (potentially masked away for the attribute byte)
-	BEQ TEST_2004_Eval_7_SkipBitStuff ; If that's not the case, check for logical bit flips.
-	
-	LDA <$60 ; Check if the data needed to be shifter over a byte.
-	BNE FAIL_2004_Stress_Eval2 ; If not, fail the test. The bit flips can only occur in situations where the data was shifted over a byte.
-	
-	LDA $200, Y
-	EOR #$FF
-	AND $601, X
-	BNE TEST_2004_Eval_BNE_Slide ; If this isn't zero, fail the test. Otherwise, allow it.
-	
-TEST_2004_Eval_7_SkipBitStuff:
-	INY                  ; Increment Y
-	TXA
-	AND #$7
-	CMP #3
-	BCC TEST_2004_Eval_7_SkipDEY ; if X = 0, 1, or 2.
-	CMP #7
-	BEQ TEST_2004_Eval_7_SkipDEY ; if X = 7.
-	DEY                  ; Decrement Y (Don't INY if X&7 = 4, 5, or 6.)
-TEST_2004_Eval_7_SkipDEY:	
-	INX                  ; Increment X
-	CPX #16              ; Check if X=16
-	BNE TEST_2004_Eval_7 ; Loop until X=16
-	INC <ErrorCode
-	
-	; 8.)
-	LDA $611             ; Address $611...
-	CMP $2FC             ; It should equal the Y position of the final object in OAM.
-	BEQ TEST_2004_Eval_8_Pass ; If that's not the case, check for logical bit flips.
-	LDA <$60 ; Check if the data needed to be shifter over a byte.
-	BNE FAIL_2004_Stress_Eval2 ; If not, fail the test. The bit flips can only occur in situations where the data was shifted over a byte.
-	LDA $2FC
-	EOR #$FF
-	AND $611
-	BNE FAIL_2004_Stress_Eval2 ; If this isn't zero, fail the test. Otherwise, allow it.
-TEST_2004_Eval_8_Pass:
-	
-	
-	LDA <$60
-	BEQ TEST_2004_Eval_8_Post ; if we had to shift the data, this could be anything.
-	; otherwise, it's $FF
-	LDA $612
-	CMP #$FF
-	BNE FAIL_2004_Stress_Eval2
-TEST_2004_Eval_8_Post:
-	
-	INC <ErrorCode
-	
-	; Address $612 should be $FF, but bit flips can happen on this byte, so it could genuinely be ANY value. Don't bother...
-	
-	; 9.)
-	LDX #46              ; Evaluating from $640 to $613 in reverse order, simply to save bytes.
-TEST_2004_Eval_9:
-	LDA $612, X          ; Read from $640 to $613
-	CMP #$FF             ; Address $612 to $640 should hold the value $FF.
-	BNE FAIL_2004_Stress_Eval2 ; If that's not the case, fail the test.
-	DEX                  ; Decrement X
-	BNE TEST_2004_Eval_9 ; Loop until X=0
-	INC <ErrorCode
-	
-	; 10.)
-	LDX #21              ; Evaluating from $655 to $641 in reverse order, simply to save bytes.
-TEST_2004_Eval_10:
-	LDA $640, X          ; Read from $655 to $641
-	CMP <$65             ; It should equal the Y position of the first object in OAM2.
-	BNE FAIL_2004_Stress_Eval2 ; If that's not the case, fail the test.
-	DEX                  ; Decrement X
-	BNE TEST_2004_Eval_10 ; Loop until X=0
-
-	; We passed the evaluation. (Address $61 is still #1)
 	RTS
 ;;;;;;;
-
-FAIL_2004_Stress_Eval2:
-	DEC <$61
+	
+	
+	
+TEST_2004_Stress_Eval1_Fail:
+	LDA #0
 	RTS
 ;;;;;;;
+	
+
+Test_2004_Stress_OAM:
+	.byte $80, $00, $00, $FF
+	.byte $7F, $01, $20, $EE
+	.byte $7E, $02, $40, $DD
+	.byte $7D, $03, $60, $CC
+	.byte $7C, $04, $80, $BB
+	.byte $7B, $05, $A0, $AA
+	.byte $7A, $06, $C0, $99
+	.byte $79, $07, $E0, $88
+
+Test_2004_Stress_AnswerKey1:
+	.byte $7F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
+	.byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
+	.byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
+	.byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
+	.byte $FF, $FF, $FF, $FB, $FB, $F7, $F7, $F3, $F3, $EF, $EF, $EB, $EB, $E7, $E7, $E3
+	.byte $E3, $DF, $DF, $DB, $DB, $D7, $D7, $D3, $D3, $CF, $CF, $CB, $CB, $C7, $C7, $C3
+	.byte $C3, $BF, $BF, $BB, $BB, $B7, $B7, $B3, $B3, $AF, $AF, $AB, $AB, $A7, $A7, $A3
+	.byte $A3, $9F, $9F, $9B, $9B, $97, $97, $93, $93, $8F, $8F, $8B, $8B, $87, $87, $83
+	.byte $83, $7F, $7F, $7E, $7E, $61, $61, $7C, $7C, $7B, $7B, $7A, $7A, $61, $61, $78
+	.byte $78, $77, $77, $73, $73, $6F, $6F, $6B, $6B, $67, $67, $63, $63, $5F, $5F, $5B
+	.byte $5B, $57, $57, $53, $53, $4F, $4F, $4B, $4B, $47, $47, $43, $43, $3F, $3F, $3B
+	.byte $3B, $37, $37, $33, $33, $2F, $2F, $2B, $2B, $27, $27, $23, $23, $1F, $1F, $1B
+	.byte $1B, $17, $17, $13, $13, $0F, $0F, $0B, $0B, $07, $07, $03, $03, $FF, $03, $FB
+	.byte $03, $F7, $03, $F3, $03, $EF, $03, $EB, $03, $E7, $03, $E3, $03, $DF, $03, $DB
+	.byte $03, $D7, $03, $D3, $03, $CF, $03, $CB, $03, $C7, $03, $C3, $03, $BF, $03, $BB
+	.byte $03, $B7, $03, $B3, $03, $AF, $03, $AB, $03, $A7, $03, $A3, $03, $9F, $03, $9B
+	.byte $03, $7F, $7E, $61, $7C, $7C, $7C, $7C, $7C, $7B, $7A, $61, $78, $78, $78, $78
+	.byte $78, $03, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
+	.byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
+	.byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
+	.byte $FF, $7F, $7F, $7F, $7F, $7F, $7F, $7F, $7F, $7F, $7F, $7F, $7F, $7F, $7F, $7F
+	.byte $7F, $7F, $7F, $7F, $7F
+
+Test_2004_Stress_AnswerKey2:
+	.byte $7F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
+	.byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
+	.byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
+	.byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
+	.byte $FF, $80, $80, $00, $00, $00, $00, $FF, $FF, $7F, $7F, $01, $01, $20, $20, $EE
+	.byte $EE, $7E, $7E, $02, $02, $40, $40, $DD, $DD, $7D, $7D, $03, $03, $60, $60, $CC
+	.byte $CC, $7C, $7C, $04, $04, $80, $80, $BB, $BB, $7B, $7B, $05, $05, $A0, $A0, $AA
+	.byte $AA, $7A, $7A, $06, $06, $C0, $C0, $99, $99, $79, $79, $07, $07, $E0, $E0, $88
+	.byte $88, $00, $80, $05, $80, $02, $80, $0F, $80, $10, $80, $15, $80, $02, $80, $1F
+	.byte $80, $20, $80, $25, $80, $22, $80, $2F, $80, $30, $80, $35, $80, $22, $80, $3F
+	.byte $80, $40, $80, $45, $80, $42, $80, $4F, $80, $50, $80, $55, $80, $42, $80, $5F
+	.byte $80, $60, $80, $65, $80, $62, $80, $6F, $80, $70, $80, $75, $80, $62, $80, $7F
+	.byte $80, $80, $80, $81, $80, $82, $80, $80, $80, $84, $80, $88, $80, $8C, $80, $90
+	.byte $80, $94, $80, $98, $80, $9C, $80, $A0, $80, $A4, $80, $A8, $80, $AC, $80, $B0
+	.byte $80, $B4, $80, $B8, $80, $BC, $80, $C0, $80, $C4, $80, $C8, $80, $CC, $80, $D0
+	.byte $80, $D4, $80, $D8, $80, $DC, $80, $80, $80, $7F, $80, $7E, $80, $7D, $80, $7C
+	.byte $80, $80, $00, $00, $FF, $FF, $FF, $FF, $FF, $7F, $01, $20, $EE, $EE, $EE, $EE
+	.byte $EE, $7E, $02, $40, $DD, $DD, $DD, $DD, $DD, $7D, $03, $60, $CC, $CC, $CC, $CC
+	.byte $CC, $7C, $04, $80, $BB, $BB, $BB, $BB, $BB, $7B, $05, $A0, $AA, $AA, $AA, $AA
+	.byte $AA, $7A, $06, $C0, $99, $99, $99, $99, $99, $79, $07, $E0, $88, $88, $88, $88
+	.byte $88, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80
+	.byte $80, $80, $80, $80, $80, $80
+
+
+
+
 
 TEST_2002FlagTiming:
 	;;; Test 1 [$2002 Flag Timing]: Verify the timing in which the sprite zero and sprite overflow flags are cleared. ;;;	

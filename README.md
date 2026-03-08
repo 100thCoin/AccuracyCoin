@@ -640,16 +640,8 @@ or
   4: (Composite PPU Only) Consecutive frames should shift the background on scanline 0, causing the sprite zero hit to miss on every other frame. (Tested at X=$00)  
 
 ### $2004 Stress Test  
-  1: Reading from $2004 (with rendering enabled) on dot 0 should return Secondary_OAM Index 0.  
-  2: Reading from $2004 (with rendering enabled) from dots 1 through dots 64 should return #$FF.  
-  3: Reading from $2004 (with rendering enabled) from dots 65 through 256 should read from the "OAM Latch" used during OAM Evaluation.  
-  4: Reading from $2004 (with rendering enabled) from dots 65 through 256 should read from the "OAM Latch" used during OAM Evaluation. (For sprites that a re in-range on the target scanline.)  
-  5: Reading from $2004 (with rendering enabled) from dots 65 through 256 should read from the "OAM Latch" used during OAM Evaluation.  
-  6: Reading from $2004 (with rendering enabled) from dots 65 through 256 should read from the "OAM Latch" used during OAM Evaluation. (After the OAM Address loops around.)  
-  7: Reading from $2004 (with rendering enabled) from dots 257 through 320 should read from secondary OAM.  
-  8: OAM Evaluation should always write to Secondary OAM even when the object is not in range.
-  9: Secondary OAM is initialized with all $FFs during dots 1 through 64, so you should read $FF from dots 274 to dots 320
-  A: Reading from $2004 (with rendering enabled) from dots 321 through 340 should read from index 0 of secondary OAM.  
+  1: Reading from $2004 (with rendering enabled) should read from the "OAM Buffer" used during OAM Evaluation. Your results did not match the expected results of the test where OAMADDR overflows. See TEST_2004_Stress_Evaluate in the .asm code for details.  
+  2: Reading from $2004 (with rendering enabled) should read from the "OAM Buffer" used during OAM Evaluation. Your results did not match the expected results of the test with more than 8 in-range objects. See TEST_2004_Stress_Evaluate in the .asm code for details.  
 
 ## Page 20: CPU Behavior 2
 
