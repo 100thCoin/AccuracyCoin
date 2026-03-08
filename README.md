@@ -1,7 +1,7 @@
 # AccuracyCoin
 AccuracyCoin is a large collection of NES accuracy tests on a single NROM cartridge.
 
-This ROM was designed for an NTSC console with an RP2A03G CPU and RP2C02G PPU. Some tests might fail on hardware with a different revision.
+This ROM was designed for an NTSC console with an RP2A03G CPU and RP2C02G PPU. Some tests might be automatically skipped on hardware with a different revision.
 
 This ROM currently has 136 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
@@ -487,8 +487,8 @@ or
   2: Reading address $2007 should increment the "v" register.  
   3: There should be a 1-byte buffer when reading from $2007.  
   4: Reading from CHR ROM should use the buffer.  
-  5: Reading from Palette RAM should NOT use the buffer.  
-  6: Writing to $2006 does not modify the buffer value.  
+  5: Writing to $2006 does not modify the buffer value.  
+  6: Reading from Palette RAM should NOT use the buffer.  
   7: The value on the nametable at $2F00 through $2FFF should be put in the buffer when reading from palette RAM at $3F00 through $3FFF.  
 
 ### Palette RAM Quirks
@@ -761,6 +761,14 @@ Some tests have multiple acceptable behaviors that are tested for in this ROM. T
 ### Controller Clocking
   1: The controller was read the way a US-released NES / AV Famicom should read controllers.  
   2: The controller was read the way a Famicom should read controllers.  
+
+### PPU Read Buffer
+  E: The Picture Processing Unit behavide like revision E or earlier.
+  G: The Picture Processing Unit behavide like revision G or earlier.
+
+### Address $2004 Behavior
+  E: The Picture Processing Unit behavide like revision E or earlier.
+  G: The Picture Processing Unit behavide like revision G or earlier.
 
 ### Sprites on Scanline 0
   1: This test was ran on a composite PPU.  
