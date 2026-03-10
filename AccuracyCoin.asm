@@ -4517,6 +4517,9 @@ TEST_SHA_93:
 	; The big difference here is the "corruption" of the high byte when the Y register indexes beyond a page boundary.
 	; With behavior 1, the high byte of the address bus is bitwise ANDed with A AND X.
 	; With behavior 2, the high byte of the address bus is bitwise ANDed with X. (The A register doesn't have any affect on this high byte corruption with behavior 2.)
+	; With behavior 3, the high byte of the address bus is bitwise ANDed with (A OR MAGIC)
+	; With behavior 4, the high byte of the address bus is bitwise ANDed with (A OR X)
+
 	; Both behaviors can have a "magic number", though it is much more common with behavior 2.
 	LDA #PostDMACyclesUntilTestInstruction+3
 	STA <Test_UnOp_CycleDelayPostDMA	
@@ -4531,7 +4534,7 @@ TEST_SHA_93:
 ;;;;;;;
 	
 TEST_SHA_93_CorrectLength:
-	; Determine if this instruction is using behavior 1 or 2. (or not implemented)
+	; Determine if this instruction is using behavior 1, 2, 3, or 4. (or not implemented)
 	JSR WriteFFToLowestPageBytes
 	LDA #$F0
 	STA <Test_UnOp_IndirectPointerLo
@@ -4541,8 +4544,10 @@ TEST_SHA_93_CorrectLength:
 	LDX #$AA
 	LDY #$10
 	.byte $93, Test_UnOp_IndirectPointerLo ; SHA (Test_UnOp_IndirectPointerLo), Y ; (Test_UnOp_IndirectPointerLo) = $1EF0
-	; Behavior 1: Hi = ($1E+1) & $55 & $AA = 0	:: write ($1E+1) & $55 & $AA = 0
-	; Behavior 2: Hi = ($1E+1) & $AA = 0A		:: ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
+	; Behavior 1: Hi = ($1E+1) & $55 & $AA = 0	    :: write ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
+	; Behavior 2: Hi = ($1E+1) & $AA = 0A	        :: write ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
+	; Behavior 3: Hi = ($1E+1) & ($55 & MAGIC) = ??	:: write ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
+	; Behavior 4: Hi = ($1E+1) & ($55 | $AA) = 1F   :: write ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
 	; copy to $50 for debugging.
 	JSR CopyLowestPageBytesTo60
 
@@ -4580,15 +4585,16 @@ TEST_SHA_9F:
 	
 TEST_SHA_9F_CorrectLength:
 	
-	; Determine if this instruction is using behavior 1 or 2. (or not implemented)
+	; Determine if this instruction is using behavior 1, 2, 3, or 4. (or not implemented)
 	JSR WriteFFToLowestPageBytes
 	LDA #$55
 	LDX #$AA
 	LDY #$10
 	.byte $9F, $F0, $1E	; SHA $1EF0, Y
-	; Behavior 1: Hi = ($1E+1) & $55 & $AA = 0	:: write ($1E+1) & $55 & $AA = 0
-	; Behavior 2: Hi = ($1E+1) & $AA = 0A		:: ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
-	; Behavior 3: Hi = ??? more research needed
+	; Behavior 1: Hi = ($1E+1) & $55 & $AA = 0	    :: write ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
+	; Behavior 2: Hi = ($1E+1) & $AA = 0A	        :: write ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
+	; Behavior 3: Hi = ($1E+1) & ($55 & MAGIC) = ??	:: write ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
+	; Behavior 4: Hi = ($1E+1) & ($55 | $AA) = 1F   :: write ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
 	JSR CopyLowestPageBytesTo60
 	LDA $0A00
 	CMP #$FF
@@ -4865,7 +4871,7 @@ TEST_SHS_9B:
 	; See TEST_SHA_93 for more information.
 	LDA #PostDMACyclesUntilTestInstruction+4
 	STA <Test_UnOp_CycleDelayPostDMA
-	; Determine if this instruction is using behavior 1 or 2. (or not implemented)
+	; Determine if this instruction is using behavior 1, 2, 3, or 4. (or not implemented)
 	; Since we need to run this instruction to determine the behavior *before* running a series of tests, let's first confirm this instruction's length in bytes.
 	; This is SHS Absolute, which is 3 bytes long.
 	TSX
@@ -4891,8 +4897,10 @@ TEST_SHS_9B_CorrectLength:
 	LDX #$AA
 	LDY #$10
 	.byte $9B, $F0, $1E	; SHS $1EF0, Y
-	; Behavior 1: Hi = ($1E+1) & $55 & $AA = 0	:: write ($1E+1) & $55 & $AA = 0
-	; Behavior 2: Hi = ($1E+1) & $AA = 0A		:: ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
+	; Behavior 1: Hi = ($1E+1) & $55 & $AA = 0	    :: write ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
+	; Behavior 2: Hi = ($1E+1) & $AA = 0A	        :: write ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
+	; Behavior 3: Hi = ($1E+1) & ($55 & MAGIC) = ??	:: write ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
+	; Behavior 4: Hi = ($1E+1) & ($55 | $AA) = 1F   :: write ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
 	JSR CopyLowestPageBytesTo60
 	LDX <Copy_SP
 	TXS
