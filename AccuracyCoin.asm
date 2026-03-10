@@ -1153,7 +1153,177 @@ SkipFindingNextName:
 	RTS
 ;;;;;;;
 
+AXYFS_IgnoreStackPointer:
+	LDA $593
+	CMP #$9B ; SHS *does* update the stack pointer.
+	BEQ AXYFS_IgnoreStackPointer_Done
+	CMP #$BB ; LAE *does* update the stack pointer.
+	BEQ AXYFS_IgnoreStackPointer_Done
+	LDA <Test_UnOp_SP
+	STA <Test_UnOp_CPS
+AXYFS_IgnoreStackPointer_Done:
+	RTS
 
+TEST_SHS_Behavior4_9B:
+	LDA #$9B
+	PHA	
+	LDA <RunningAllTests
+	BNE TEST_SHA_Behavior4_BNE2
+	
+	LDA #0
+	STA <dontSetPointer
+	JSR PrintTextCentered
+	.word $22D0
+	.byte " SHS Behavior 4", $FF
+	JSR PrintTextCentered
+	.word $2350
+	.byte "SHS magic = $", $FF
+	TSX
+	STX <Copy_SP
+	LDA #$FF
+	LDX #$00
+	LDY #$60
+	.byte $9B, $F0, $FE ; SHS $FEF0, Y
+	LDX <Copy_SP
+	TXS
+	LDA <$50
+	JSR PrintByte
+	JSR ResetScrollAndWaitForVBlank
+	JMP TEST_SHA_Behavior4
+
+TEST_SHA_Behavior4_93:
+	LDA #$93
+	PHA	
+	LDA <RunningAllTests
+TEST_SHA_Behavior4_BNE2:
+	BNE TEST_SHA_Behavior4_BNE
+	
+	LDA #0
+	STA <dontSetPointer
+	JSR PrintTextCentered
+	.word $22B0
+	.byte " SHA Behavior 4", $FF
+	JSR PrintTextCentered
+	.word $2330
+	.byte "SHA magic = $", $FF
+	LDA #$F0
+	STA <$60
+	LDA #$FE
+	STA <$61
+	LDA #$FF
+	LDX #$00
+	LDY #$60
+	.byte $93, $60; SHA ($0060), Y
+	LDA <$50
+	JSR PrintByte
+	JMP TEST_SHA_Behavior4
+	
+TEST_SHA_Behavior4_9F:
+	LDA #$9F
+	PHA ; push the opcode. This just lets me re-use the upcoming code.
+	LDA <RunningAllTests
+TEST_SHA_Behavior4_BNE:
+	BNE TEST_SHA_Behavior4
+	
+	LDA #0
+	STA <dontSetPointer
+	JSR PrintTextCentered
+	.word $22B0
+	.byte " SHA Behavior 4", $FF
+	
+	JSR PrintTextCentered
+	.word $2330
+	.byte "SHA magic = $", $FF
+	LDA #$FF
+	LDX #$00
+	LDY #$60
+	.byte $9F, $F0, $FE ; SHA $FEF0, Y
+	LDA <$50
+	JSR PrintByte
+		
+TEST_SHA_Behavior4:
+	JSR ResetScrollAndWaitForVBlank
+
+	PLA
+	JSR TEST_UnOp_Setup; Set the opcode
+	; This is the fourth known way that the SHA instruction can behave, and it works like this:
+	
+	; Stable:
+	; Write: A & H
+	; Hi = Hi
+	
+	; Unstable:
+	; Write: A & H
+	; Hi = Hi & (A | X)
+	
+	; I'm re-using the code logic here for both SHA and SHS.
+	; NOTE: The TEST_RunTest_AddrInitAXYFS subroutine will replace the target stack pointer with the initial stack pointer for SHA instructions.
+	
+	JSR TEST_RunTest_AddrInitAXYFS
+	.word $0555
+	.byte $FF
+	.byte $FF, $FF, $00, (flag_i), $80
+	.word $0555
+	.byte $06
+	.byte $FF, $FF, $00, (flag_i), $FF
+	
+	JSR TEST_RunTest_AddrInitAXYFS
+	.word $1D60
+	.byte $FF
+	.byte $03, $FF, $00, (flag_i | flag_z), $5A
+	.word $1D60
+	.byte $02
+	.byte $03, $FF, $00, (flag_i | flag_z), $03
+	
+	; Now to make the high byte go unstable.
+	JSR TEST_RunTest_AddrInitAXYFS
+	.word $1F50 ; $1E90 will be the operand.
+	.byte $FF
+	.byte $F0, $00, $80, (flag_i | flag_c | flag_z | flag_v), $FF
+	.word $1050
+	.byte $10
+	.byte $F0, $00, $80, (flag_i | flag_c | flag_z | flag_v), $00
+	
+	JSR TEST_RunTest_AddrInitAXYFS
+	.word $1F50 ; $1E90 will be the operand.
+	.byte $FF
+	.byte $50, $AF, $80, (flag_i | flag_c | flag_v), $67
+	.word $1050
+	.byte $FF
+	.byte $50, $AF, $80, (flag_i | flag_c | flag_v), $00
+	
+	; And now to test if the value written is still ANDed with H if the cycle before the write had a DMA.
+	PHA
+	LDA #$20
+	STA $0580
+	LDA #Low(DMASync_50MinusACyclesRemaining)
+	STA $0581
+	LDA #High(DMASync_50MinusACyclesRemaining)
+	STA $0582	
+	LDA #$7
+	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 6 is probably the only one that will show up.
+	PLA
+	
+	JSR TEST_RunTest_AddrInitAXYFS
+	.word $0568
+	.byte $5A
+	.byte $8F, $FF, $00, (flag_i), $40
+	.word $0568
+	.byte $8F	; H isn't part of the equation anymore.
+	.byte $8F, $FF, $00, (flag_i), $8F
+	
+	JSR TEST_RunTest_AddrInitAXYFS
+	.word $0568
+	.byte $5A
+	.byte $8F, $FF, $FF, (flag_i), $60
+	.word $0568
+	.byte $8F	; H isn't part of the equation anymore.
+	.byte $8F, $FF, $FF, (flag_i), $8F
+	
+	;; END OF TEST ;;
+	LDA #17	; Pass, "code 4"
+	RTS
+;;;;;;;
 	
 	
 TEST_DMA_Plus_2002R:
@@ -1918,9 +2088,8 @@ TEST_2004_Stress_Evaluate:
 	; CC 7C 04 80 BB BB BB BB BB 7B 05 A0 AA AA AA AA 
 	; AA 7A 06 C0 99 99 99 99 99 79 07 E0 88 88 88 88 
 	; 88 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 
-	; 80 80 80 80 80 80
+	; 80 80 80 80 80
 
-	
 	; Like the other table, this could be off by one due to a clock alignment.
 	
 	; Anway, looking at that data there, you'll see the following pattern:
@@ -3812,6 +3981,7 @@ TEST_AddrInitAXYFS_PreLoop:
 	; With the variables all set up, let's prep the test:
 	JSR FixRTS
 	JSR TEST_UnOpRunTest
+	JSR AXYFS_IgnoreStackPointer
 	; Evaluating the test.
 	LDA <initialSubTest
 	STA <ErrorCode	
@@ -3821,6 +3991,7 @@ TEST_AddrInitAXYFS_PreLoop:
 	LDA UnOpTest_Opcode ; reset this value before the next test, assuming another one follows
 	RTS
 ;;;;;;;
+
 	
 TEST_RunTest_ImmOperandAXYF:
 	STA <$FF
@@ -4381,9 +4552,13 @@ TEST_SHA_93_CorrectLength:
 	LDA <$00
 	CMP #$FF
 	BNE TEST_SHA_Behavior1_93_JMP ; if address $0000 was updated, this is behavior 1.
+	LDA $1F00
+	CMP #$15
+	BEQ TEST_SHA_Behavior4_93_JMP
 	JMP TEST_SHA_Behavior3_93 ; If neither known behavior occured, we need to do some annoying extra checks.
 ;;;;;;;
-	
+TEST_SHA_Behavior4_93_JMP
+	JMP TEST_SHA_Behavior4_93	
 TEST_SHA_Behavior2_93_JMP:
 	JMP TEST_SHA_Behavior2_93
 TEST_SHA_Behavior1_93_JMP:
@@ -4421,9 +4596,13 @@ TEST_SHA_9F_CorrectLength:
 	LDA <$00
 	CMP #$FF
 	BNE TEST_SHA_Behavior1_9F_JMP ; if address $0000 was updated, this is behavior 1.
+	LDA $1F00
+	CMP #$15
+	BEQ TEST_SHA_Behavior4_9F_JMP
 	JMP TEST_SHA_Behavior3_9F ; If neither known behavior occured, we need to do some annoying extra checks.
 ;;;;;;;
-	
+TEST_SHA_Behavior4_9F_JMP
+	JMP TEST_SHA_Behavior4_9F
 TEST_SHA_Behavior2_9F_JMP:
 	JMP TEST_SHA_Behavior2_9F
 TEST_SHA_Behavior1_9F_JMP:
@@ -4571,7 +4750,7 @@ TEST_SHA_Behavior1:
 	RTS
 ;;;;;;;
 	
-TEST_SHA_Behavior2_93
+TEST_SHA_Behavior2_93:
 	LDA #$93
 	PHA	
 	LDA <RunningAllTests
@@ -4723,8 +4902,14 @@ TEST_SHS_9B_CorrectLength:
 	LDA <$00
 	CMP #$FF
 	BNE TEST_SHS_Behavior1_9B ; if address $0000 was updated, this is behavior 1.
+	LDA $1F00
+	CMP #$15
+	BEQ TEST_SHS_Behavior4_9B_JMP
 	JMP TEST_SHS_Behavior3_9B ; If neither known behavior occured, we need to do some annoying extra checks.
 ;;;;;;;
+
+TEST_SHS_Behavior4_9B_JMP:
+	JMP TEST_SHS_Behavior4_9B
 	
 TEST_SHS_Behavior2_9B_JMP:
 	JMP TEST_SHS_Behavior2_9B
@@ -12874,6 +13059,7 @@ TEST_SHS_Behavior3_Skip:
 	RTS
 ;;;;;;;
 	
+	
 	.bank 3
 	.org $E000
 
@@ -15142,7 +15328,7 @@ EnableRendering_S:; Enables rending sprites. Does not affect the other mask flag
 EnableFullRendering:; Enables rending both sprites and background, and the 8 pixel mask. Does not affect the other mask flags.
 	PHA
 	LDA <PPUMASK_COPY
-	ORA #$1E
+	ORA #$0E
 	STA <PPUMASK_COPY
 	STA $2001
 	PLA
