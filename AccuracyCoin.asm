@@ -4517,7 +4517,7 @@ TEST_SHA_93:
 	; The big difference here is the "corruption" of the high byte when the Y register indexes beyond a page boundary.
 	; With behavior 1, the high byte of the address bus is bitwise ANDed with A AND X.
 	; With behavior 2, the high byte of the address bus is bitwise ANDed with X. (The A register doesn't have any affect on this high byte corruption with behavior 2.)
-	; With behavior 3, the high byte of the address bus is bitwise ANDed with (A OR MAGIC)
+	; With behavior 3, the high byte of the address bus is bitwise ANDed with (A AND MAGIC)
 	; With behavior 4, the high byte of the address bus is bitwise ANDed with (A OR X)
 
 	; Both behaviors can have a "magic number", though it is much more common with behavior 2.
