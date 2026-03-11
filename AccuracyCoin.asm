@@ -1346,10 +1346,10 @@ TEST_DMA_Plus_2002R:
 	LDA #0
 	.byte $1F
 	.word $4015 ; SLO $4015, X
-	; if this next cycle is a "get", A = $00. If this next cycle is a "put" A = $80.
+	; if this next cycle is a "put", A = $00. If this next cycle is a "get" A = $80.
 	; if the next cycle is a "get", delay by 1 CPU cycle.
-	BMI TEST_DMA_Plus_2002R_putSync
-TEST_DMA_Plus_2002R_putSync:
+	BMI TEST_DMA_Plus_2002R_putSync ; either [(put), (get)] or [(get), (put), (get)]
+TEST_DMA_Plus_2002R_putSync:        ; Eitehr way, we are now synced with a put cycle.
 	; We are now synced to a "put" cycle.
 	; Enable the DMC DMA
 	LDA #$10  ; [put] [get]
@@ -1387,8 +1387,8 @@ TEST_DMA_Plus_2002R_RareBehavior:
 	.word $4015 ; SLO $4015, X
 	; if this next cycle is a "put", A = $00. If this next cycle is a "get" A = $80.
 	; if the next cycle is a "get", delay by 1 CPU cycle.
-	BMI TEST_DMA_Plus_2002R__putSync
-TEST_DMA_Plus_2002R__putSync:
+	BMI TEST_DMA_Plus_2002R__putSync ; either [(put), (get)] or [(get), (put), (get)]
+TEST_DMA_Plus_2002R__putSync:        ; Eitehr way, we are now synced with a put cycle.
 	; We are now synced to a "put" cycle.
 	; Enable the DMC DMA
 	LDA #$10  ; [put] [get]
@@ -8988,13 +8988,13 @@ TEST_IFlagLatency_Test_C:
 	; 50 CPU cycles until DMA.
 	JSR Clockslide_50
 	; [DMC DMA. This takes 4 cycles, next CPU cycle is a "put" cycle.]
-	; Run a 4-byte DMC DMA every 432 CPU cycles. Unless of course, it lands on a write cycle, in which case it is delayed and only lasts 3 cycles.
+	; Run a 4-cycle DMC DMA every 432 CPU cycles. Unless of course, it lands on a write cycle, in which case it is delayed and only lasts 3 cycles.
 	; We need to make sure a DMC DMA will occur somewhere between 0 and 5 CPU cycles before the Frame Counter IRQ Flag is set and polled.
 	JSR Clockslide_300 ; NOTE: do not optimize with ClockslideFromWord, as write cycles throw off the DMC DMA timing.
 	JSR Clockslide_50  ; ^
 	JSR Clockslide_43  ; ^
 	LDA #$00
-	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	JSR Clockslide_20000 ; NOTE: do not optimize with ClockslideFromWord, as write cycles throw off the DMC DMA timing.
 	JSR Clockslide_9000  ; ^
 	JSR Clockslide_500   ; ^
@@ -9005,11 +9005,11 @@ TEST_IFlagLatency_Test_C:
 	JSR $4013
 	;[DMC DMA. 4 cycles. Data bus = $90]
 	;(put cycle) Read Opcode: $90
-	; poll for interrupts, Interrupt *will* occur.
+	; poll for interrupts, (IRQ Level detector is high)
 	;(get cycle) Read Operand: $90
 	;(put cycle) Dummy read $4015.
 	; (transition from put to get: the Frame Counter Interrupt flag is cleared)
-	; poll for interrupts, interrupt will *not* occur.
+	; poll for interrupts, (IRQ Level detector is low)
 	;(get cycle) Dummy read.
 	
 	; This will run `BCC $3FA5`
@@ -9528,13 +9528,13 @@ TEST_FrameCounterIRQ:
 	STA $4017	; 4-step mode, enable IRQ
 	JSR Clockslide_30000 ; wait long enough that the IRQ flag would be set.
 	LDA #02
-	STA $4014 ; align with "put" cycle.
-	LDA #0
-	LDX #0
+	STA $4014 ; align with "get" cycle.
+	LDA #0 ; (get), (put)
+	LDX #0 ; (get), (put)
 	; TODO: Shouldn't I make sure the SLO instruction works before running this?
-	.byte $1F	; SLO Absolute, X
-	.word $4015 ; This reads from $4015 twice!
-	BNE FAIL_FrameCounterIRQ ; If SLO is properly emulated, you might see bit 7 set here (failing the test). The flag is actually cleared before the second read, so it bit 7 should be 0.
+	.byte $1F	; (get) : SLO Absolute, X 
+	.word $4015 ; (put), (get), (put), (get), (put), (get) : This reads from $4015 twice!
+	BNE FAIL_FrameCounterIRQ ; If SLO is properly emulated, you might see bit 7 set here (failing the test). The flag is actually cleared before the second read, so bit 7 should be 0.
 	INC <ErrorCode
 	
 	;;; Test 7 [APU Frame Counter IRQ]: The IRQ flag should not be cleared when the APU transitions from a "get" cycle to a "put" cycle. ;;;
@@ -9565,12 +9565,12 @@ TEST_FrameCounterIRQ:
 	STA $4017	; 4-step mode, enable IRQ
 	JSR Clockslide_30000 ; wait long enough that the IRQ flag would be set.
 	LDA #02
-	STA $4014 ; align with "put" cycle.
-	LDA <$00  ; align with "get" cycle.
-	LDA #0
-	LDX #0
-	.byte $1F	; SLO Absolute, X
-	.word $4015 ; This reads from $4015 twice!
+	STA $4014 ; align with "get" cycle.
+	LDA <$00  ; (get), (put), (get)
+	LDA #0    ; (put), (get)
+	LDX #0    ; (put), (get)
+	.byte $1F ; (put) : SLO Absolute, X 
+	.word $4015;(get), (put), (get), (put), (get), (put) This reads from $4015 twice!
 	BEQ FAIL_FrameCounterIRQ2 ; If SLO is properly emulated, bit 7 will be set if you passed the test. The frame counter interrupt flag gets cleared after the second read in this case.
 	INC <ErrorCode
 
@@ -9597,11 +9597,11 @@ TEST_FrameCounterIRQ:
 	;;; Test A [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (see if it's set too early) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync CPU with "put" cycle
-	LDA #$40
-	STA $4017 ; 4-step mode, clear IRQ flag
-	LDA #$00	
-	STA $4017 ; 4-step mode, enable IRQ (The CPU was on "get" cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
+	STA $4014 ; sync CPU with "get" cycle
+	LDA #$40  ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : 4-step mode, clear IRQ flag 
+	LDA #$00  ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : 4-step mode, enable IRQ. (The CPU was on "put" cycle when writing that, so the frame counter is reset in 3 CPU cycles.) 
 	; the flag should be enabled in 29830 CPU cycles.
 	; So let's stall for 29826 cycles, and read $4015 to see if the flag was set. That should be 1 cycle too early.
 	JSR ClockslideFromWord
@@ -9620,11 +9620,11 @@ TEST_FrameCounterIRQ_Continue:
 	;;; Test B [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (see if it's set on the right CPU cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync CPU with "put" cycle
-	LDA #$40
-	STA $4017 ; 4-step mode, clear IRQ flag
-	LDA #$00	
-	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
+	STA $4014 ; sync CPU with "get" cycle
+	LDA #$40  ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : 4-step mode, clear IRQ flag 
+	LDA #$00  ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : 4-step mode, enable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	; the flag should be enabled in 29830 CPU cycles.
 	; So let's stall for 29827 cycles, and read $4015 to see if the flag was set. That should be 1 cycle too early.
 	JSR ClockslideFromWord
@@ -9636,12 +9636,12 @@ TEST_FrameCounterIRQ_Continue:
 	;;; Test C [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (If the write occurs on a "put" CPU cycle, the IRQ is delayed by 1 CPU cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync CPU with "put" cycle
-	LDA <$00  ; sync CPU with "get" cycle
-	LDA #$40
-	STA $4017 ; 4-step mode, clear IRQ flag
-	LDA #$00	
-	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4014 ; sync CPU with "get" cycle
+	LDA <$00  ; (get), (put), (get)
+	LDA #$40  ; (put), (get)
+	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag
+	LDA #$00  ; (put), (get)
+	STA $4017 ; (put), (get), (put), (get), 4-step mode, enable IRQ (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
 	; So let's stall for 29827 cycles, and read $4015 to see if the flag was set. That should be 1 cycle too early.
 	JSR ClockslideFromWord
@@ -9653,12 +9653,12 @@ TEST_FrameCounterIRQ_Continue:
 	;;; Test D [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (see if it's set on the correct cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with "put" CPU cycle
-	LDA <$00  ; sync with "get" CPU cycle
-	LDA #$40
-	STA $4017 ; 4-step mode, clear IRQ flag
-	LDA #$00	
-	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4014 ; sync with "get" CPU cycle
+	LDA <$00  ; (get), (put), (get)
+	LDA #$40  ; (put), (get)
+	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag
+	LDA #$00  ; (put), (get)
+	STA $4017 ; (put), (get), (put), (get) : 4-step mode, enable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
 	; So let's stall for 29828 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
 	JSR ClockslideFromWord
@@ -9670,12 +9670,12 @@ TEST_FrameCounterIRQ_Continue:
 	;;; Test E [APU Frame Counter IRQ]: Reading $4015 on the same cycle the IRQ flag is set, will not clear the IRQ flag (it gets set again on the following 2 CPU cycles) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with "put" CPU cycle
-	LDA <$00  ; sync with "get" CPU cycle
-	LDA #$40
-	STA $4017 ; 4-step mode, clear IRQ flag
-	LDA #$00	
-	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4014 ; sync with "get" CPU cycle
+	LDA <$00  ; (get), (put), (get)
+	LDA #$40  ; (put), (get)
+	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag
+	LDA #$00  ; (put), (get)
+	STA $4017 ; (put), (get), (put), (get) : 4-step mode, enable IRQ (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	JSR ClockslideFromWord
 	.word 29827
 	LDA $4015 ; Read on the same cycle the IRQ flag is set.
@@ -9686,12 +9686,12 @@ TEST_FrameCounterIRQ_Continue:
 	;;; Test F [APU Frame Counter IRQ]: Reading $4015 on the cycle after the IRQ flag is set, will not clear the IRQ flag (it gets set again on the following CPU cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with "put" CPU cycle
-	LDA <$00  ; sync with "get" CPU cycle
-	LDA #$40
-	STA $4017 ; 4-step mode, clear IRQ flag
-	LDA #$00	
-	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4014 ; sync with "get" CPU cycle
+	LDA <$00  ; (get), (put), (get)
+	LDA #$40  ; (put), (get)
+	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag
+	LDA #$00  ; (put), (get)
+	STA $4017 ; (put), (get), (put), (get) : 4-step mode, enable IRQ (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	JSR ClockslideFromWord
 	.word 29828
 	LDA $4015 ; Read on the same cycle the IRQ flag is set.
@@ -9702,12 +9702,12 @@ TEST_FrameCounterIRQ_Continue:
 	;;; Test G [APU Frame Counter IRQ]: Reading $4015 2 cycles after the IRQ flag is set, will not clear the IRQ flag (it gets set again on this CPU cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with "put" CPU cycle
-	LDA <$00  ; sync with "get" CPU cycle
-	LDA #$40
-	STA $4017 ; 4-step mode, clear IRQ flag
-	LDA #$00	
-	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4014 ; sync with "get" CPU cycle
+	LDA <$00  ; (get), (put), (get)
+	LDA #$40  ; (put), (get)
+	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag
+	LDA #$00  ; (put), (get)
+	STA $4017 ; (put), (get), (put), (get) : 4-step mode, enable IRQ (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	JSR ClockslideFromWord
 	.word 29829
 	LDA $4015 ; Read on the same cycle the IRQ flag is set.
@@ -9718,12 +9718,12 @@ TEST_FrameCounterIRQ_Continue:
 	;;; Test H [APU Frame Counter IRQ]: Reading $4015 3 cycles after the IRQ flag is set, will clear the IRQ flag (it does not get set again on this CPU cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with "put" CPU cycle
-	LDA <$00  ; sync with "get" CPU cycle
-	LDA #$40
-	STA $4017 ; 4-step mode, clear IRQ flag
-	LDA #$00	
-	STA $4017 ; 4-step mode, enable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4014 ; sync with "get" CPU cycle
+	LDA <$00  ; (get), (put), (get)
+	LDA #$40  ; (put), (get)
+	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag
+	LDA #$00  ; (put), (get)
+	STA $4017 ; (put), (get), (put), (get) : 4-step mode, enable IRQ (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	JSR ClockslideFromWord
 	.word 29830
 	LDA $4015 ; Read on the same cycle the IRQ flag is set.
@@ -9748,10 +9748,10 @@ TEST_FrameCounterIRQ_Continue2:
 	; The following 4 tests will check 29827, 29828, 29829, and 29830 cycles after resetting the frame counter, and the test after that will verify that the IRQ level detector is not pulled low. (An IRQ did not happen)
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with "put" CPU cycle
-	LDA <$00  ; sync with "get" CPU cycle
-	LDA #$40
-	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4014 ; sync with "get" CPU cycle
+	LDA <$00  ; (get), (put), (get)
+	LDA #$40  ; (put), (get)
+	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
 	; So let's stall for 29827 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
 	JSR ClockslideFromWord
@@ -9764,10 +9764,10 @@ TEST_FrameCounterIRQ_Continue2:
 	;;; Test J [APU Frame Counter IRQ]: Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It happens on this cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with "put" CPU cycle
-	LDA <$00  ; sync with "get" CPU cycle
-	LDA #$40
-	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4014 ; sync with "get" CPU cycle
+	LDA <$00  ; (get), (put), (get)
+	LDA #$40  ; (put), (get)
+	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
 	; So let's stall for 29828 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
 	JSR ClockslideFromWord
@@ -9780,10 +9780,10 @@ TEST_FrameCounterIRQ_Continue2:
 	;;; Test K [APU Frame Counter IRQ]: Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It happens on this cycle too) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with "put" CPU cycle
-	LDA <$00  ; sync with "get" CPU cycle
-	LDA #$40
-	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4014 ; sync with "get" CPU cycle
+	LDA <$00  ; (get), (put), (get)
+	LDA #$40  ; (put), (get)
+	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
 	; So let's stall for 29829 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
 	JSR ClockslideFromWord
@@ -9796,10 +9796,10 @@ TEST_FrameCounterIRQ_Continue2:
 	;;; Test L [APU Frame Counter IRQ]:  Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It does not happen on this cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with "put" CPU cycle
-	LDA <$00  ; sync with "get" CPU cycle
-	LDA #$40
-	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4014 ; sync with "get" CPU cycle
+	LDA <$00  ; (get), (put), (get)
+	LDA #$40  ; (put), (get)
+	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
 	; So let's stall for 29830 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
 	JSR ClockslideFromWord
@@ -9815,10 +9815,10 @@ TEST_FrameCounterIRQ_Continue2:
 	JSR WaitForVBlank
 	LDX #$5A
 	LDA #02
-	STA $4014 ; sync with "put" CPU cycle
-	LDA <$00  ; sync with "get" CPU cycle
-	LDA #$40
-	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4014 ; sync with "get" CPU cycle
+	LDA <$00  ; (get), (put), (get)
+	LDA #$40  ; (put), (get)
+	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the flag should be enabled in 29831 CPU cycles.
 	; So let's stall for 29828 cycles, and read $4015 to see if the flag was set. That should be *the* cycle it gets set.
 	JSR ClockslideFromWord
@@ -9833,10 +9833,10 @@ TEST_FrameCounterIRQ_Continue2:
 	;;; Test N [APU Frame Counter IRQ]: If the CPU's I flag is clear, when exactly does the IRQ occur? ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with "put" CPU cycle
-	LDA <$00  ; sync with "get" CPU cycle
-	LDA #$00
-	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4014 ; sync with "get" CPU cycle
+	LDA <$00  ; (get), (put), (get)
+	LDA #$00  ; (put), (get)
+	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the IRQ should occur in 29834 CPU cycles.
 	JSR ClockslideFromWord
 	.word 29824
@@ -9859,10 +9859,10 @@ TEST_FrameCounterIRQ_Continue3:
 	;;; Test O [APU Frame Counter IRQ]: If the CPU's I flag is clear, when exactly does the IRQ occur? ;;;
 	JSR WaitForVBlank
 	LDA #02
-	STA $4014 ; sync with "put" CPU cycle
-	LDA <$00  ; sync with "get" CPU cycle
-	LDA #$00
-	STA $4017 ; 4-step mode, clear IRQ flag (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
+	STA $4014 ; sync with "get" CPU cycle
+	LDA <$00  ; (get), (put), (get)
+	LDA #$00  ; (put), (get)
+	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
 	; the IRQ should occur in 29833 CPU cycles.
 	JSR ClockslideFromWord
 	.word 29825
@@ -9892,15 +9892,15 @@ TEST_FrameCounter4Step:
 	;;; Test 1 [APU Frame Counter 4-Step Mode]: Verify the timing of the first clock (read 1 cycle early. It's still going) ;;;
 	LDA #2
 	STA $4014
-	;CPU is synced with "put" CPU cycle
-	LDA #0
-	STA $4017 ; Reset the frame counter.
-	LDA #$18
-	STA $4003 ; Length = 2.
-	LDA #$80
-	STA $4017 ; Manually clock the pulse 1 length counter.
-	LDA #$40
-	STA $4017 ; 4-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
+	; CPU is synced with "get" CPU cycle
+	LDA #0    ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : Reset the frame counter.
+	LDA #$18  ; (get), (put)
+	STA $4003 ; (get), (put), (get), (put) : Length = 2.
+	LDA #$80  ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : Manually clock the pulse 1 length counter.
+	LDA #$40  ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : 4-step mode, disable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	NOP  ; stall for frame counter to be reset.
 	; Okay, the first time the length counters get clocked is in 14913 CPU cycles.
 	JSR ClockslideFromWord
@@ -9916,15 +9916,15 @@ TEST_FrameCounter4Step:
 	;;; Test 2 [APU Frame Counter 4-Step Mode]: Verify the timing of the first clock  (Read the cycle it stops);;;
 	LDA #2
 	STA $4014
-	;CPU is synced with "put" CPU cycle
-	LDA #0
-	STA $4017 ; Reset the frame counter.
-	LDA #$18
-	STA $4003 ; Length = 2.
-	LDA #$80
-	STA $4017 ; Manually clock the pulse 1 length counter.
-	LDA #$40
-	STA $4017 ; 4-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
+	;CPU is synced with "get" CPU cycle
+	LDA #0    ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : Reset the frame counter.
+	LDA #$18  ; (get), (put)
+	STA $4003 ; (get), (put), (get), (put) : Length = 2.
+	LDA #$80  ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : Manually clock the pulse 1 length counter.
+	LDA #$40  ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : 4-step mode, disable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	NOP  ; stall for frame counter to be reset.
 	; Okay, the first time the length counters get clocked is in 14913 CPU cycles.
 	JSR ClockslideFromWord
@@ -9941,11 +9941,11 @@ TEST_FrameCounter4Step:
 	;;; Test 3 [APU Frame Counter 4-Step Mode]: Verify the timing of the second clock while not inhibiting Frame Counter IRQs (read 1 cycle early. It's still going) ;;;
 	LDA #2
 	STA $4014
-	;CPU is synced with "put" CPU cycle
-	LDA #$18
-	STA $4003	; Set the length to 2. We don't need to manually clock this one, as we're checking the timing of the 2nd clock.
-	LDA #$40
-	STA $4017 ; 4-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
+	;CPU is synced with "get" CPU cycle
+	LDA #$18  ; (get), (put)
+	STA $4003 ; (get), (put), (get), (put) : Set the length to 2. We don't need to manually clock this one, as we're checking the timing of the 2nd clock.
+	LDA #$40  ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : 4-step mode, disable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	NOP  ; stall for frame counter to be reset.
 	; Okay, the second time the length counters get clocked is in 29829 CPU cycles.
 	JSR ClockslideFromWord
@@ -9960,10 +9960,11 @@ TEST_FrameCounter4Step:
 	;;; Test 4 [APU Frame Counter 4-Step Mode]: Verify the timing of the second clock while not inhibiting Frame Counter IRQs (Read the cycle it stops) ;;;
 	LDA #2
 	STA $4014
-	LDA #$18
-	STA $4003 ; Set the length to 2. We don't need to manually clock this one, as we're checking the timing of the 2nd clock.
-	LDA #$40
-	STA $4017 ; 4-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
+	;CPU is synced with "get" CPU cycle
+	LDA #$18  ; (get), (put)
+	STA $4003 ; (get), (put), (get), (put) : Set the length to 2. We don't need to manually clock this one, as we're checking the timing of the 2nd clock.
+	LDA #$40  ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : 4-step mode, disable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	NOP  ; stall for frame counter to be reset.
 	; Okay, the second time the length counters get clocked is in 29829 CPU cycles.
 	JSR ClockslideFromWord
@@ -9979,15 +9980,15 @@ TEST_FrameCounter4Step:
 	;;; Test 5 [APU Frame Counter 4-Step Mode]: Verify the timing of the third clock (read 1 cycle early. It's still going) ;;;
 	LDA #2
 	STA $4014
-	;CPU is synced with "put" CPU cycle
-	LDA #0
-	STA $4017 ; Reset the frame counter.
-	LDA #$28
-	STA $4003 ; Length = 4.
-	LDA #$80
-	STA $4017 ; Manually clock the pulse 1 length counter.
-	LDA #$40
-	STA $4017 ; 4-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
+	;CPU is synced with "get" CPU cycle
+	LDA #0    ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : Reset the frame counter.
+	LDA #$28  ; (get), (put)
+	STA $4003 ; (get), (put), (get), (put) : Length = 4.
+	LDA #$80  ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : Manually clock the pulse 1 length counter.
+	LDA #$40  ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : 4-step mode, disable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	NOP  ; stall for frame counter to be reset.
 	; Okay, the third time the length counters get clocked is in 44743 CPU cycles.
 	JSR ClockslideFromWord
@@ -10003,15 +10004,15 @@ TEST_FrameCounter4Step:
 	;;; Test 6 [APU Frame Counter 4-Step Mode]: Verify the timing of the third clock  (Read the cycle it stops) ;;;
 	LDA #2
 	STA $4014
-	;CPU is synced with "put" CPU cycle
-	LDA #0
-	STA $4017 ; Reset the frame counter.
-	LDA #$28
-	STA $4003 ; Length = 4.
-	LDA #$80
-	STA $4017 ; Manually clock the pulse 1 length counter.
-	LDA #$40
-	STA $4017 ; 4-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
+	;CPU is synced with "get" CPU cycle
+	LDA #0    ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : Reset the frame counter.
+	LDA #$28  ; (get), (put)
+	STA $4003 ; (get), (put), (get), (put) : Length = 4.
+	LDA #$80  ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : Manually clock the pulse 1 length counter.
+	LDA #$40  ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : 4-step mode, disable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	NOP  ; stall for frame counter to be reset.
 	; Okay, the third time the length counters get clocked is in 44743 CPU cycles.
 	JSR ClockslideFromWord
@@ -10062,13 +10063,13 @@ TEST_FrameCounter5Step:
 	;;; Test 1 [APU Frame Counter 5-Step Mode]: Verify the timing of the first clock (read 1 cycle early. It's still going) ;;;
 	LDA #2
 	STA $4014
-	;CPU is synced with "put" CPU cycle
-	LDA #0
-	STA $4017 ; Reset the frame counter.
-	LDA #$18
-	STA $4003 ; Length = 2.
-	LDA #$80  ; This upcoming write will clock it once, then we just need to wait for the second clock.
-	STA $4017 ; 5-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
+	;CPU is synced with "get" CPU cycle
+	LDA #0    ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : Reset the frame counter.
+	LDA #$18  ; (get), (put)
+	STA $4003 ; (get), (put), (get), (put) : Length = 2.
+	LDA #$80  ; (get), (put)               : This upcoming write will clock it once, then we just need to wait for the second clock.
+	STA $4017 ; (get), (put), (get), (put) : 5-step mode, disable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	LDA <$00  ; stall for 3 CPU cycles.
 	; Okay, the first time the length counters get clocked is in 14912 CPU cycles.
 	JSR ClockslideFromWord
@@ -10084,13 +10085,13 @@ TEST_FrameCounter5Step:
 	;;; Test 2 [APU Frame Counter 5-Step Mode]: Verify the timing of the first clock  (Read the cycle it stops);;;
 	LDA #2
 	STA $4014
-	;CPU is synced with "put" CPU cycle
-	LDA #0
-	STA $4017 ; Reset the frame counter.
-	LDA #$18
-	STA $4003 ; Length = 2.
-	LDA #$80  ; This upcoming write will clock it once, then we just need to wait for the second clock.
-	STA $4017 ; 5-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
+	;CPU is synced with "get" CPU cycle
+	LDA #0    ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : Reset the frame counter.
+	LDA #$18  ; (get), (put)
+	STA $4003 ; (get), (put), (get), (put) : Length = 2.
+	LDA #$80  ; (get), (put)               : This upcoming write will clock it once, then we just need to wait for the second clock.
+	STA $4017 ; (get), (put), (get), (put) : 5-step mode, disable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	LDA <$00  ; stall for 3 CPU cycles.
 	; Okay, the first time the length counters get clocked is in 14912 CPU cycles.
 	JSR ClockslideFromWord
@@ -10106,14 +10107,14 @@ TEST_FrameCounter5Step:
 	;;; Test 3 [APU Frame Counter 5-Step Mode]: Verify the timing of the second clock (read 1 cycle early. It's still going) ;;;
 	LDA #2
 	STA $4014
-	;CPU is synced with "put" CPU cycle
-	LDA #0
-	STA $4017 ; Reset the frame counter.
-	LDA #$28
-	STA $4003 ; Length = 4.
-	LDA #$80  ; This upcoming write will clock it once, then we just need to wait for the second clock.
-	STA $4017 ; clock it an extra time.
-	STA $4017 ; 5-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
+	;CPU is synced with "get" CPU cycle
+	LDA #0    ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : Reset the frame counter.
+	LDA #$28  ; (get), (put)
+	STA $4003 ; (get), (put), (get), (put) : Length = 4.
+	LDA #$80  ; (get), (put)               : This upcoming write will clock it once, then we just need to wait for the second clock.
+	STA $4017 ; (get), (put), (get), (put) : clock it an extra time.
+	STA $4017 ; (get), (put), (get), (put) : 5-step mode, disable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	LDA <$00  ; stall for 3 CPU cycles.
 	; Okay, the second time the length counters get clocked is in 37280 CPU cycles.
 	JSR ClockslideFromWord
@@ -10128,14 +10129,14 @@ TEST_FrameCounter5Step:
 	;;; Test 4 [APU Frame Counter 5-Step Mode]: Verify the timing of the second clock  (Read the cycle it stops);;;
 	LDA #2
 	STA $4014
-	;CPU is synced with "put" CPU cycle
-	LDA #0
-	STA $4017 ; Reset the frame counter.
-	LDA #$28
-	STA $4003 ; Length = 4.
-	LDA #$80  ; This upcoming write will clock it once, then we just need to wait for the second clock.
-	STA $4017 ; clock it an extra time.
-	STA $4017 ; 5-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
+	;CPU is synced with "get" CPU cycle
+	LDA #0    ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : Reset the frame counter.
+	LDA #$28  ; (get), (put)
+	STA $4003 ; (get), (put), (get), (put) : Length = 4.
+	LDA #$80  ; (get), (put)               : This upcoming write will clock it once, then we just need to wait for the second clock.
+	STA $4017 ; (get), (put), (get), (put) : clock it an extra time.
+	STA $4017 ; (get), (put), (get), (put) : 5-step mode, disable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	LDA <$00  ; stall for 3 CPU cycles.
 	; Okay, the second time the length counters get clocked is in 37280 CPU cycles.
 	JSR ClockslideFromWord
@@ -10150,13 +10151,13 @@ TEST_FrameCounter5Step:
 	;;; Test 5 [APU Frame Counter 5-Step Mode]: Verify the timing of the third clock (read 1 cycle early. It's still going) ;;;
 	LDA #2
 	STA $4014
-	;CPU is synced with "put" CPU cycle
-	LDA #0
-	STA $4017 ; Reset the frame counter.
-	LDA #$28
-	STA $4003 ; Length = 4.
-	LDA #$80  ; This upcoming write will clock it once, then we just need to wait for the second clock.
-	STA $4017 ; 5-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
+	;CPU is synced with "get" CPU cycle
+	LDA #0    ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : Reset the frame counter.
+	LDA #$28  ; (get), (put)
+	STA $4003 ; (get), (put), (get), (put) : Length = 4.
+	LDA #$80  ; (get), (put)               : This upcoming write will clock it once, then we just need to wait for the second clock.
+	STA $4017 ; (get), (put), (get), (put) : 5-step mode, disable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	LDA <$00  ; stall for 3 CPU cycles.
 	; Okay, the third time the length counters get clocked is in 52194 CPU cycles.
 	JSR ClockslideFromWord
@@ -10172,13 +10173,13 @@ TEST_FrameCounter5Step:
 	;;; Test 6 [APU Frame Counter 5-Step Mode]: Verify the timing of the third clock  (Read the cycle it stops);;;
 	LDA #2
 	STA $4014
-	;CPU is synced with "put" CPU cycle
-	LDA #0
-	STA $4017 ; Reset the frame counter.
-	LDA #$28
-	STA $4003 ; Length = 4.
-	LDA #$80  ; This upcoming write will clock it once, then we just need to wait for the second clock.
-	STA $4017 ; 5-step mode, disable IRQ (The CPU was on an odd cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
+	;CPU is synced with "get" CPU cycle
+	LDA #0    ; (get), (put)
+	STA $4017 ; (get), (put), (get), (put) : Reset the frame counter.
+	LDA #$28  ; (get), (put)
+	STA $4003 ; (get), (put), (get), (put) : Length = 4.
+	LDA #$80  ; (get), (put)               : This upcoming write will clock it once, then we just need to wait for the second clock.
+	STA $4017 ; (get), (put), (get), (put) : 5-step mode, disable IRQ (The CPU was on a "put" cycle when writing that, so the frame counter is reset in 3 CPU cycles.)
 	LDA <$00  ; stall for 3 CPU cycles.
 	; Okay, the third time the length counters get clocked is in 52194 CPU cycles.
 	JSR ClockslideFromWord
@@ -11015,17 +11016,17 @@ TEST_ImpliedDummyRead:
 	LDA $4015
 	CMP #$40
 	BNE FAIL_ImpliedDummyRead1
-	; As a means of preventing these error codes from stretching beyond the alphabet, I'm going to also check for the even/odd cycle behavior of clearing this flag under error code 2.
+	; As a means of preventing these error codes from stretching beyond the alphabet, I'm going to also check for the get/put cycle behavior of clearing this flag under error code 2.
 	; See [APU Frame Counter IRQ] test 6 and 7.
 	LDA #$00	
 	STA $4017	; 4-step mode, enable IRQ
 	JSR Clockslide_30000 ; wait long enough that the IRQ flag would be set.
 	LDA #02
-	STA $4014 ; align with "put" cycle.
-	LDA #0
-	LDX #0
-	.byte $1F	; SLO Absolute, X
-	.word $4015 ; This reads from $4015 twice!
+	STA $4014 ; align with "get" cycle.
+	LDA #0    ; (get), (put)
+	LDX #0    ; (get), (put)
+	.byte $1F	; (get) : SLO Absolute, X
+	.word $4015 ; (put), (get), (put) : This reads from $4015 twice!
 	BNE FAIL_ImpliedDummyRead1 ; If SLO is properly emulated, you might see bit 7 set here (failing the test). The flag is actually cleared before the second read, so it bit 7 should be 0.
 	; This test *very deliberately* makes sure the double-reads from $4015 will always have bit 6 cleared before the second read, so we don't need to test for the alternate alignment here.
 
@@ -11472,7 +11473,7 @@ TEST_ImpliedDummyRead_Loop6:	; This loop tests BRK and RTI
 	LDA #LOW(TEST_ImpliedDummyRead_Post6) ; 11 cycles until DMA
 	PHA		 ; 12 cycles until DMA
 	LDA <$A5 ; 6 cycles until DMA
-	; This one doesn't need to worry about even/odd cycle polarity, since we're not double-reading $4015. We dummy read it, and the PC is moved *far away*.
+	; This one doesn't need to worry about get/put cycle polarity, since we're not double-reading $4015. We dummy read it, and the PC is moved *far away*.
 	JMP $4013; [Read opcode] [Read operand] [Dummy Read] [Push PCH] [Push PCL] [Read operand] 
 	; [DMC DMA, data bus = $48]
 	; PHA [data bus = A (A = the opcode we want to test)] [also dummy read.]
@@ -11514,7 +11515,7 @@ TEST_ImpliedDummyRead_Continue4:
 	PHA		 ; 12 cycles until DMA
 	LDA <$A5 ; 6 cycles until DMA
 	PHA
-	; This one doesn't need to worry about even/odd cycle polarity, since we're not double-reading $4015. We dummy read it, and the PC is moved *far away*.
+	; This one doesn't need to worry about get/put cycle polarity, since we're not double-reading $4015. We dummy read it, and the PC is moved *far away*.
 	JMP $4013; [Read opcode] [Read operand] [Read operand] 
 	; [DMC DMA, data bus = $68]
 	; PHA [data bus = A (A = the opcode we want to test)] [also dummy read.]
@@ -11860,8 +11861,8 @@ TEST_AddrMode_IndIndeY:
 	INC <ErrorCode
 	
 	;;; Test 2 [Indirect Addressing, Y Wraparound]: The Y indexing is allowed to cross page boundaries. ;;;
-	; Address $610 will hold the value $5A.
-	LDA #$5A
+	; Address $610 will hold the value $A5.
+	LDA #$A5
 	STA $610
 	; and address $50 will be set up with a pointer to address $5F0
 	LDA #$F0
@@ -11873,7 +11874,7 @@ TEST_AddrMode_IndIndeY:
 	; And low we run the LDA instruction.
 	LDA [$0050], Y
 	; The result of which, should be the value at address $610
-	CMP #$5A
+	CMP #$A5
 	BNE FAIL_AddrMode_IndIndeY
 	INC <ErrorCode
 	
@@ -17310,8 +17311,8 @@ Sync_ToSpriteFlagsClearingLoop:
 	LDX #0
 	.byte $1F
 	.word $4015 ; SLO $4015, X
-	; if this next cycle is a "get", A = $00. If this next cycle is a "put" A = $80.
-	; if the write to $4014 is on a "get" cycle, then there's a 1 cycle delay.
+	; if this next cycle is a "put", A = $00. If this next cycle is a "get" A = $80.
+	; if the write to $4014 is on a "put" cycle, then there's a 1 cycle delay.
 	PHA
 	LDA #2
 	STA $4014
@@ -17379,8 +17380,8 @@ Sync_ToLine0Dot1_Even:
 	LDX #0
 	.byte $1F
 	.word $4015 ; SLO $4015, X
-	; if this next cycle is a "get", A = $00. If this next cycle is a "put" A = $80.
-	; if the write to $4014 is on a "get" cycle, then there's a 1 cycle delay.
+	; if this next cycle is a "put", A = $00. If this next cycle is a "get" A = $80.
+	; if the write to $4014 is on a "put" cycle, then there's a 1 cycle delay.
 	PHA
 	LDA #2
 	STA $4014
@@ -17400,8 +17401,8 @@ Sync_ToLine0Dot1_Odd:
 	LDX #0
 	.byte $1F
 	.word $4015 ; SLO $4015, X
-	; if this next cycle is a "get", A = $00. If this next cycle is a "put" A = $80.
-	; if the write to $4014 is on a "get" cycle, then there's a 1 cycle delay.
+	; if this next cycle is a "put", A = $00. If this next cycle is a "get" A = $80.
+	; if the write to $4014 is on a "put" cycle, then there's a 1 cycle delay.
 	PHA
 	LDA #2
 	STA $4014
