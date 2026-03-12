@@ -16330,7 +16330,9 @@ SetPPUADDRFromWord:	; pretty much the same as ReadPPUADDRFromWord, but it doesn'
 	STA <$FF
 	STY <$FE
 	JSR CopyReturnAddressToByte0
-	LDA $2002
+	;LDA $2002 
+	; Good practices would dictate that I read from $2002 here to reset the w register.
+	; However, there are rare situations where I wish to use this subroutine without clearing the vblank flag.
 	LDY #0
 	LDA [$0000],Y
 	STA $2006
