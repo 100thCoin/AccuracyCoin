@@ -3,7 +3,7 @@ AccuracyCoin is a large collection of NES accuracy tests on a single NROM cartri
 
 This ROM was designed for an NTSC console with an RP2A03G CPU and RP2C02G PPU. Some tests might be automatically skipped on hardware with a different revision.
 
-This ROM currently has 136 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
+This ROM currently has 137 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
 Here's an example of the menu in this ROM shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been run yet. (The cursor is currently next to the "The Decimal Flag" test.)
 
@@ -314,7 +314,7 @@ For more information, I recommend reading the fully commented assembly code for 
   C: The IRQ flag was enabled too early. (writing to $4017 on an even CPU cycle.)  
   D: The IRQ flag was enabled too late. (writing to $4017 on an even CPU cycle.)  
   E: Reading $4015 on the last cycle before the IRQ flag is set should not clear the IRQ flag. (it gets set on the following 2 CPU cycles)  
-  F: Reading $4015 1 cycle later than the previous test should not clear the IRQ flag. (it gets set again on the following CPU cycle)  
+  F: Reading $4015 on the same cycle the IRQ flag is set should not clear the IRQ flag. (it gets set again on the following CPU cycle)  
   G: Reading $4015 1 cycle later than the previous test should not clear the IRQ flag. (it gets set again on this CPU cycle)  
   H: Reading $4015 1 cycle later than the previous test should clear the IRQ flag.  
   I: The Frame Counter Interrupt flag should not have been set 29827 cycles after resetting the frame counter.  
@@ -642,6 +642,9 @@ or
 ### $2004 Stress Test  
   1: Reading from $2004 (with rendering enabled) should read from the "OAM Buffer" used during OAM Evaluation. Your results did not match the expected results of the test where OAMADDR overflows. See TEST_2004_Stress_Evaluate in the .asm code for details.  
   2: Reading from $2004 (with rendering enabled) should read from the "OAM Buffer" used during OAM Evaluation. Your results did not match the expected results of the test with more than 8 in-range objects. See TEST_2004_Stress_Evaluate in the .asm code for details.  
+
+### $2007 Stress Test  
+  1: Reading from $2007 should set up the PPU Read Buffer two ppu cycles after the CPU Read ends. Reading from $2007 (with rendering enabled) should set up the PPU Read Buffer with the same value as the resulting read from the background or sprite fetch that occured on the same ppu cycle as the read for the PPU Read Buffer. If you fail this test, you are likely reading from memory to set up the PPU Read Buffer on the wrong ppu cycle, missing dummy nametable reads during sprite fetch, or missing dummy nametable reads at the end of a scanline.  
 
 ## Page 20: CPU Behavior 2
 

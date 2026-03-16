@@ -310,6 +310,7 @@ result_Rendering2007Read = $48A
 result_BranchDummyRead = $48B
 result_2004_Stress = $48C
 result_2002FlagClearTiming = $48D
+result_2007_Stress = $48E
 
 result_DrawTest = $03FF	; page 3 omits the test from the all-test-result-table.
 
@@ -752,6 +753,7 @@ Suite_PPUMisc:
 	table "BG Serial In",             $FF, result_BGSerialIn,            TEST_BGSerialIn
 	table "Sprites On Scanline 0",    $FF, result_Scanline0Sprites,      TEST_Scanline0Sprites
 	table "$2004 Stress Test",        $FF, result_2004_Stress,           TEST_2004_Stress
+	table "$2007 Stress Test",        $FF, result_2007_Stress,           TEST_2007_Stress
 
 	;table "RMW $2007 Extra Write", $FF, result_RMW2007, TEST_RMW2007 ; Commented out for now. More research required.
 	;table "Palette Corruption", $FF, result_Unimplemented, DebugTest (I did not write a test for this, because it relies on a specific cpu/ppu clock alignment.)
@@ -2027,7 +2029,7 @@ Test_2004_Stress_ShiftBy1_Loop:
 
 TEST_2004_Stress_Evaluate:
 
-	; so here's the deal. We need to verify 341 bytes, but I really don't want to make a 341-byte answer key.
+	; so here's the deal. We need to verify 341 bytes.
 	; Here are the bytes:
 	; 7F FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF 
     ; FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF 
@@ -2509,6 +2511,303 @@ TEST_BGSerialIn_Exit:
 FAIL_BGSerialIn2:
 	JMP FAIL_BGSerialIn
 ;;;;;;;;;;;;;;;;;
+
+TEST_2007_Stress:
+	; clear nametable 2.
+	JSR DisableRendering
+	JSR ClearNametable2
+	JSR ClearPage2
+
+	; Write 00 01 02 03... from $2C00 through $2FFF
+	JSR SetPPUADDRFromWord
+	.byte $2C, $00
+	LDX #0
+	LDY #4
+TEST_2007StressTest_Loop1:
+	STX $2007
+	INX
+	BNE TEST_2007StressTest_Loop1
+	DEY
+	BNE TEST_2007StressTest_Loop1 
+	
+	; sync to dot 0, then delay a bit so the loop occurs at the right time.
+	JSR Sync_ToLine0Dot1
+	; Wait until VBlank
+	LDX #0
+	STX $2001
+	; 2 cpu cycles have passed.
+	JSR ClockslideFromWord ; 
+	.word 28000-5
+	JSR ClockslideFromWord ; 
+	.word 29780
+	JSR ClockslideFromWord ; 
+	.word 29781-540
+	
+	; OAM Might have decayed, since we disabled rendering for a couple frames. Let's run an OAM DMA, and sync everything up.
+	LDA #0
+	LDX #0
+	.byte $1F
+	.word $4015 ; SLO $4015, X
+	; if this next cycle is a "get", A = $00. If this next cycle is a "put" A = $80.
+	; if the write to $4014 is on a "get" cycle, then there's a 1 cycle delay.
+	PHA
+	LDA #2
+	STA $4014
+	PLA
+	BMI TEST_2007StressTest_Loop2	
+	; Reset v
+TEST_2007StressTest_Loop2:
+	JSR TEST_2007StressTest_TimingLoop
+	
+	LDA #$08
+	STA $2001
+	
+	JSR Clockslide_50
+	JSR Clockslide_36
+	
+	LDA $2007 ; read on dot 0. Repeat this every 29781 cpu cycles.
+	LDA #0
+	STA $2001
+	LDA $2007 ;Read the contents of the buffer.
+	STA $500, X
+	
+	INX
+	BEQ TEST_2007StressTest_Cont
+	
+	JSR ClockslideFromWord
+	.word 27866
+	JMP TEST_2007StressTest_Loop2 
+TEST_2007StressTest_Cont:
+	JSR ClockslideFromWord
+	.word 27866+2
+TEST_2007StressTest_Loop3:
+	JSR TEST_2007StressTest_TimingLoop
+	LDA #$08
+	STA $2001
+	
+	JSR Clockslide_50
+	JSR Clockslide_36
+	
+	LDA $2007 ; read on dot 0. Repeat this every 29781 cpu cycles.
+	LDA #0
+	STA $2001
+	LDA $2007 ;Read the contents of the buffer.
+	STA $600, X
+	
+	INX
+	CPX #341-256
+	BEQ TEST_2007StressTest_Exit
+	
+	JSR ClockslideFromWord
+	.word 27866-2
+	JMP TEST_2007StressTest_Loop3 
+TEST_2007StressTest_Exit:
+
+	;;; Test 1 [$2007 Stress Test]: What data goes into the PPU Read Buffer if we read from $2007 in the middle of a visible scanline? ;;;
+
+	; Okay, let's talk about this test.
+	
+	; Here's what the above loop was doing:
+	; Read from $2007 on every dot of a visible scanline. This sets up the PPU Read Buffer. Then we read from $2007 to get the buffer contents, and store it at $500 + i
+	; But what's *actually* going on when reading from $2007? What goes into the PPU Read Buffer? Let's talk about how the PPU performs reads from memory, and what's going on with the PPU DATA State Machine.
+
+	; It all begins with one important piece of information: The PPU reuses 8 pins both as the data bus and the lower 8 pins of the address bus.
+	; Reads with the PPU take 2 cycles:
+	; - cycle 1 will set up the 8-bit address latch. This will be used at the low byte of the address to read from.
+	; - cycle 2 will read from memory. The address it reads from will be the high byte of the PPU's address bus with the low byte being the 8-bit address latch that was set up last cycle.
+	
+	; Let's ignore address $2007 for now and just think about the cadence in which the PPU reads during visible scanlines. We have the background fetch, and the sprite fetch to consider:
+	; on dot 1, the address latch is set up. (The address bus is set up to read from the nametable)
+	; on dot 2, the PPU reads from the nametable.
+	; on dot 3, the address latch is set up. (The address bus is set up to read from the attribute table)
+	; on dot 4, the PPU reads from the attribute table.
+	; on dot 5, the address latch is set up. (The address bus is set up by the Pattern Address Register)
+	; on dot 6, the PPU reads from the pattern table.
+	; on dot 7, the address latch is set up. (The address bus is set up by the Pattern Address Register)
+	; on dot 8, the PPU reads from the pattern table.
+	; on dot 9, the address latch is set up. (The address bus is set up to read from the nametable)
+	; on dot 10, the PPU reads from the nametable.
+	; ...
+	; this exact same pattern continues even into HBlank, as the sprite fetch is doing the same thing.
+	; on dot 257, the address latch is set up. (The address bus is set up to read from the nametable)
+	; on dot 258, the PPU reads from the nametable.
+	; on dot 259, the address latch is set up. (The address bus is set up to read from the nametable)
+	; on dot 260, the PPU reads from the nametable.
+	; on dot 261, the address latch is set up. (The address bus is set up by the Pattern Address Register)
+	; on dot 262, the PPU reads from the pattern table.
+	; on dot 263, the address latch is set up. (The address bus is set up by the Pattern Address Register)
+	; on dot 264, the PPU reads from the pattern table.
+	; on dot 265, the address latch is set up. (The address bus is set up to read from the nametable)
+	; on dot 266, the PPU reads from the nametable.
+	; ...
+	; Once sprite fetch is over, the pattern continues reading for the background yet again, but the final few dots of a scanline are a bit interesting:
+	; on dot 337, the address latch is set up. (The address bus is set up to read from the nametable)
+	; on dot 338, the PPU reads from the nametable.
+	; on dot 339, the address latch is set up. (The address bus is set up to read from the nametable)
+	; on dot 340, the PPU reads from the attribute table.
+	; on dot 0, the address latch is set up. (The address bus is set up by the Pattern Address Register)
+
+	; So every single PPU cycle is either setting up the address + latch, or reading from memory!
+	
+	; This also applies to reads from address $2007.
+	; Let's assume we're in vertical blank, or forced blank, so the read cadence of the background/sprite fetch isn't occuring.
+	; When you read from address $2007, you read the value of the PPU Read Buffer.
+	; Once the M2 line of the CPU goes low, the read has ended. At the moment the read ends, the PPU DATA State machine begins.
+	; - Keep in mind, the PPU clock could be high or low at the moment the state machine begins.
+	; - For the purposes of the following lines, when I say "One PPU cycle after the state machine begins", I mean the PPU clock must go low then high again after the state machine begins. 
+	;   - If the state machine begins while the clock is low, you need to wait for it to go high, then low, then high again, and now it's one ppu cycle after the state machine began.
+	; One PPU cycle after the state machine begins, the address latch is set up. (The address bus is set up using the value of the v register)
+	; Two PPU cycles after the state machine begins, read from memory. This read will update the PPU Read Buffer.
+	
+	; Keep in mind, reading from memory does not include Palette RAM. Palette RAM is internal to the PPU, so the address/data bus will just read from the cartridge or the nametable for the value used for the PPU Read Buffer.
+	
+	; So with this information in mind, what happens if you read $2007 in the middle of a visible scanline?
+	; Well, it all depends on exactly when the read ends, since that's what starts the PPU DATA State Machine.
+	; Let's say the read ends on dot 0, while the ppu clock is high. Here's what happens next.
+	; on dot 1, the address bus would normally be set up with v due to the PPU DATA State Machine, but in reality, the background fetch takes priority, so the address bus + latch are set up using the address for the nametable read.
+	; on dot 2, the nametable fetch occurs just fine, this is also the value that goes into the PPU Read Buffer.
+	; Wow! The read from $2007 didn't use `v`, but instead used the nametable address that was used during the background fetch.
+	
+	; But something even more interesting happens if you read from $2007 in a way that is mis-aligned from the PPU's background/sprite fetch read cadence.
+	; * NOTE: The following is just one of many possible outcomes. This is analogue behavior, and does not reflect the behavior of all consoles. Not even the behavior of all consoles tested.
+	; Let's say the read ends on dot 1, while the ppu clock is high. Here's what happens next.
+	; on dot 2, the address bus would normally be set up with v due to the PPU DATA State Machine, but the PPU is currently reading from the nametable! 
+	; - This results in analogue behavior, since we are simultaneously attempting to use these 8 pins as the data bus, but also to set up the 8-bit address latch!
+	; on dot 3, the address bus is once again changed due to the read cadence, but the PPU is now trying to read for the value that goes into the read buffer!
+	; - Once again, this is analogue behavior, as we are simultaneously attempting to use these 8 pins as the data bus, but also to set up the 8-bit address latch!
+	; - The end result is typically this: The value that goes into the read buffer is read from an address where the high byte is determined by the read cadence, and the value of the 8-bit address latch is the result of the read from the address determined by the read cadence.
+	;   - for instance, this cycle would set up the address bus to read from the attribute tables. let's say this address is $23C0. If address $23C0 would read $5A, then the value that goes into the buffer is the value at address $235A.*
+	; * NOTE: This is at least the behavior I noticed on my console. This is analogue behavior, and does not reflect the behavior of all consoles. Not even the behavior of all consoles tested.
+	
+	; So depending on how the read from the PPU DATA State Machine aligns with the PPU Background/Sprite fetch read cadence, the result is either stable or unstable.
+	; Naturally, we'll only be checking the results of the stable reads.
+
+	; Speaking of the results, here are the expected results from the loop above.
+	
+	; Keep in mind, half the bytes are affected by analogue behavior and are displayed a ?? since they could be *anything*.
+	
+	; ?? 02 ?? C0 ?? 46 ?? 46 ?? 03 ?? C0 ?? 06 ?? 06
+	; ?? 04 ?? C1 ?? 6C ?? 6C ?? 05 ?? C1 ?? 60 ?? 60
+	; ?? 06 ?? C1 ?? 60 ?? 60 ?? 07 ?? C1 ?? 06 ?? 06
+	; ?? 08 ?? C2 ?? 66 ?? 66 ?? 09 ?? C2 ?? 66 ?? 66
+	; ?? 0A ?? C2 ?? 24 ?? 24 ?? 0B ?? C2 ?? 66 ?? 66
+	; ?? 0C ?? C3 ?? 66 ?? 66 ?? 0D ?? C3 ?? 64 ?? 64
+	; ?? 0E ?? C3 ?? 60 ?? 60 ?? 0F ?? C3 ?? 60 ?? 60
+	; ?? 10 ?? C4 ?? 66 ?? 66 ?? 11 ?? C4 ?? 66 ?? 66
+	; ?? 12 ?? C4 ?? 18 ?? 18 ?? 13 ?? C4 ?? 0C ?? 0C
+	; ?? 14 ?? C5 ?? 6C ?? 6C ?? 15 ?? C5 ?? 60 ?? 60
+	; ?? 16 ?? C5 ?? 76 ?? 76 ?? 17 ?? C5 ?? 72 ?? 72
+	; ?? 18 ?? C6 ?? 66 ?? 66 ?? 19 ?? C6 ?? 7C ?? 7C
+	; ?? 1A ?? C6 ?? 3C ?? 3C ?? 1B ?? C6 ?? 7C ?? 7C
+	; ?? 1C ?? C7 ?? 3C ?? 3C ?? 1D ?? C7 ?? 7E ?? 7E
+	; ?? 1E ?? C7 ?? 66 ?? 66 ?? 1F ?? C7 ?? 66 ?? 66
+	; ?? 00 ?? C0 ?? 3C ?? 3C ?? 01 ?? C0 ?? 18 ?? 18
+	; ?? 02 ?? 00 ?? FF ?? FF ?? 00 ?? 00 ?? FF ?? FF
+	; ?? 00 ?? 00 ?? FF ?? FF ?? 00 ?? 00 ?? FF ?? FF
+	; ?? 00 ?? 00 ?? FF ?? FF ?? 00 ?? 00 ?? FF ?? FF
+	; ?? 00 ?? 00 ?? FF ?? FF ?? 00 ?? 00 ?? FF ?? FF
+	; ?? 00 ?? C0 ?? 66 ?? 66 ?? 01 ?? C0 ?? 38 ?? 38
+	; ?? 02 ?? 02 
+
+	; The answer key below only includes the non-?? bytes.
+	
+	; As an example, let's look at the first 8 bytes:
+	; ?? 02 ?? C0 ?? 46 ?? 46
+	; Well... let's look at the stable bytes, at least.
+	
+	; This is the exact result of the background fetch reads.
+	; $02: we read a value of $02 from the address on the nametable.       (Address $2C02)
+	; $C0: we read a value of $C0 from the address on the attribute table. (Address $2FC0)
+	; $46: we read a value of $46 from the address on the pattern table.   (Address $0022)
+	; $46: we read a value of $46 from the address on the pattern table.   (Address $002A)
+
+	; Honestly, this test is a lot less intimidating than it could be, since I cannot require the analogue behavior to behave in a specific way.
+	; As an added challenge, run this test on a console you own, then try and make your emulator match for all the remaining reads!
+	
+	; Anyway, this entire test could be off by a cycle due to CPU/PPU Clock alignments. 
+	; Remember how if the ppu clock is low when the read from $2007 ends, then you pretty much need to wait an entire extra cycle for the state machine to work? 
+	; Wow! Now we know the cause of the alignment-specific behavior for this test!
+	
+	; Check if the entire thing is off by a byte.
+	LDA $503
+	CMP #$C0                           ; Address $503 is consistently $C0, and the neighboring bytes are NOT $C0, even with analogue behavior (as far as I can tell.)
+	BEQ TEST_2007StressTest_RotateSkip ; Otherwise, if we don't need to shift all the data, just skip ahead to evaluate it.
+	
+	LDA $502
+	CMP #$C0                           ; Address $502 is correct, but $504 wasn't, then we were off by one. Just fix that real quick...
+	
+	LDA $654                           ; Store the final byte at $7FF
+	STA $7FF                           ; We're reusing the Test_2004_Stress_ShiftBy1 routine, which copies address $7FF into $500.
+	JSR Test_2004_Stress_ShiftBy1      ; and shift it all aver!
+	
+TEST_2007StressTest_RotateSkip:        ; Now let's check every other byte of the recorded data.
+	LDX #0                             ; X will track the index into the answer key. (The key only has the stable bytes.)
+	LDY #0                             ; Y will be the index into the resulting data from $500 through $654
+TEST_2007StressTest_EvalLoop1:
+	TYA                                ; Check if Y&1 == 0.
+	AND #$01                           ; We need to skip all the bytes where this condition is true, since those are the unstable reads.
+	BEQ TEST_2007StressTest_EvalSkip1  ; Skip ahead if needed.
+	TXA                                ; Otherwise, check if we're reading from $500, X or from $600, X. If X >= $80 then we're reading from $600, X.
+	BMI TEST_2007StressTest_Eval600
+	LDA $500, Y	                       ; Read from the resulting data.
+	JMP TEST_2007StressTest_EvalMerge  ; jump ahead
+TEST_2007StressTest_Eval600:
+	LDA $600, Y                        ; Read from the resulting data.
+TEST_2007StressTest_EvalMerge:
+	CMP TEST_2007StressTest_Key, X     ; Compare with the asnwer key.
+	BNE TEST_2007StressTest_Fail       ; If it's not a match, fail the test.
+	INX                                ; Increment X for the next read from the answer key.
+TEST_2007StressTest_EvalSkip1:	
+	INY                                ; Increment Y for the next loop.
+	CPX #$AA                           ; If X = $AA then we read all the bytes.
+	BNE TEST_2007StressTest_EvalLoop1  ; Loop until X = $AA
+
+	;; END OF TEST ;;
+
+	LDA #1
+	RTS
+;;;;;;;
+
+TEST_2007StressTest_Fail:
+	JMP TEST_Fail
+	
+TEST_2007StressTest_TimingLoop:
+	LDA #$18 ; 28004
+	STA $2006; 28008
+	LDA #$00   ; 28010
+	STA $2006; 28014
+	; disable rendering
+	LDA #0   ; 28016
+	STA $2001; 28018
+	JSR ClockslideFromWord ; 
+	.word 1779-12
+	RTS
+;;;;;;;
+
+TEST_2007StressTest_Key: ; This is every other byte from the data. Honestly a real shame half the bytes are affected by analogue behavior.
+	.byte $02, $C0, $46, $46, $03, $C0, $06, $06
+	.byte $04, $C1, $6C, $6C, $05, $C1, $60, $60
+	.byte $06, $C1, $60, $60, $07, $C1, $06, $06
+	.byte $08, $C2, $66, $66, $09, $C2, $66, $66
+	.byte $0A, $C2, $24, $24, $0B, $C2, $66, $66
+	.byte $0C, $C3, $66, $66, $0D, $C3, $64, $64
+	.byte $0E, $C3, $60, $60, $0F, $C3, $60, $60
+	.byte $10, $C4, $66, $66, $11, $C4, $66, $66
+	.byte $12, $C4, $18, $18, $13, $C4, $0C, $0C
+	.byte $14, $C5, $6C, $6C, $15, $C5, $60, $60
+	.byte $16, $C5, $76, $76, $17, $C5, $72, $72
+	.byte $18, $C6, $66, $66, $19, $C6, $7C, $7C
+	.byte $1A, $C6, $3C, $3C, $1B, $C6, $7C, $7C
+	.byte $1C, $C7, $3C, $3C, $1D, $C7, $7E, $7E
+	.byte $1E, $C7, $66, $66, $1F, $C7, $66, $66
+	.byte $00, $C0, $3C, $3C, $01, $C0, $18, $18
+	.byte $02, $00, $FF, $FF, $00, $00, $FF, $FF
+	.byte $00, $00, $FF, $FF, $00, $00, $FF, $FF
+	.byte $00, $00, $FF, $FF, $00, $00, $FF, $FF
+	.byte $00, $00, $FF, $FF, $00, $00, $FF, $FF
+	.byte $00, $C0, $66, $66, $01, $C0, $38, $38
+	.byte $02, $02
+
 
 
 	.bank 1
