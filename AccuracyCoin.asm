@@ -4811,8 +4811,7 @@ TEST_ISC:
 
 TEST_SHA_93:
 	; Okay, this one needs an explanation.
-	; Per my research, it would appear early RP2A03G revision CPU's (and earlier) have slightly different behavior than late RP2A03G revision CPU's (and later)
-	; I call the early revision behavior "Behavior 1", and the late revision behavior "Behavior 2."
+	; Per my research, it would appear these instructions behave differently with different manufacturers.
 	; The big difference here is the "corruption" of the high byte when the Y register indexes beyond a page boundary.
 	; With behavior 1, the high byte of the address bus is bitwise ANDed with A AND X.
 	; With behavior 2, the high byte of the address bus is bitwise ANDed with X. (The A register doesn't have any affect on this high byte corruption with behavior 2.)
@@ -5114,31 +5113,32 @@ TEST_SHA_Behavior2:
 	; Write: A & (X | Magic) & H
 	; Hi = Hi & X
 	
-	; We can not make any assumptions on what "magic" is. Therefore, X needs to always be FF.
+	; We can not make any assumptions on what "magic" is. Therefore, X needs to always be FF, or at least contain the same bits as A.
 	JSR TEST_RunTest_AddrInitAXYF
 	.word $0525
 	.byte $FF
-	.byte $FF, $FF, $00, (flag_i)
+	.byte $FF, $FF, $10, (flag_i)
 	.word $0525
 	.byte $06
-	.byte $FF, $FF, $00, (flag_i)
+	.byte $FF, $FF, $10, (flag_i)
 	
 	JSR TEST_RunTest_AddrInitAXYF
 	.word $1D00
 	.byte $FF
-	.byte $03, $FF, $00, (flag_i)
+	.byte $03, $13, $00, (flag_i)
 	.word $0500
 	.byte $02
-	.byte $03, $FF, $00, (flag_i)
+	.byte $03, $13, $00, (flag_i)
 	
 	; Now to make the high byte go unstable.
+	; We need to make sure X equals A here, since we don't know what MAGIC will be.
 	JSR TEST_RunTest_AddrInitAXYF
 	.word $1F10 ; $1E90 will be the operand.
 	.byte $FF
-	.byte $0A, $FF, $80, (flag_i | flag_c | flag_z | flag_v)
-	.word $0710
+	.byte $0A, $0A, $80, (flag_i | flag_c | flag_z | flag_v)
+	.word $0A10
 	.byte $0A
-	.byte $0A, $FF, $80, (flag_i | flag_c | flag_z | flag_v)
+	.byte $0A, $0A, $80, (flag_i | flag_c | flag_z | flag_v)
 	; the high byte will only be ANDed with X (FF in this case)
 	
 	; And now to test if the value written is still ANDed with H if the cycle before the write had a DMA.
@@ -5350,10 +5350,10 @@ TEST_SHS_Behavior2_SkipPrints:
 	JSR TEST_RunTest_AddrInitAXYFS
 	.word $0525
 	.byte $FF
-	.byte $FF, $FF, $00, (flag_i), $FF
+	.byte $FF, $FF, $10, (flag_i), $FF
 	.word $0525
 	.byte $06
-	.byte $FF, $FF, $00, (flag_i), $FF
+	.byte $FF, $FF, $10, (flag_i), $FF
 	
 	JSR TEST_RunTest_AddrInitAXYFS
 	.word $1D00
@@ -5366,10 +5366,10 @@ TEST_SHS_Behavior2_SkipPrints:
 	JSR TEST_RunTest_AddrInitAXYFS
 	.word $1F10 ; $1E90 will be the operand.
 	.byte $FF
-	.byte $0A, $FF, $80, (flag_i | flag_c | flag_z | flag_v), $7E
-	.word $0710
+	.byte $0A, $0A, $80, (flag_i | flag_c | flag_z | flag_v), $7E
+	.word $0A10
 	.byte $0A
-	.byte $0A, $FF, $80, (flag_i | flag_c | flag_z | flag_v), $0A
+	.byte $0A, $0A, $80, (flag_i | flag_c | flag_z | flag_v), $0A
 
 	PHA
 	LDA #$20
@@ -7640,6 +7640,8 @@ FAIL_APURegActivation_Pre:
 TEST_APURegActivation:
 	;;; Test 1 [APU Register Activation]: Pre-requisite test suite: Does DMA affect the data bus? Is DMC DMA timing accurate? Is open bus accurate enough for this test? How about PPU Open Bus? What about the PPU Read buffer? OAM DATA? ;;;
 	; For the purposes of debugging, you can press select to show the debug menu. Address $50 will be labeled 00 to 05 based on which pre-requisite it fails.
+	JSR DisableRendering ; This is mostly used to make sure OAM Corruption doesn't conflict with the OAMDATA pre-test.
+
 	LDA <result_DMADMASync_PreTest	; This is written before the main menu loads when resetting the ROM. If you aren't passing this test (and using savestates), you'll need to reboot the ROM to update this value.
 	CMP #1
 	BNE FAIL_APURegActivation_Pre ; Fail if the DMC DMA doesn't update the data bus.
@@ -7816,7 +7818,6 @@ APURegActivation_Continue:
 	; Controller 2 was also strobed, but never read.
 	; Step 4: Put $14 in the PPU read buffer.
 	JSR WaitForVBlank
-	JSR DisableRendering
 	JSR WriteToPPUADDRWithByte
 	.byte $2C, $00
 	.byte $14, $FF
@@ -11548,6 +11549,8 @@ TEST_ImpliedDummyRead_Continue:
 
 	LDA #$00	; We need a series of bytes to be BRKs
 	LDX #0
+	LDA <$10
+	STA $710
 TEST_ImpliedDummyRead_OverwriteRAM_loop:
 	STA <$00, X
 	INX
@@ -11555,7 +11558,6 @@ TEST_ImpliedDummyRead_OverwriteRAM_loop:
 	LDA $710
 	STA <$10
 	; I recognize this is more bytes than opcodes I'm testing, but better safe than sorry.
-
 	LDX #0
 
 TEST_ImpliedDummyRead_Loop2:	; This loop tests the opcodes that do have bit 5 set. ($20)
@@ -12538,7 +12540,7 @@ PaletteRAM_PreRevisionG:
 	JSR Print_PreRevGBehavior
 	JSR PrintTextCentered
 	.word $2370
-	.byte "Missing reads from Palette RAM.", $FF
+	.byte " Missing reads from Palette RAM.", $FF
 	; Automatically skip the Palette RAM Quirks test?
 	;LDA #$FF
 	;STA result_PaletteRAMQuirks
