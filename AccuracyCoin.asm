@@ -11547,10 +11547,11 @@ TEST_ImpliedDummyRead_Continue:
 	
 	; Due to the upper 3 bits of a controller (or 5 bits on famicom) being open bus, (and $4015 doesn't update the data bus) the low byte operand of the JSR instruction could have anything in those bits.
 
-	LDA #$00	; We need a series of bytes to be BRKs
-	LDX #0
 	LDA <$10
 	STA $710
+	LDA #$00	; We need a series of bytes to be BRKs
+	LDX #0
+
 TEST_ImpliedDummyRead_OverwriteRAM_loop:
 	STA <$00, X
 	INX
