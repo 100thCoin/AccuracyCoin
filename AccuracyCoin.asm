@@ -2736,6 +2736,7 @@ TEST_2007StressTest_Exit:
 	; Sprite fetch should not be performing attribute table fetches, rather it should perform two nametable fetches in a row.
 	; The "Dummy Background Fetch" phase should not be performing attribute table fetches, rather it should perform two nametable fetches in a row, and the first cycle of a pattern fetch.
 	; The dummy nametable fetch on dot 257 should be reading from the OLD high byte of v before the v register is "horizontally reset".
+	;;;;;;;;;;;;;;;;;;;
 
 	; Honestly, this test is a lot less intimidating than it could be, since I cannot require the analogue behavior to behave in a specific way.
 	; As an added challenge, run this test on a console you own, then try and make your emulator match for all the remaining reads!
@@ -7656,7 +7657,6 @@ FAIL_APURegActivation_Pre:
 TEST_APURegActivation:
 	;;; Test 1 [APU Register Activation]: Pre-requisite test suite: Does DMA affect the data bus? Is DMC DMA timing accurate? Is open bus accurate enough for this test? How about PPU Open Bus? What about the PPU Read buffer? OAM DATA? ;;;
 	; For the purposes of debugging, you can press select to show the debug menu. Address $50 will be labeled 00 to 05 based on which pre-requisite it fails.
-	JSR DisableRendering ; This is mostly used to make sure OAM Corruption doesn't conflict with the OAMDATA pre-test.
 
 	LDA <result_DMADMASync_PreTest	; This is written before the main menu loads when resetting the ROM. If you aren't passing this test (and using savestates), you'll need to reboot the ROM to update this value.
 	CMP #1
@@ -7668,7 +7668,8 @@ TEST_APURegActivation:
 	BNE FAIL_APURegActivation_Pre ; Fail if DMC DMA timing is off.
 	INC <$50 ; for debugging.
 
-	JSR ResetScrollAndWaitForVBlank
+
+	JSR DisableRendering ; This is mostly used to make sure OAM Corruption doesn't conflict with the OAMDATA pre-test.
 	LDY #$10	 ; A copy of Open Bus test 3. If this fails, then open bus isn't reliable enough for this test.
 	LDA $50F8, Y ; This offset changes the high byte of the value read, but not the data bus.
 	CMP #$50
