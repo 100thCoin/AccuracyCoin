@@ -498,6 +498,7 @@ or
   4: The backdrop colors for sprites should be mirrors of the backdrop colors for backgrounds.  
   5: The values read from Palette RAM should only be 6-bit, with the upper 2 bits being PPU open bus.  
   6: With "Greyscale Mode" enabled, the lower four bits of the value read should all be zero.
+  7: With "Greyscale Mode" enabled, the lower four bits of the value written should be unaffected.
 
 ### Rendering Flag Behavior
   1: Background shift registers should not be initialized or clocked when rendering is entirely disabled.  
