@@ -14615,7 +14615,23 @@ TEST_PaletteRAMQuirksCont:
 	LDA $2007 ; The upper 2 bits read from palette RAM are copies of the PPU bus.
 	CMP #$FF
 	BNE FAIL_PaletteRAMQuirks2
+	INC <ErrorCode
+
+	;;; Test 6 [Palette RAM Quirks]: Reading from Palette RAM with greyscale mode enabled always reads the lower four bits as zero ;;;
 	
+	JSR SetPPUADDRFromWord
+	.byte $3F, $1C
+	LDA #$5A
+	STA $2007 ; write $5A to palette RAM
+	JSR SetPPUADDRFromWord
+	.byte $3F, $1C
+	LDA #1
+	STA $2001 ; Enable greyscale
+	LDA $2007 ; Read $10 from palette ram! (notably, not $5A, which is the value we wrote. Not even $1A. Rather, the lower four bits are all zero.)
+	CMP #$10
+	BNE FAIL_PaletteRAMQuirks2
+	STA $2001 ; Disable greyscale
+
 	;; END OF TEST ;;
 	JSR WaitForVBlank
 	JSR SetUpDefaultPalette
