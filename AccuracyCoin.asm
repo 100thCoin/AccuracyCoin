@@ -2260,7 +2260,8 @@ TEST_2002FlagTiming:
 	; If you are failing this test, you might be inclined to scoot the sprite flags over, so they get cleared on dot 0, but that's not the proper solution.
 	; Here's what's going on:
 	
-	; Reads from $2002 will read the vblank flag at the beginning of the read (when M2 goes high) and the sprite flags are read at the end (when M2 goes low)
+	; Reads from $2002 will latch the state of the vblank flag at the beginning of the read (when M2 goes high),
+	; but the sprite flags are not latched, so the value you get back is the state of the sprite flags at the end of the read. (when M2 goes low)
 	; On a revision G CPU, M2 has a duty cycle of 15/24, meaning that there are 7.5 master clock cycles between M2 going high and M2 going low.
 	; In other words, the sprite flags are read approximately 1.875 PPU cycles after the vblank flag is read.
 	
@@ -2751,7 +2752,8 @@ TEST_2007StressTest_Exit:
 	BEQ TEST_2007StressTest_RotateSkip ; Otherwise, if we don't need to shift all the data, just skip ahead to evaluate it.
 	
 	LDA $502
-	CMP #$C0                           ; Address $502 is correct, but $504 wasn't, then we were off by one. Just fix that real quick...
+	CMP #$C0                           ; Address $502 is correct, but $503 wasn't, then we were off by one. Just fix that real quick...
+	BNE TEST_2007StressTest_Fail       ; Otherwise, then the data was wrong (and it wasn't off by one address) so fail the test.
 	
 	LDA $654                           ; Store the final byte at $7FF
 	STA $7FF                           ; We're reusing the Test_2004_Stress_ShiftBy1 routine, which copies address $7FF into $500.
@@ -5629,7 +5631,7 @@ TEST_ARR_6B:
 	.byte $EE, $64, $45, (flag_i | flag_z | flag_v)
 	.byte $71, $64, $45, (flag_i | flag_c)
 	; ARR ;
-	; Bitwise AND with A then Rotate A and check bits
+	; Bitwise AND with A then Rotate A Right and check bits
 	; Negative flag = bit 7
 	; Carry flag = bit 6
 	; Overflow flag = bit 5 XOR bit 6
@@ -5659,7 +5661,7 @@ TEST_ANE_8B:
 	; ANE ;
 	; A = (((A | Magic) & X) & Immediate)
 	; The "Magic" value is not consistent, and so this test cannot rely on any specific value.
-	; It is possible to test and see what this value is, but it could be different between tests.
+	; It is possible to test and see what this value is, but it could be different between instances of running the test.
 	; Because of this, the tests used here need to specifically verify behavior only in cases where the magic value does not alter the outcome.
 	; Basically, unless Immediate is $00, or A is $FF, the outcome is not guaranteed.
 	
