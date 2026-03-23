@@ -12349,6 +12349,7 @@ TEST_BFlag_BRK:
 	INC <ErrorCode
 	
 	;;; Test 3 [The B Flag]: This emulator should be capable of running an IRQ before I run an IRQ test. ;;;
+	LDA $4015 ; acknowledge any pending IRQs. (there shouldn't be one yet.)
 	LDA #LOW(TEST_BFlag_BRK2)
 	STA $601
 	LDA #HIGH(TEST_BFlag_BRK2)
