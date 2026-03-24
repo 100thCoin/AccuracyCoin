@@ -2728,11 +2728,11 @@ TEST_2007StressTest_Exit:
 	; R└────┘/Q
 	;
 	; This is an SR latch.
-	; If S is ever true, then Q is set to be true.
-	; If R is ever true, then Q is set to be false.
+	; If S is ever true, then Q is set to be false.
+	; If R is ever true, then Q is set to be true.
 	; The SR latch will hold its state until either S or R are true. 
-	; This means that S could be true for a very brief amount of time, and Q will be true ultil R is ever true.
-	; At which point, Q will be false until S is ever true.
+	; This means that S could be true for a very brief amount of time, and Q will be false ultil R is ever true.
+	; At which point, Q will be true until S is ever true.
 	;
 	; If S and R are ever simultaneously true, both Q and /Q are false. This probably doesn't happen in the state machine though...
 	;
@@ -2767,6 +2767,9 @@ TEST_2007StressTest_Exit:
 	; /PPU_Clock is low on the first half of a ppu cycle, and high on the second half.
 	; $2007_Read is high when the CPU is reading from address $2007 (or a mirror of address $2007) and remains high until the CPU read cycle ends. (M2 goes low.)
 	;
+	; NOTE: The SR latch by default is outputting true. (preventing the NOR gate from outputting true. $2007_Read will make the SR latch output false, and this NOR gate will need to wait for the read to end.
+	;
+	;
 	; When ALE is high, the lower 8 bits of the address bus is set up with the lower 8 bits of v, and these 8 bits are also stored in an octal latch outside the PPU.
 	; When Read is high, the PPU performs the read from memory.
 	;
@@ -2790,12 +2793,12 @@ TEST_2007StressTest_Exit:
 	;│ t0.1 │ 0 │ 0 │ 01010 │ false │ false │ ; M2 is low.
 	;│ t1.0 │ 0 │ 0 │ 11010 │ false │ false │
 	;│ t1.1 │ 0 │ 0 │ 10010 │ false │ false │
-	;│ t2.0 │ 0 │ 0 │ 10110 │ true  │ false │
-	;│ t2.1 │ 0 │ 1 │ 10100 │ true  │ false │
+	;│ t2.0 │ 0 │ 0 │ 10110 │ true  │ false │ ; ALE is true.
+	;│ t2.1 │ 0 │ 1 │ 10100 │ true  │ false │ ; ALE is (still) true.
 	;│ t3.0 │ 0 │ 1 │ 00101 │ false │ false │
 	;│ t3.1 │ 0 │ 1 │ 01101 │ false │ false │
-	;│ t4.0 │ 0 │ 1 │ 01001 │ false │ true  │
-	;│ t4.1 │ 0 │ 1 │ 01011 │ false │ true  │
+	;│ t4.0 │ 0 │ 1 │ 01001 │ false │ true  │ ; Read is true.
+	;│ t4.1 │ 0 │ 1 │ 01011 │ false │ true  │ ; Read is (still) true.
 	;│ t5.0 │ 0 │ 1 │ 01010 │ false │ false │
 	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │
 	;└──────┴───┴───┴───────┴───────┴───────┘
@@ -2895,7 +2898,11 @@ TEST_2007StressTest_Exit:
 	; Latches shows the state of the Q output for all 5 D_Latches.
 	; - In this table, the leftmost bit is "D_Latch 0", and the rightmost bit is "D_Latch 4"
 	; - NOTE: All these latches are connected to each other using the /Q output! This means that "D_Latch n+1" will be latched with the opposite value of "D_Latch n"
+	;
+	; You can see from the output that ALE is true for two half-cycles, the state machine is idle for one half-cycle, then Write is true for two half-cycles.
 
+	
+	
 	; All of that to say, every ppu cycle will alternate from stable to unstable (and why), and now we can talk about the results of this test.
 	
 	; - Key -	
