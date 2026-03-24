@@ -2656,34 +2656,247 @@ TEST_2007StressTest_Exit:
 	; Once the M2 line of the CPU goes low, the read has ended. At the moment the read ends, the PPU DATA State machine begins.
 	; - Keep in mind, the PPU clock could be high or low at the moment the state machine begins.
 	; - For the purposes of the following lines, when I say "One PPU cycle after the state machine begins", I mean the PPU clock must go low then high again after the state machine begins. 
-	;   - If the state machine begins while the clock is low, you need to wait for it to go high, then low, then high again, and now it's one ppu cycle after the state machine began.
+	;   - If the state machine begins while the clock is low, you need to wait for it to go high (now the state machine begins), then low, then high again, and now it's one ppu cycle after the state machine began.
 	; One PPU cycle after the state machine begins, the address latch is set up. (The address bus is set up using the value of the v register)
-	; Two PPU cycles after the state machine begins, read from memory. This read will update the PPU Read Buffer.
+	; Two PPU cycles after the state machine begins, the state machine is effectively "idle". Neither setting up the address, nor reading.
+	; Three PPU cycles after the state machine begins, read from memory. This read will update the PPU Read Buffer.
 	
 	; Keep in mind, reading from memory does not include Palette RAM. Palette RAM is internal to the PPU, so the address/data bus will just read from the cartridge or the nametable for the value used for the PPU Read Buffer.
 	
 	; So with this information in mind, what happens if you read $2007 in the middle of a visible scanline?
 	; Well, it all depends on exactly when the read ends, since that's what starts the PPU DATA State Machine.
-	; Let's say the read ends on dot 0, while the ppu clock is high. Here's what happens next.
-	; on dot 1, the address bus would normally be set up with v due to the PPU DATA State Machine, but in reality, the background fetch takes priority, so the address bus + latch are set up using the address for the nametable read.
-	; on dot 2, the nametable fetch occurs just fine, this is also the value that goes into the PPU Read Buffer.
-	; Wow! The read from $2007 didn't use `v`, but instead used the nametable address that was used during the background fetch.
 	
-	; But something even more interesting happens if you read from $2007 in a way that is mis-aligned from the PPU's background/sprite fetch read cadence.
-	; * NOTE: The following is just one of many possible outcomes. This is analogue behavior, and does not reflect the behavior of all consoles. Not even the behavior of all consoles tested.
-	; Let's say the read ends on dot 1, while the ppu clock is high. Here's what happens next.
-	; on dot 2, the address bus would normally be set up with v due to the PPU DATA State Machine, but the PPU is currently reading from the nametable! 
-	; - This results in analogue behavior, since we are simultaneously attempting to use these 8 pins as the data bus, but also to set up the 8-bit address latch!
-	; on dot 3, the address bus is once again changed due to the read cadence, but the PPU is now trying to read for the value that goes into the read buffer!
-	; - Once again, this is analogue behavior, as we are simultaneously attempting to use these 8 pins as the data bus, but also to set up the 8-bit address latch!
-	; - The end result is typically this: The value that goes into the read buffer is read from an address where the high byte is determined by the read cadence, and the value of the 8-bit address latch is the result of the read from the address determined by the read cadence.
-	;   - for instance, this cycle would set up the address bus to read from the attribute tables. let's say this address is $23C0. If address $23C0 would read $5A, then the value that goes into the buffer is the value at address $235A.*
-	; * NOTE: This is at least the behavior I noticed on my console. This is analogue behavior, and does not reflect the behavior of all consoles. Not even the behavior of all consoles tested.
+	; NOTE: The PPU Read Cadence takes two cycles per read, but the State Machine takes three!
+	; This will always result in at least one read being affected by simultaneously setting up the Octal Latch (using the lower 8 bits as the address bus) and reading from memory (using the lower 8 bits as a data bus).
+	; In fact, this will always result in at least one unstable fetch for the read cadence, but depending on how it lines up, the read for the state machine can be stable or unstable.
 	
-	; So depending on how the read from the PPU DATA State Machine aligns with the PPU Background/Sprite fetch read cadence, the result is either stable or unstable.
+	;;; Unstable Read Cadence, Stable Read Buffer ;;;
+	; Let's say the read ends on dot 0, while the ppu clock is low. (one half cycle before dot 1) Here's what happens next.
+	; on dot 1, the state machine hasn't started yet. The read cadence sets "ALE", and the address bus is updated.
+	; on dot 2, we have a problem. Both "ALE" (from the state machine) and "Read" (from the read cadence) are true. This results in an analogue feedback loop, which will affect the read from the nametable.
+	; on dot 3, the state machine is idle, but the read cadence once again sets up the address bus.
+	; on dot 4, the "Read" line is synced between the read cadence and the state machine, so the value read from the attribute table will also go into the Read Buffer.
+	
+	;;; Unstable Read Cadence, Unstable Read Buffer ;;;
+	; Let's say the read ends on dot 0, while the ppu clock is high. (two half cycles before dot 1) Here's what happens next.
+	; on dot 1, "ALE" is set by both the read cadence, and the state machine. The address bus would normally be set up with v due to the PPU DATA State Machine, but in reality, the background fetch takes priority, so the address bus + latch are set up using the address for the nametable read.
+	; on dot 2, the nametable fetch occurs just fine. The state machine is idle.
+	; on dot 3, we have a problem. Both "ALE" and "Read" are true. This results in an analogue feedback loop affecting the data read and the octal latch. The result of this read goes into the read buffer.
+	; on dot 4, the Read Cadence also reads from an unstable address, since it uses the octal latch which was experiencing a feedback loop on the previous cycle.
+	
+	; So depending on how the read from the PPU DATA State Machine aligns with the PPU Background/Sprite fetch read cadence, the result going into the read buffer is either stable or unstable.
 	; Naturally, we'll only be checking the results of the stable reads.
 
-	; Speaking of the results, here are the expected results from the loop above.
+	;;;;;;;;;;;;;;;;;;;;;;;;;;
+	; PPU DATA State Machine ;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;
+	; Let's talk about ths PPU DATA state machine in extra detail, just to clear things up.
+	; Reads and writes have their own state machines and they behave in pretty much the same way, but the timing of the outputs is different.
+	;
+	;
+	;
+	; Below, we have a circuit diagram of this state machine. If this is a lower level than you are used to, allow me to explain what's going on here.
+	;
+	; A┌─────┐
+	;  │ NOR │Q
+	; B└─────┘
+	;
+	; This is a NOR gate. If either input (A, B) is true, the output (Q) is false. You can think of this as `if(!(A || B))` or `if(!A && !B)`
+	;
+	;;;;;;;;;;;;;
+	;
+	;  ┌───────┐
+	; E│       │Q
+	;  │D_Latch│
+	; D│   0   │/Q
+	;  └───────┘
+	;
+	; This is a D Latch.
+	; The E input enables the latch, while the D input is the value that gets stored.
+	; For instance, if E is true, the output (Q) will be set the the value of D. Then if E is false, changing D does not change Q
+	; /Q is the opposite of Q. So if Q is true, /Q is false.
+	;
+	; You will see in the diagram below that the "E input" for the D latch is driven by PPU_Clock or /PPU_Clock.
+	; This means that on the first half of the PPU cycle (when the clock is high) the D input is recorded for some D Latches,
+	; and on the second half of the PPU cucle (when the clock is low) the D input is recorded for the other D Latches.
+	; You will also notice in the dragram below that the chain of D Latches is connected using their /Q output.
+	;
+	;;;;;;;;;;;
+	;
+	; S┌────┐Q
+	;  │ SR │
+	; R└────┘/Q
+	;
+	; This is an SR latch.
+	; If S is ever true, then Q is set to be true.
+	; If R is ever true, then Q is set to be false.
+	; The SR latch will hold its state until either S or R are true. 
+	; This means that S could be true for a very brief amount of time, and Q will be true ultil R is ever true.
+	; At which point, Q will be false until S is ever true.
+	;
+	; If S and R are ever simultaneously true, both Q and /Q are false. This probably doesn't happen in the state machine though...
+	;
+	;;;;;;;;;;;;;;
+	; $2007 read ;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;                                                                                                                                                  ;
+	;                                                                                                                                                  ;
+	;  PPU_Clock  ├────────────────────────┬───────────────────────────────┬───────────────────────────────┐                                           ;
+	;                                      │                               │                               │                                           ;
+	;  /PPU_Clock ├────────────────────────│───────────────┬───────────────│───────────────┐               │                                           ;
+	;                                      │               │               │               │               │              /D_Latch2                    ;
+	;                                      │               │               │             ┌─│───────────────│──────────────────────►┌─────┐             ;
+	;                                      │               │               │             │ │               │                       │ NOR ├─────► ALE   ;
+	;                                      │               │               │             │ │               │             ┌────────►└─────┘             ;
+	;                                      │               │               │             │ │               │             │ D_Latch4                    ;
+	;                                      │   ┌───────┐   │   ┌───────┐   │   ┌───────┐ │ │   ┌───────┐   │   ┌───────┐ │                             ;
+	;                                      └──►│       │   └──►│       │   └──►│       ├┐│ └──►│       │   └──►│       ├─┘                             ;
+	;  $2007_Read ├─┬───────────►┌─────┐       │D_Latch│       │D_Latch│       │D_Latch│││     │D_Latch│       │D_Latch│                               ;
+	;               │            │ NOR ├──────►│   0   ├──────►│   1   ├──────►│   2   ├│┴────►│   3   ├───┬──►│   4   ├─┐                             ;
+	;               │         ┌─►└─────┘       └───────┘       └───────┘       └───────┘│      └───────┘   │   └───────┘ │                             ;
+	;               └─►┌────┬─┘                                                         │                  │             │/D_Latch4                    ;
+	;                  │ SR │                                                           │                  │             └────────►┌─────┐             ;
+	;               ┌─►└────┘                                                           │                  │                       │ NOR ├─────► Read  ;
+	;               │                                                                   └──────────────────│──────────────────────►└─────┘             ;
+	;               └──────────────────────────────────────────────────────────────────────────────────────┘               D_Latch2                    ;
+	;                /D_Latch3                                                                                                                         ;
+	;                                                                                                                                                  ;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;
+	; PPU_Clock is high on the first half of a ppu cycle, and low on the second half.
+	; /PPU_Clock is low on the first half of a ppu cycle, and high on the second half.
+	; $2007_Read is high when the CPU is reading from address $2007 (or a mirror of address $2007) and remains high until the CPU read cycle ends. (M2 goes low.)
+	;
+	; When ALE is high, the lower 8 bits of the address bus is set up with the lower 8 bits of v, and these 8 bits are also stored in an octal latch outside the PPU.
+	; When Read is high, the PPU performs the read from memory.
+	;
+	; Here's a timeline of an STA $2007, and how this affects the latches, ALE, and Write.
+	;
+	;┌──────┬───┬───┬───────┬───────┬───────┐
+	;│ Time │ R │SR │Latches│  ALE  │ Read  │
+	;├──────┼───┼───┼───────┼───────┼───────┤
+	;│ d    │ 0 │ 1 │ 01010 │ false │ false │
+	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │ ; The CPU is reading the opcode.
+	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │ ; The CPU is reading the opcode.
+	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │ ; M2 is low.
+	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │ ; The CPU is reading the low byte operand.
+	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │ ; The CPU is reading the low byte operand.
+	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │ ; M2 is low.
+	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │ ; The CPU is reading the high byte operand.
+	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │ ; The CPU is reading the high byte operand.
+	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │ ; M2 is low.
+	;│ ...  │ 1 │ 0 │ 01010 │ false │ false │ ; The CPU is reading from $2007
+	;│ t0.0 │ 1 │ 0 │ 01010 │ false │ false │ ; The CPU is reading from $2007
+	;│ t0.1 │ 0 │ 0 │ 01010 │ false │ false │ ; M2 is low.
+	;│ t1.0 │ 0 │ 0 │ 11010 │ false │ false │
+	;│ t1.1 │ 0 │ 0 │ 10010 │ false │ false │
+	;│ t2.0 │ 0 │ 0 │ 10110 │ true  │ false │
+	;│ t2.1 │ 0 │ 1 │ 10100 │ true  │ false │
+	;│ t3.0 │ 0 │ 1 │ 00101 │ false │ false │
+	;│ t3.1 │ 0 │ 1 │ 01101 │ false │ false │
+	;│ t4.0 │ 0 │ 1 │ 01001 │ false │ true  │
+	;│ t4.1 │ 0 │ 1 │ 01011 │ false │ true  │
+	;│ t5.0 │ 0 │ 1 │ 01010 │ false │ false │
+	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │
+	;└──────┴───┴───┴───────┴───────┴───────┘
+	; Time is how many cycles have passed since the end of the CPU Read cycle.
+	; - d just shows the default state of all these latches, and outputs.
+	; tn.0 is the first half of the PPU cycle when the clock is high. (PPU_Clock)
+	; tn.1 is the second half of the PPU cycle when the clock is low. (/PPU_Clock)
+	; t0.1 will be the half-cycle in which the CPU stops reading from $2007.
+	;
+	; R is the state of $2007_Read.
+	;
+	; SR is the state of the Q output of the SR latch.
+	;
+	; Latches shows the state of the Q output for all 5 D_Latches.
+	; - In this table, the leftmost bit is "D_Latch 0", and the rightmost bit is "D_Latch 4"
+	; - NOTE: All these latches are connected to each other using the /Q output! This means that "D_Latch n+1" will be latched with the opposite value of "D_Latch n"
+	;
+	; You can see from the output that ALE is true for two half-cycles, the state machine is idle for two half-cycles, then Read is true for two half-cycles.
+	;
+	;
+	; Currently, writes to $2007 aren't a part of this test, but while I'm here...
+	;
+	;;;;;;;;;;;;;;;
+	; $2007 write ;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;                                                                                                                                                  ;
+	;                                                                                                                                                  ;
+	;  PPU_Clock  ├────────────────────────┬───────────────────────────────┬───────────────────────────────┐                                           ;
+	;                                      │                               │                               │                                           ;
+	;  /PPU_Clock ├────────────────────────│───────────────┬───────────────│───────────────┐               │                                           ;
+	;                                      │               │               │               │               │              /D_Latch2                    ;
+	;                                      │               │               │             ┌─│───────────────│──────────────────────►┌─────┐             ;
+	;                                      │               │               │             │ │               │                       │ NOR ├─────► ALE   ;
+	;                                      │               │               │             │ │               │             ┌────────►└─────┘             ;
+	;                                      │               │               │             │ │               │             │ D_Latch4                    ;
+	;                                      │   ┌───────┐   │   ┌───────┐   │   ┌───────┐ │ │   ┌───────┐   │   ┌───────┐ │                             ;
+	;                                      └──►│       │   └──►│       │   └──►│       │ │ └──►│       ├─┐ └──►│       ├─┘                             ;
+	; $2007_Write ├─┬───────────►┌─────┐       │D_Latch│       │D_Latch│       │D_Latch│ │     │D_Latch│ │     │D_Latch│                               ;
+	;               │            │ NOR ├──────►│   0   ├──────►│   1   ├───┬──►│   2   ├─┴────►│   3   ├─│─┬──►│   4   │                               ;
+	;               │         ┌─►└─────┘       └───────┘       └───────┘   │   └───────┘       └───────┘ │ │   └───────┘                               ;
+	;               └─►┌────┬─┘                                            │                             │ │               D_Latch3                    ;
+	;                  │ SR │                                              │                             └─│──────────────────────►┌─────┐             ;
+	;               ┌─►└────┘                                              │                               │                       │ NOR ├─────► Write ;
+	;               │                                                      └───────────────────────────────│──────────────────────►└─────┘             ;
+	;               └──────────────────────────────────────────────────────────────────────────────────────┘              /D_Latch1                    ;
+	;                /D_Latch3                                                                                                                         ;
+	;                                                                                                                                                  ;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;
+	; PPU_Clock is high on the first half of a ppu cycle, and low on the second half.
+	; /PPU_Clock is low on the first half of a ppu cycle, and high on the second half.
+	; $2007_Write is high when the CPU is writing to address $2007 (or a mirror of address $2007) and remains high until the CPU write cycle ends. (M2 goes low.)
+	;
+	; When ALE is high, the lower 8 bits of the address bus is set up with the lower 8 bits of v, and these 8 bits are also stored in an octal latch outside the PPU.
+	; When Write is high, the PPU performs the write to memory.
+	;	- NOTE: for simplicity, I am omitting a detail of "Write" where this line is suppressed during a write to Palette RAM.
+	;
+	; Here's a timeline of an STA $2007, and how this affects the latches, ALE, and Write.
+	;
+	;┌──────┬───┬───┬───────┬───────┬───────┐
+	;│ Time │ W │SR │Latches│  ALE  │ Write │
+	;├──────┼───┼───┼───────┼───────┼───────┤
+	;│ d    │ 0 │ 1 │ 01010 │ false │ false │
+	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │ ; The CPU is reading the opcode.
+	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │ ; The CPU is reading the opcode.
+	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │ ; M2 is low.
+	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │ ; The CPU is reading the low byte operand.
+	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │ ; The CPU is reading the low byte operand.
+	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │ ; M2 is low.
+	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │ ; The CPU is reading the high byte operand.
+	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │ ; The CPU is reading the high byte operand.
+	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │ ; M2 is low.
+	;│ ...  │ 1 │ 0 │ 01010 │ false │ false │ ; The CPU is writing to $2007
+	;│ t0.0 │ 1 │ 0 │ 01010 │ false │ false │ ; The CPU is writing to $2007
+	;│ t0.1 │ 0 │ 0 │ 01010 │ false │ false │ ; M2 is low.
+	;│ t1.0 │ 0 │ 0 │ 11010 │ false │ false │
+	;│ t1.1 │ 0 │ 0 │ 10010 │ false │ false │
+	;│ t2.0 │ 0 │ 0 │ 10110 │ true  │ false │
+	;│ t2.1 │ 0 │ 1 │ 10100 │ true  │ false │
+	;│ t3.0 │ 0 │ 1 │ 00101 │ false │ false │
+	;│ t3.1 │ 0 │ 1 │ 01101 │ false │ true  │
+	;│ t4.0 │ 0 │ 1 │ 01001 │ false │ true  │
+	;│ t4.1 │ 0 │ 1 │ 01011 │ false │ false │
+	;│ t5.0 │ 0 │ 1 │ 01010 │ false │ false │
+	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │
+	;└──────┴───┴───┴───────┴───────┴───────┘
+	; Time is how many cycles have passed since the end of the CPU Write cycle.
+	; - d just shows the default state of all these latches, and outputs.
+	; tn.0 is the first half of the PPU cycle when the clock is high. (PPU_Clock)
+	; tn.1 is the second half of the PPU cycle when the clock is low. (/PPU_Clock)
+	; t0.1 will be the half-cycle in which the CPU stops writing to $2007.
+	;
+	; W is the state of $2007_Write.
+	;
+	; SR is the state of the Q output of the SR latch.
+	;
+	; Latches shows the state of the Q output for all 5 D_Latches.
+	; - In this table, the leftmost bit is "D_Latch 0", and the rightmost bit is "D_Latch 4"
+	; - NOTE: All these latches are connected to each other using the /Q output! This means that "D_Latch n+1" will be latched with the opposite value of "D_Latch n"
+
+	; All of that to say, every ppu cycle will alternate from stable to unstable (and why), and now we can talk about the results of this test.
 	
 	; - Key -	
 	; NT : Nametable Fetch
