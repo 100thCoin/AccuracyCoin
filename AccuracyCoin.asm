@@ -8213,7 +8213,7 @@ Fail_APURegAct_EverdriveLoop:
 	JMP TEST_APURegActivation_Finale
 	
 APURegAct_EverdriveKey:
-	.byte $C1, $C1, $FF, $FF, $24, $21, $20, $20, $20, $20, $20, $20, $20, $20, $A9
+	.byte $C1, $C1, $FF, $FF, $24, $21, $20, $20, $20, $20, $20, $20, $20, $20, $A1
 	
 ;;;;;;;;;;;;;;;;;
 		
