@@ -2900,8 +2900,6 @@ TEST_2007StressTest_Exit:
 	; - NOTE: All these latches are connected to each other using the /Q output! This means that "D_Latch n+1" will be latched with the opposite value of "D_Latch n"
 	;
 	; You can see from the output that ALE is true for two half-cycles, the state machine is idle for one half-cycle, then Write is true for two half-cycles.
-
-	
 	
 	; All of that to say, every ppu cycle will alternate from stable to unstable (and why), and now we can talk about the results of this test.
 	
@@ -2953,7 +2951,7 @@ TEST_2007StressTest_Exit:
 	;;;;;;;;;;;;;;;;;;;
 	; COMMON MISTAKES ;
 	;;;;;;;;;;;;;;;;;;;
-	; The PPU Read Buffer should be set up 2 ppu cycles after the CPU Read to $2007 ends. Read up on the PPU DATA State Machine, as mentioned above.
+	; The PPU Read Buffer should be set up 4 ppu cycles after the CPU Read to $2007 ends. Read up on the PPU DATA State Machine, as mentioned above.
 	; Sprite fetch should not be performing attribute table fetches, rather it should perform two nametable fetches in a row.
 	; The "Dummy Background Fetch" phase should not be performing attribute table fetches, rather it should perform two nametable fetches in a row, and the first cycle of a pattern fetch.
 	; The dummy nametable fetch on dot 257 should be reading from the OLD high byte of v before the v register is "horizontally reset".
