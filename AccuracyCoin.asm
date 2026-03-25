@@ -8103,6 +8103,18 @@ APURegActivation_Continue:
 	LDA #$60 ; This value of $60 will be put on the data bus. an RTS instruction!
 	STA <$01 ; And since the BRK jumps to a function loading the value of A with $A9, we can check for this after the test.
 	
+	; Okay real quick, suppose the everdrive ever fixes the open bus issue.
+	; I know everdrives have custom readable registers around $40F0 through $40FF.
+	; That would break this, but I still want to be able to print "PASS" on real hardware.
+	; We're skipping to error code 7 on an everdrive. Don't make your emulator do this.
+	LDA $40FF ; This *SHOULD* be open bus, but an everdrive puts junk here.
+	CMP #$40
+	BEQ TEST_APURegActivation_NonEverdrive
+	LDA #$21 ; Success code "8", referring to an everdrive N8 Pro.
+	RTS      ; It is strongly advised that you do not make your emulator behave this way, as this skips the test to avoid potential crashes.
+
+TEST_APURegActivation_NonEverdrive:
+	
 	; Step 7: Schedule a DMA
 	LDA #$40
 	JSR DMASyncWith40
@@ -8169,7 +8181,7 @@ TEST_APURegActivation_Eval_2:
 TEST_APURegActivation_Skip0401:
 	LDA $500,X						; Read the value copied from OAM
 	CMP #$00						; This should be 00
-	BNE Fail_APURegAct_EverdriveLoop; If it's not $00, you fail
+	BNE FAIL_APURegActivation		; If it's not $00, you fail
 	INY								; Increment Y for the next one.
 	CPY #$20
 	BNE TEST_APURegActivation_SkipResetY	; if Y=20, reset to 0, so we can check for the "$04 $01"
@@ -8188,35 +8200,10 @@ FAIL_APURegActivation:
 	STA $4015
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
+TEST_APURegActivation_Everdrive:
+	LDA #7
+	STA <ErrorCode
 
-FAIL_APURegActivation_CheckForEverdriveN8Pro:
-	; As I am writing this, the everdrive N8 pro currently does not accurately handle reads from open bus.
-	; However, it is a shockingly easy fix.
-	; Anyway, it turns out the everdrive has custom readable registers from $40F0 through $40FF.
-	; So even if it *did* properly emulate the open bus stuff here, it destroys the results right at the end!
-	; Let's check if we failed when X= $F1.
-	CPX #$F1
-	BNE FAIL_APURegActivation ; Otherwise, we really did fail.
-	; From here on out, let's just read from this LUT I made for what happens on an everdrive N8 Pro. 
-	; But please do keep in mind, this is everdrive-specific, and you should NOT be running this on your emulator.
-Fail_APURegAct_EverdriveLoop:
-	LDA $500,X
-	CMP APURegAct_EverdriveKey-$F1, X
-	BNE FAIL_APURegActivation
-	INX
-	BNE Fail_APURegAct_EverdriveLoop
-	; Okay... Everdrive detected. I'll allow it.
-	INC <ErrorCode
-	LDA <ErrorCode
-	CMP #$7
-	BEQ TEST_APURegActivation_Continue
-	JMP TEST_APURegActivation_Finale
-	
-APURegAct_EverdriveKey:
-	.byte $C1, $C1, $FF, $FF, $24, $21, $20, $20, $20, $20, $20, $20, $20, $20, $A1
-	
-;;;;;;;;;;;;;;;;;
-		
 TEST_APURegActivation_Continue:
 	;;; Test 7 [APU Register Activation]: If the APU registers are active, there will be bus conflicts if the OAM DMA is reading from outside of open bus. ;;;
 	; The setup here is incredibly similar, except the OAM DMA will occur on page 2 instead, after clearing page 2 to all FFs.
@@ -8362,7 +8349,7 @@ TEST_APURegActivation_Eval_4:
 	LDY #03							; It probably should have been INY's for neatness, but this saves 2 CPU cycles.
 TEST_APURegActivation_Skip0602:
 	LDA $200,X						; Read the value copied from OAM
-	BNE Fail_APURegAct_2EverdriveLoop; If it's not $00, you fail
+	BNE FAIL_APURegActivation2; If it's not $00, you fail
 	INY								; Increment Y for the next one.
 	CPY #$20
 	BNE TEST_APURegActivation_YSkip3	; if Y=20, reset to 0, so we can check for the "$04 $01"
@@ -8382,9 +8369,6 @@ FAIL_APURegActivation2:
 	STA $4015
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
-
-Fail_APURegAct_2EverdriveLoop:
-	JMP Fail_APURegAct_EverdriveLoop
 
 FAIL_DMA_Timing:
 	LDA #$40
