@@ -3045,7 +3045,40 @@ TEST_2007StressTest_Key: ; This is every other byte from the data. Honestly a re
 	.byte $00, $C0, $66, $66, $01, $C0, $38, $38
 	.byte $02, $02
 
-
+TEST_APURegActivation_Finale:
+	LDA #0
+	STA $4015
+	; The controller ports might not have been visible by the OAM DMA, but did the controller ports get clocked?
+	; This used to be an error code, but different consoles behave differently, so let's just print if it did or not.
+	LDA #0
+	STA <dontSetPointer ; prep this, since we're drawing stuff.
+	LDA $4016
+	LDA $4016	; it is assumed the B button is not pressed during the test.
+	LSR A
+	BCS TEST_APURegActivation_ConflictClocked	
+	; And the controller ports were NOT clocked here!
+	LDA <RunningAllTests
+	BNE TEST_APURegActivation_Res1
+	JSR PrintTextCentered
+	.word $2350
+	.byte "OAM DMA Bus Conflict no Clock", $FF
+	JSR ResetScroll
+TEST_APURegActivation_Res1:
+	LDA #5 ; Success Code 1
+	RTS
+	
+TEST_APURegActivation_ConflictClocked:
+	; Bingo! Look at that. The controller ports *were* clocked, but did not appear in OAM!
+	LDA <RunningAllTests
+	BNE TEST_APURegActivation_Res2
+	JSR PrintTextCentered
+	.word $2350
+	.byte "OAM DMA Bus Conflict Clocks", $FF
+	JSR ResetScroll
+TEST_APURegActivation_Res2:
+	LDA #9 ; Success Code 2
+	RTS
+;;;;;;;
 
 	.bank 1
 	.org $A000	; This next line of code is located at address $A000 in the ROM.
@@ -8136,7 +8169,7 @@ TEST_APURegActivation_Eval_2:
 TEST_APURegActivation_Skip0401:
 	LDA $500,X						; Read the value copied from OAM
 	CMP #$00						; This should be 00
-	BNE FAIL_APURegActivation		; If it's not $00, you fail
+	BNE Fail_APURegAct_EverdriveLoop; If it's not $00, you fail
 	INY								; Increment Y for the next one.
 	CPY #$20
 	BNE TEST_APURegActivation_SkipResetY	; if Y=20, reset to 0, so we can check for the "$04 $01"
@@ -8154,6 +8187,34 @@ FAIL_APURegActivation:
 	LDA #0
 	STA $4015
 	JMP TEST_Fail
+;;;;;;;;;;;;;;;;;
+
+FAIL_APURegActivation_CheckForEverdriveN8Pro:
+	; As I am writing this, the everdrive N8 pro currently does not accurately handle reads from open bus.
+	; However, it is a shockingly easy fix.
+	; Anyway, it turns out the everdrive has custom readable registers from $40F0 through $40FF.
+	; So even if it *did* properly emulate the open bus stuff here, it destroys the results right at the end!
+	; Let's check if we failed when X= $F1.
+	CPX #$F1
+	BNE FAIL_APURegActivation ; Otherwise, we really did fail.
+	; From here on out, let's just read from this LUT I made for what happens on an everdrive N8 Pro. 
+	; But please do keep in mind, this is everdrive-specific, and you should NOT be running this on your emulator.
+Fail_APURegAct_EverdriveLoop:
+	LDA $500,X
+	CMP APURegAct_EverdriveKey-$F1, X
+	BNE FAIL_APURegActivation
+	INX
+	BNE Fail_APURegAct_EverdriveLoop
+	; Okay... Everdrive detected. I'll allow it.
+	INC <ErrorCode
+	LDA <ErrorCode
+	CMP #$7
+	BEQ TEST_APURegActivation_Continue
+	JMP TEST_APURegActivation_Finale
+	
+APURegAct_EverdriveKey:
+	.byte $C1, $C1, $FF, $FF, $24, $21, $20, $20, $20, $20, $20, $20, $20, $20, $A9
+	
 ;;;;;;;;;;;;;;;;;
 		
 TEST_APURegActivation_Continue:
@@ -8242,7 +8303,7 @@ TEST_APURegActivation_Eval_3:
 	BPL TEST_APURegActivation_Skip0601
 	LDA $500,X						; Read the value copied from OAM at $2_5
 	CMP #$24						; This should be 24
-	BNE FAIL_APURegActivation		; If it's not $24, you fail
+	BNE FAIL_APURegActivation2		; If it's not $24, you fail
 	INX								; Increment X for the next one.
 	LDA $500,X						; Read the value copied from OAM at $2_6
 	CMP #$E3						; This should be E3
@@ -8301,7 +8362,7 @@ TEST_APURegActivation_Eval_4:
 	LDY #03							; It probably should have been INY's for neatness, but this saves 2 CPU cycles.
 TEST_APURegActivation_Skip0602:
 	LDA $200,X						; Read the value copied from OAM
-	BNE FAIL_APURegActivation2		; If it's not $00, you fail
+	BNE Fail_APURegAct_2EverdriveLoop; If it's not $00, you fail
 	INY								; Increment Y for the next one.
 	CPY #$20
 	BNE TEST_APURegActivation_YSkip3	; if Y=20, reset to 0, so we can check for the "$04 $01"
@@ -8321,6 +8382,9 @@ FAIL_APURegActivation2:
 	STA $4015
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
+
+Fail_APURegAct_2EverdriveLoop:
+	JMP Fail_APURegAct_EverdriveLoop
 
 FAIL_DMA_Timing:
 	LDA #$40
@@ -8360,41 +8424,6 @@ TEST_DMA_Plus_4015R:
 	LDA #$40
 	STA $4017
 	LDA #1
-	RTS
-;;;;;;;
-
-TEST_APURegActivation_Finale:
-	LDA #0
-	STA $4015
-	; The controller ports might not have been visible by the OAM DMA, but did the controller ports get clocked?
-	; This used to be an error code, but different consoles behave differently, so let's just print if it did or not.
-	LDA #0
-	STA <dontSetPointer ; prep this, since we're drawing stuff.
-	LDA $4016
-	LDA $4016	; it is assumed the B button is not pressed during the test.
-	LSR A
-	BCS TEST_APURegActivation_ConflictClocked	
-	; And the controller ports were NOT clocked here!
-	LDA <RunningAllTests
-	BNE TEST_APURegActivation_Res1
-	JSR PrintTextCentered
-	.word $2350
-	.byte "OAM DMA Bus Conflict no Clock", $FF
-	JSR ResetScroll
-TEST_APURegActivation_Res1:
-	LDA #5 ; Success Code 1
-	RTS
-	
-TEST_APURegActivation_ConflictClocked:
-	; Bingo! Look at that. The controller ports *were* clocked, but did not appear in OAM!
-	LDA <RunningAllTests
-	BNE TEST_APURegActivation_Res2
-	JSR PrintTextCentered
-	.word $2350
-	.byte "OAM DMA Bus Conflict Clocks", $FF
-	JSR ResetScroll
-TEST_APURegActivation_Res2:
-	LDA #9 ; Success Code 2
 	RTS
 ;;;;;;;
 
@@ -8439,13 +8468,7 @@ TEST_DMA_Plus_4016R_Loop:
 TEST_DMA_Plus_4016R_SkipText1:
 	LDA #5 ; Success code 1. NES / AV Famicom.
 	RTS
-;;;;;;;
-	; It's a bit silly putting the new bank right here in the middle of this test, but hey- we can branch around this audio sample...
-	.bank 2	; If I don't do this, the ROM won't compile.
-	.org $C000
-	; and 33 00s in a row for a nice and neat silent DPCM sample.
-	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-
+	
 DMA_Plus_4016R_TryFamicomControllerBehavior:
 	LDA <$51
 	ORA #7
@@ -8465,8 +8488,12 @@ TEST_DMA_Plus_4016R_SkipText2:
 	LDA #9 ; Success code 2. Famicom.
 	RTS
 ;;;;;;;
-
-
+	
+;;;;;;;
+	.bank 2	; If I don't do this, the ROM won't compile.
+	.org $C000
+	; and 33 00s in a row for a nice and neat silent DPCM sample.
+	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 
 FAIL_DMA_Plus_4016R:
 FAIL_ControllerStrobing:
@@ -11198,6 +11225,44 @@ FAIL_DMC_Conflicts1:
 	JMP FAIL_AndDisableAudioChannels
 ;;;;;;;;;;;;;;;;;
 
+TEST_VblankSync_PreTest:
+	; This runs almost immediately after power on, in order to check if the VBlank Sync routine won't loop infinitely.
+	LDA $2002
+	BPL TEST_VblankSync_PreTest
+	; We are now in VBlank, but there's a large window in which this could have occurred.
+	; LDA [Read Opcode] [Read Operand] [Read Operand] * [Read $2002]
+	; BPL [Read Opcode] [Read Operand] [Dummy Read, move PC]
+	; A 7 CPU cycle window is a bit large.
+	; At the moment we execute this code, all we know is that the VBlank flag was set between 3 and 10 CPU cycles ago.
+	; So the VBlank flag will be set between 29770.66 and 29777.66 CPU cycles.
+	; With rendering disabled, every 29781 CPU cycles will "fall back" 1 PPU cycle.
+	; The plan: Read $2002 in exactly 29770 CPU cycles. (0.66 CPU cycles too early.)
+	; Then, stall for 29781 CPU cycles, and read $2002 again.
+	; This will take a minimum of 3 frames to exit, and a maximum of 24 frames.
+	; If it takes longer than 24 frames, it can be assumed the frame timing has the wrong number of CPU/PPU cycles, and could never use my VBlank sync routines.
+	LDX #0 ; +2 cycles.
+	JSR ClockslideFromWord
+	.word 29765
+TEST_VblSyncPreTest_Loop:
+	LDA $2002	;+3 [VBlank happens here?] +1
+	BMI TEST_VblSyncPreTest_GoodEnding; +2
+	INX; +2
+	CPX #25 ; +2
+	BEQ TEST_VblSyncPreTest_BadEnding ; +2
+	JSR ClockslideFromWord
+	.word 29766
+	JMP TEST_VblSyncPreTest_Loop;+3
+	
+TEST_VblSyncPreTest_GoodEnding:
+	LDA #1
+	STA <result_VblankSync_PreTest
+	RTS
+TEST_VblSyncPreTest_BadEnding:
+	LDA #$80	; I use $80 so my VBL sync routine can start by running `LDA <result_VblankSync_PreTest` `BMI FAIL`
+	STA <result_VblankSync_PreTest
+	RTS
+;;;;;;;
+
 TEST_DMABusConflict:
 	; A very similar test to [APU Register Activation]. In fact, I highly suggest you pass that test before looking into this one, as it's slightly more complicated.
 	; As a recap, when the 6502 address bus is in the range $4000 to $401F, the APU registers are active (including mirrors of them.)
@@ -11370,44 +11435,6 @@ TEST_DMC_Test3:
 FAIL_DMC_Conflicts:
 	JMP FAIL_AndDisableAudioChannels
 ;;;;;;;;;;;;;;;;;
-	
-TEST_VblankSync_PreTest:
-	; This runs almost immediately after power on, in order to check if the VBlank Sync routine won't loop infinitely.
-	LDA $2002
-	BPL TEST_VblankSync_PreTest
-	; We are now in VBlank, but there's a large window in which this could have occurred.
-	; LDA [Read Opcode] [Read Operand] [Read Operand] * [Read $2002]
-	; BPL [Read Opcode] [Read Operand] [Dummy Read, move PC]
-	; A 7 CPU cycle window is a bit large.
-	; At the moment we execute this code, all we know is that the VBlank flag was set between 3 and 10 CPU cycles ago.
-	; So the VBlank flag will be set between 29770.66 and 29777.66 CPU cycles.
-	; With rendering disabled, every 29781 CPU cycles will "fall back" 1 PPU cycle.
-	; The plan: Read $2002 in exactly 29770 CPU cycles. (0.66 CPU cycles too early.)
-	; Then, stall for 29781 CPU cycles, and read $2002 again.
-	; This will take a minimum of 3 frames to exit, and a maximum of 24 frames.
-	; If it takes longer than 24 frames, it can be assumed the frame timing has the wrong number of CPU/PPU cycles, and could never use my VBlank sync routines.
-	LDX #0 ; +2 cycles.
-	JSR ClockslideFromWord
-	.word 29765
-TEST_VblSyncPreTest_Loop:
-	LDA $2002	;+3 [VBlank happens here?] +1
-	BMI TEST_VblSyncPreTest_GoodEnding; +2
-	INX; +2
-	CPX #25 ; +2
-	BEQ TEST_VblSyncPreTest_BadEnding ; +2
-	JSR ClockslideFromWord
-	.word 29766
-	JMP TEST_VblSyncPreTest_Loop;+3
-	
-TEST_VblSyncPreTest_GoodEnding:
-	LDA #1
-	STA <result_VblankSync_PreTest
-	RTS
-TEST_VblSyncPreTest_BadEnding:
-	LDA #$80	; I use $80 so my VBL sync routine can start by running `LDA <result_VblankSync_PreTest` `BMI FAIL`
-	STA <result_VblankSync_PreTest
-	RTS
-;;;;;;;
 
 TEST_ImpliedDummyRead_BRKed:
 	; This is where the PC *should* go after reading an opcode from $4015.
