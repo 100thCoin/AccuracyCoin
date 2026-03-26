@@ -746,7 +746,6 @@ Some tests have multiple acceptable behaviors that are tested for in this ROM. T
 ### APU Register Activation
   1: The controllers were not clocked by the bus conflict with the OAM DMA.  
   2: The controllers were clocked by the bus conflict with the OAM DMA.  
-  8: This test was ran on an everdrive N8 Pro with proper open bus behavior, and had to skip sections to avoid a game crash. (Don't reproduce this behavior in an emulator.)  
 
 ### DMC DMA Bus Conflicts
   1: The controller was read the way a US-released NES should read controllers.  

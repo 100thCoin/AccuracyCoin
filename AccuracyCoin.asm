@@ -7950,7 +7950,10 @@ TEST_APURegActivation:
 	STX $2003
 	LDA #$5A
 	STA $2004
-	STX $2003
+	TXA
+	LDX #1
+	STA $2002
+	STA $2002, X ; safely write to $2003 without the risk of OAM Corruption.
 	LDA #$A5
 	STA $2002
 	TXA
@@ -8048,8 +8051,8 @@ APURegActivation_Continue:
 	;
 	;      00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
 	;    ┌─────────────────────────────────────────────────┐
-	; 00 │ 40 40 40 40 40 40 40 40 40 40 40 40 40 40 40 40 │ ; The value of $40 is left over from the data bus.
-	; 10 │ 40 40 40 40 40 44 41 40 40 40 40 40 40 40 40 40 │ ; The $40's are the left over data bus. The value of $44 is the frame interrupt flag + the triangle channel from reading address $4015 (APU Status).
+	; 00 │ 50 50 40 50 50 50 40 50 50 50 40 50 50 50 40 50 │ ; The value of $50 is left over from the data bus. The attribute bytes from OAM are missing bit 4 though, so they are read back as $40.
+	; 10 │ 50 50 40 50 50 44 41 40 40 40 40 40 40 40 40 40 │ ; The $40's are the left over data bus. The value of $44 is the frame interrupt flag + the triangle channel from reading address $4015 (APU Status).
 	; 20 │ 40 40 40 40 40 40 40 40 40 40 40 40 40 40 40 40 │ ; Referring to the above line, the $41 is open bus + reading controller 1, and $40 is open bus + controller 2. (this line is just open bus)
 	; 30 │ 40 40 40 40 40 04 01 00 00 00 00 00 00 00 00 00 │ ; This time, the frame interrupt flag is cleared, which clears bit 4 of open bus in future reads. The $01 is just controller 1. Controller 2 is still $00.
 	; 40 │ 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 │ ; All zeroes. Just open bus.
@@ -8103,20 +8106,10 @@ APURegActivation_Continue:
 	LDA #$60 ; This value of $60 will be put on the data bus. an RTS instruction!
 	STA <$01 ; And since the BRK jumps to a function loading the value of A with $A9, we can check for this after the test.
 	
-	; Okay real quick, suppose the everdrive ever fixes the open bus issue.
-	; I know everdrives have custom readable registers around $40F0 through $40FF.
-	; That would break this, but I still want to be able to print "PASS" on real hardware.
-	; We're skipping to error code 7 on an everdrive. Don't make your emulator do this.
-	LDA $40FF ; This *SHOULD* be open bus, but an everdrive puts junk here.
-	CMP #$40
-	BEQ TEST_APURegActivation_NonEverdrive
-	LDA #$21 ; Success code "8", referring to an everdrive N8 Pro.
-	RTS      ; It is strongly advised that you do not make your emulator behave this way, as this skips the test to avoid potential crashes.
-
 TEST_APURegActivation_NonEverdrive:
 	
 	; Step 7: Schedule a DMA
-	LDA #$40
+	LDA #$50
 	JSR DMASyncWith40
 	; We have 50 CPU cycles until the DMA occurs.
 	; JSR takes 6 cycles, we want the DMA to occur 3 cycles after that. We need to stall for 41 CPU cycles
@@ -8140,11 +8133,16 @@ TEST_APURegActivation_Test5Loop:
 	BNE TEST_APURegActivation_Test5Loop
 	; Instead of making a 256 byte large look up table, I'm going to check each row individually. The result should match that table printed out above in the Test 4 description.
 	; X already equals zero.
+	LDY #0
 TEST_APURegActivation_Eval_0:		;
 	LDA $500,X						; Read the value copied from OAM
-	CMP #$40						; This row should be all $40's
-	BNE FAIL_APURegActivation		; If it's not $40, you fail
-	INX								; If it IS $40, check the next one.
+	CMP TEST_APURegActivation_E0Key, Y; This row should be a pattern of 50 50 40 50
+	BNE FAIL_APURegActivation		; If it's not a match, you fail
+	INY								; INY for the key here.
+	TYA								; clamp Y to 0 through 3
+	AND #3							; ^
+	TAY								; ^
+	INX								; If it IS a match, check the next one.
 	CPX #$15						; Loop this through address $214
 	BNE TEST_APURegActivation_Eval_0;
 	LDA $500,X						; Read the value copied from OAM at $215
@@ -8200,9 +8198,10 @@ FAIL_APURegActivation:
 	STA $4015
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
-TEST_APURegActivation_Everdrive:
-	LDA #7
-	STA <ErrorCode
+
+TEST_APURegActivation_E0Key:
+	.byte $50, $50, $40, $50
+
 
 TEST_APURegActivation_Continue:
 	;;; Test 7 [APU Register Activation]: If the APU registers are active, there will be bus conflicts if the OAM DMA is reading from outside of open bus. ;;;
@@ -8231,7 +8230,7 @@ TEST_APURegActivation_Continue:
 	; F0 │ 00 00 00 00 00 04 00 00 00 00 00 00 00 00 00 00 │ 
 	;    └─────────────────────────────────────────────────┘
 	;
-	; Most amusingly, it looks like $4015 is read, but $4016 and $4017 aren't visible in this chart. (But don't let that fool you, as the controllers are still getting clocked)
+	; Most amusingly, it looks like $4015 is read, but $4016 and $4017 aren't visible in this chart. (But don't let that fool you, as the controllers are still getting clocked... on some consoles.)
 	
 	JSR ClearPage2
 	LDX #$80
