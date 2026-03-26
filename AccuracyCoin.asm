@@ -8054,7 +8054,7 @@ APURegActivation_Continue:
 	; 00 │ 50 50 40 50 50 50 40 50 50 50 40 50 50 50 40 50 │ ; The value of $50 is left over from the data bus. The attribute bytes from OAM are missing bit 4 though, so they are read back as $40.
 	; 10 │ 50 50 40 50 50 44 41 40 40 40 40 40 40 40 40 40 │ ; The $40's are the left over data bus. The value of $44 is the frame interrupt flag + the triangle channel from reading address $4015 (APU Status).
 	; 20 │ 40 40 40 40 40 40 40 40 40 40 40 40 40 40 40 40 │ ; Referring to the above line, the $41 is open bus + reading controller 1, and $40 is open bus + controller 2. (this line is just open bus)
-	; 30 │ 40 40 40 40 40 04 01 00 00 00 00 00 00 00 00 00 │ ; This time, the frame interrupt flag is cleared, which clears bit 4 of open bus in future reads. The $01 is just controller 1. Controller 2 is still $00.
+	; 30 │ 40 40 40 40 40 04 01 00 00 00 00 00 00 00 00 00 │ ; This time, the frame interrupt flag is cleared, which clears bit 6 of open bus in future reads. The $01 is just controller 1. Controller 2 is still $00.
 	; 40 │ 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 │ ; All zeroes. Just open bus.
 	; 50 │ 00 00 00 00 00 04 01 00 00 00 00 00 00 00 00 00 │ ; Just the triangle playing with APU STATUS, and controller 1 being $01, which will never change. Controller 2 is still $00, and will never change.
 	; 60 │ 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 │
@@ -13943,8 +13943,10 @@ TEST_OAM_Corruption:
 	STX $2003
 	LDA #$5A
 	STA $2004
-	LDA #0
-	STX $2003
+	TXA
+	LDX #1
+	STA $2002
+	STA $2002, X ; safely write to $2003 without the risk of OAM corruption... a bit ironic considering the test we're running.
 	LDA #$A5
 	STA $2002
 	LDA $2004
