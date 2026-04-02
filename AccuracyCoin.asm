@@ -2773,7 +2773,7 @@ TEST_2007StressTest_Exit:
 	; When ALE is high, the lower 8 bits of the address bus is set up with the lower 8 bits of v, and these 8 bits are also stored in an octal latch outside the PPU.
 	; When Read is high, the PPU performs the read from memory.
 	;
-	; Here's a timeline of an STA $2007, and how this affects the latches, ALE, and Write.
+	; Here's a timeline of an LDA $2007, and how this affects the latches, ALE, and Read.
 	;
 	;┌──────┬───┬───┬───────┬───────┬───────┐
 	;│ Time │ R │SR │Latches│  ALE  │ Read  │
