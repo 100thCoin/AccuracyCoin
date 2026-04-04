@@ -1626,7 +1626,7 @@ TEST_BranchDummyRead:
 	LDA #$5A
 	JSR SetPPUReadBufferToA
 	LDA $2007
-	TXA ; just make sure A isn't the correct answer before we read from $2000. I can imagine an incredibly wrong implementation of open bus simply not chaning A, and somehow making it this far.
+	TXA ; just make sure A isn't the correct answer before we read from $2000. I can imagine an incredibly wrong implementation of open bus simply not changing A, and somehow making it this far.
 	LDA $2000
 	CMP #$5A
 	BNE FAIL_BranchDummyRead ; If the value read doesn't match the expected value, abort!
@@ -1638,6 +1638,10 @@ TEST_BranchDummyRead:
 	JSR ClearPage2
 	LDA #$60
 	STA $200
+	
+	JSR WaitForVBlank
+	JSR Clockslide_29780 ; Set the vblank flag. (This will hopefully persist until we JSR to $2000 in the next test.
+	
 	LDA #2
 	STA $4014 ; OAM DMA
 	STA $2002	
@@ -1675,14 +1679,12 @@ BranchDummyRead_RevE:
 	STA $1FA5
 	STX $1FA6 ; X=60. RTS
 	; $1FA4 now reads: INC <$50, RTS
-	
-	JSR WaitForVBlank
-	JSR Clockslide_29780 ; Set the vblank flag.
+
 	LDA #$60
-	JSR SetPPUReadBufferToA
+	JSR SetPPUReadBufferToA ; For a revision E or earlier ppu.
+	
 	LDA #$10
 	STA $2002; update PPU bus with $10 (opcode for BPL)
-	CLC
 	JSR $2000; jump to PPU registers.
 	; $2000: (opcode: $10 = BPL)
 	; $2001: (operand: $10. BPL $2012)
