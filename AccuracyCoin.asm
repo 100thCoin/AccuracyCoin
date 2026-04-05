@@ -3116,6 +3116,15 @@ TEST_StaleSpriteShiftRegs:
 	; Disabling rendering on dot 257 (or 258 depending on clock alignment) will prevent the sprite shifters from being reloaded.
 	; Sprite zero's shifter was never fully shifted, and will stop shifting during HBlank.
 	; So if we re-enable rendering after dot 339, we can shift the rest of sprite zero's shifter on the following scanline to trigger the sprite zero hit.
+	;
+	; Why dot 339?
+	; The sprites are only drawn after their "shifter counter" reaches zero. (each sprite being drawn has their own shifter counter)
+	; This shifter counter is initialized on dot 339 with the value of the sprite's X position.
+	; So when we run this test, it will be set up with $FF.
+	; Then every visible ppu cycle, this counter is decremented until 0 where the sprite is drawn and the sprite shifter will begin shifting.
+	; This results in a single pixel drawn at X=$FF for sprite zero.
+	; Then we disable rendering until after dot 339, skipping the re-initialization of the counter.
+	; Since the counter is still zero, and the shift register still has contents, the sprite will be drawn immediately as soon as rendering is re-enabled.
 
 	JSR Sync_ToLine0Dot1          ; sync the CPU to dot 1 of scanline 0.
 	JSR ClockslideFromWord        ; stall 535 CPU cycles.
