@@ -630,6 +630,11 @@ or
   3: The background shift registers should not be clocked during H-Blank or F-Blank. After re-enabling rendering, a sprite zero hit should be able to occur entirely on stale background shift register data.  
   4: The sprite shifters should treat all sprites X positions as 0 if rendering has already been disabled and remains that way during dot 339.  
 
+### Stale Sprite Shift Registers
+  1: Sprite Zero Hits should be working.  
+  2: Sprite Zero hits shouldn't occur at X=$FF.  
+  3: The sprite shift registers should not be clocked during H-Blank or F-Blank. F-Blank should prevent the shift registers from being reloaded. The sprite shifter counter shouldn't be reloaded during F-blank on dot 339, allowing the sprite to be drawn as soon as rendering is re-enabled.  
+
 ### BG Serial In
   1: Sprite zero hits should not occur when the nametable is entirely blank.  
   2: Background shift registers should bring in a 1 into bit 0 when shifted. These can be drawn on screen with carefully timed writes to $2001 to enable/disable rendering to skip reloading the shift registers.  
