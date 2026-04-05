@@ -311,6 +311,7 @@ result_BranchDummyRead = $48B
 result_2004_Stress = $48C
 result_2002FlagClearTiming = $48D
 result_2007_Stress = $48E
+result_StaleSpriteShiftRegs = $48F
 
 result_DrawTest = $03FF	; page 3 omits the test from the all-test-result-table.
 
@@ -750,6 +751,7 @@ Suite_PPUMisc:
 	table "Attributes As Tiles",      $FF, result_AttributesAsTiles,     TEST_AttributesAsTiles
 	table "t Register Quirks",        $FF, result_tRegisterQuirks,       TEST_tRegisterQuirks
 	table "Stale BG Shift Registers", $FF, result_StaleBGShiftRegisters, TEST_StaleBGShiftRegisters
+	table "Stale Sprite Shift Regs",  $FF, result_StaleSpriteShiftRegs,  TEST_StaleSpriteShiftRegs
 	table "BG Serial In",             $FF, result_BGSerialIn,            TEST_BGSerialIn
 	table "Sprites On Scanline 0",    $FF, result_Scanline0Sprites,      TEST_Scanline0Sprites
 	table "$2004 Stress Test",        $FF, result_2004_Stress,           TEST_2004_Stress
@@ -1635,7 +1637,6 @@ TEST_BranchDummyRead:
 	;;; Test 3 [Branch Dummy Reads]: (prerequisite) verify address $2004 behavior. ;;;
 	; Pre revision G PPUs behave differently, so we want this to work on either case.
 	; Let's just make sure we read either OAMDATA or PPU Open bus.
-	JSR ClearPage2
 	LDA #$60
 	STA $200
 	
@@ -2436,7 +2437,6 @@ TEST_BGSerialIn:
 	; We just need to confirm that the sprite zero hit doesn't happen :)
 	JSR DisableRendering       ; Disable rendering so the following can happen even out of vblank.
 	JSR ClearNametable2_With24 ; Clear nametable 2 with tile $24 (empty tiles)
-	JSR ClearPage2             ; Clear Page 2 with all $FFs
 	JSR SetUpSpriteZero        ; Prepare sprite zero with the following values:
 	.byte $00, $C0, $03, $92   ; Single dot on scanline 1, X = 80
 	JSR PrintCHR               ; Update the color palette so the visual artifacts of this test are visible.
@@ -2519,7 +2519,6 @@ TEST_2007_Stress:
 	; clear nametable 2.
 	JSR DisableRendering
 	JSR ClearNametable2
-	JSR ClearPage2
 
 	; Write 00 01 02 03... from $2C00 through $2FFF
 	JSR SetPPUADDRFromWord
@@ -3082,6 +3081,64 @@ TEST_APURegActivation_Res2:
 	RTS
 ;;;;;;;
 
+TEST_StaleSpriteShiftRegs:
+	
+	;;; Test 1 [Stale Sprite Shift Registers]: Verify sprite zero hits are working. ;;;
+
+	JSR VerifySpriteZeroHits      ; We already have a subroutine to verify sprite zero hits are working properly.
+	BEQ FAIL_StaleSpriteShiftRegs ; If they aren't fail the test.
+	INC <ErrorCode
+
+	;;; Test 2 [Stale Sprite Shift Registers]: Additional check that a sprite at X=$FF doesn't trigger a sprite zero hit. ;;;
+
+	JSR SetUpSpriteZero           ; Prepare sprite zero with the following values:
+	.byte $00, $FE, $03, $FF      ; 8x8 pixel box, but it's placed at X=$FF.	
+	LDA #2                        ; 
+	STA $4014                     ; OAM DMA with page 2.
+	
+	JSR WriteToPPUADDRWithByte    ; Put a box at $2C1F for the attempted sprite zero hit (that will fail)
+	.byte $2C, $1F                ; Aaddress $2C1F (upper right corner of the screen.)
+	.byte $FE, $FF                ; CHR $FE, (solid 8x8 box) followed by the terminator byte.
+	
+	JSR WriteToPPUADDRWithByte    ; While we're here, we might as well put a box at $2C00 for the next part of the test.
+	.byte $2C, $00                ; Address $2C00 (upper left corner of the screen.)
+	.byte $FE, $FF                ; CHR $FE, (solid 8x8 box) followed by the terminator byte.
+	
+	JSR ResetScroll_2C00          ; Reset the scroll to nametable address $2C00.
+	
+	JSR WaitForVBlank             ; Rendering is enabled, so sprite zero hits can occur. It's just that this one won't.
+	LDA $2002                     ; It doesn't occur, since a sprite zero hit cannot be detected at X=$FF.
+	AND #$40                      ; Check bit 6
+	BNE FAIL_StaleSpriteShiftRegs ; Fail the test if a sprite zero hit occured here.
+	INC <ErrorCode
+
+	;;; Test 3 [Stale Sprite Shift Registers]: Can a sprite at X=$FF trigger a sprite zero hit by preventing the shifter from reloading during HBlank? ;;;
+	; Disabling rendering on dot 257 (or 258 depending on clock alignment) will prevent the sprite shifters from being reloaded.
+	; Sprite zero's shifter was never fully shifted, and will stop shifting during HBlank.
+	; So if we re-enable rendering after dot 339, we can shift the rest of sprite zero's shifter on the following scanline to trigger the sprite zero hit.
+
+	JSR Sync_ToLine0Dot1          ; sync the CPU to dot 1 of scanline 0.
+	JSR ClockslideFromWord        ; stall 535 CPU cycles.
+	.word 535                     ; ^
+	LDA #0                        ; A value of 0 to disable rendering.
+	STA $2001                     ; this instruction begins on scanline 4, dot 248. Accounding for the delay, rendering should be disabled around dot 258 or 259.
+	LDA #$1E                      ; A value of $1E to enable both sprites and the background, including the 8 pixels on the left edge of the screen.
+	JSR Clockslide_22             ; stall 22 CPU cycles to wait for the end of HBlank.
+	STA $2001                     ; this instruction begins on scanline 4, dot 332. Accounding for the delay, rendering should be enabled around dot 0 or 1.
+	JSR WaitForVBlank             ; Wait for the end of the frame
+	LDA $2002                     ; Check for sprite zero hits.
+	AND #$40                      ; bit 6 is the sprite zero hit flag.
+	BEQ FAIL_StaleSpriteShiftRegs ; Fail the test if a sprite zero hit did NOT occur this time.
+
+	;; END OF TEST ;;	
+
+	LDA #1
+	RTS
+;;;;;;;
+
+FAIL_StaleSpriteShiftRegs:
+	JMP TEST_Fail
+
 	.bank 1
 	.org $A000	; This next line of code is located at address $A000 in the ROM.
 	
@@ -3605,7 +3662,6 @@ TEST_PPU_Open_Bus:
 	; Here's how PPU Open bus works.
 	; The PPU data bus is updated whenever the CPU writes to any PPU Register.
 	
-	JSR ClearPage2
 	LDA #2
 	STA $4014
 	
@@ -6942,8 +6998,8 @@ TEST_ArbitrarySpriteZero:
 	BEQ FAIL_ArbitrarySpriteZero1
 	LDX #1
 TEST_ArbitrarySpriteZeroLoop:
-	JSR WaitForVBlank
 	JSR ClearPage2
+	JSR WaitForVBlank
 	JSR InitializeSpriteX
 	;    YPos, CHR, Att, XPos
 	.byte $00, $FC, $00, $08
@@ -7278,8 +7334,6 @@ TEST_MisalignedOAM_Behavior:
 	; If the value read as the Y position *is* in range, just add 1 to the OAM address.
 	; If the value read as the Y position is *not* in range, just add 4 to the OAM address and bitwise AND the OAM address with $FC.
 	
-	; Before this test, let's clear page 2 (with $FFs).
-	JSR ClearPage2
 	; Copy data from a look up table to address $280
 	LDX #0
 TEST_MisalignedOAM_P4_Y_1_Loop:
@@ -7673,7 +7727,6 @@ FAIL_Address2004_PreRevG:
 	JMP Address2004_PreRevisionG ; too far to branch.
 
 FAIL_Address2004_Behavior:
-	JSR ClearPage2
 	JSR WaitForVBlank
 	LDA #2
 	STA $4014
@@ -7687,7 +7740,6 @@ TEST_Address2004_Behavior:
 	JSR PrintCHR	; Put a white square at $2001 on the nametable.
 	.word $2001
 	.byte $FC, $FF	
-	JSR ClearPage2
 	JSR ResetScrollAndWaitForVBlank
 	LDA #2
 	STA $4014 ; run the OAM DMA, overwriting the whole thing with $FF
@@ -7888,7 +7940,6 @@ TEST_Address2004_Behavior_loop:			; Set up page 2 so every value is essentially 
 
 	;; END OF TEST ;;
 	JSR ClearOverscanNametable
-	JSR ClearPage2
 	JSR WaitForVBlank
 	LDA #2
 	STA $4014
@@ -8107,9 +8158,7 @@ APURegActivation_Continue:
 	LDX #0 	 ; If (instead of BRK) you run: ORA <$01, X...
 	LDA #$60 ; This value of $60 will be put on the data bus. an RTS instruction!
 	STA <$01 ; And since the BRK jumps to a function loading the value of A with $A9, we can check for this after the test.
-	
-TEST_APURegActivation_NonEverdrive:
-	
+		
 	; Step 7: Schedule a DMA
 	LDA #$50
 	JSR DMASyncWith40
@@ -8473,14 +8522,15 @@ TEST_DMA_Plus_4016R_SkipText2:
 	LDA #9 ; Success code 2. Famicom.
 	RTS
 ;;;;;;;
-	
+	FAIL_DMA_Plus_4016R:
+	JMP TEST_Fail
+
 ;;;;;;;
 	.bank 2	; If I don't do this, the ROM won't compile.
 	.org $C000
 	; and 33 00s in a row for a nice and neat silent DPCM sample.
 	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 
-FAIL_DMA_Plus_4016R:
 FAIL_ControllerStrobing:
 	JMP TEST_Fail
 	
@@ -12889,7 +12939,6 @@ TEST_DMCDMAPlusOAMDMA:
 	;
 	; see https://www.nesdev.org/wiki/DMA#DMC_DMA_during_OAM_DMA
 	
-	JSR ClearPage2
 	LDX #0
 	
 	; If you fail this test, look around address $50 through $6F to see what your emulator is doing, and compare with the answer key below.
@@ -12992,7 +13041,6 @@ TEST_ExplicitDMAAbort:
 	CPY #4 ; 
 	BNE FAIL_ExplicitDMAAbort
 
-	JSR ClearPage2
 	LDX #0
 	
 	; The explicit abort test is all about what happens to the DMC DMA if the DMC is disabled while the DMA is occurring.
@@ -13065,7 +13113,6 @@ TEST_ImplicitDMAAbort:
 	BNE FAIL_ImplicitDMAAbort
 	INC <ErrorCode
 
-	JSR ClearPage2
 	LDX #0
 	
 	; The implicit abort test is all about what happens if the reload DMA occurs very briefly after a load DMA on a 1-byte sample with looping disabled.
@@ -13941,10 +13988,8 @@ TEST_OAM_Corruption:
 	CMP #1
 	BNE FAIL_OAM_Corruption
 	; also you can read from OAM. that's important.
-	LDX #0
-	STX $2003
 	LDA #$5A
-	STA $2004
+	STA $2004 ; OAMADDR will be zero.
 	TXA
 	LDX #1
 	STA $2002
@@ -14984,7 +15029,6 @@ TEST_AttributesAsTiles_loop:
 	STA $2007	; Write $24 to the following $40 bytes. (everything from $2FC0 to $2FFF)
 	DEX
 	BNE TEST_AttributesAsTiles_loop
-	JSR ClearPage2	; Clear OAM.
 
 	JSR SetPPUADDRFromWord ; move the v register to $2FC8
 	.byte $2F, $C8
@@ -15033,7 +15077,6 @@ TEST_tRegisterQuirks:
 	;;; Test 1 [t Register Quirks]: Verify the scroll is working when writing to $2006 first. ;;;
 	JSR DisableRendering
 	JSR ClearNametable2_With24 ; Nametable 2 is polluted from other tests. Since it gets drawn during this test, let's clear it first.
-	JSR ClearPage2
 	JSR PrintCHR
 	.word $2D84
 	.byte $C0, $FF ; Draw a single pixel on the second nametable.
@@ -15172,7 +15215,6 @@ TEST_StaleBGShiftRegisters:
 	JSR PrintCHR
 	.word $2000
 	.byte $C7, $FF
-	JSR ClearPage2
 	JSR SetUpSpriteZero
 	.byte $05, $C0, $00, $00 
 	JSR SetPPUADDRFromWord
@@ -15522,7 +15564,6 @@ TEST_RenderingFlagBehavior:
 	; We repeat this experiment, but we only disable rendering the background, keeping sprites active. This time, the sprite zero hit will occur!
 
 	JSR DisableRendering
-	JSR ClearPage2
 	JSR PrintCHR
 	.word $200F
 	.byte $FE, $FE, $FF ; two solid white boxes at X= $78
@@ -15958,8 +15999,12 @@ DisableNMI:; Disables the NMI. Does not affect the other PPUCRTL flags.
 	RTS
 ;;;;;;;
 
+ResetScroll_2C00:; sets the PPU "v" register to $2C00
+	LDA #$2C
+	.byte $CD ; CMP Absolute to skip the next two byte. This .byte $CD is effectively a 1-byte long "branch two bytes"
 ResetScroll:; sets the PPU "v" register to $2000
 	LDA #$20
+	CMP $2002
 	STA $2006	; Update high byte of v to $20
 	LDA #$00
 	STA $2006   ; Update low byte of v to $00
@@ -16909,7 +16954,7 @@ SetPPUADDRFromWord:	; pretty much the same as ReadPPUADDRFromWord, but it doesn'
 	LDA <$FF
 	RTS
 ;;;;;;;
-WriteToPPUADDRWithByte:	; Sets up v then writes n to it, where n is the third bytes after the JSR
+WriteToPPUADDRWithByte:	; Sets up v then writes n to it, where n is the third byte after the JSR
 	STA <$FF
 	STY <$FE
 	JSR CopyReturnAddressToByte0
@@ -17444,6 +17489,7 @@ RunTest_AllTestSkipDraw1:
 	LDA #$80
 	STA <Test_UnOp_SP             ; Some tests might modify the stack pointer. The test will use a value of $80 just to be sure it's not overwriting other stack data.
 	JSR ClearPage5                ; clear RAM from $500 to $5FF. That RAM is dedicated for running tests, so we want it clean.
+	JSR ClearPage2                ; clear page 2 as well.
 	JSR WaitForVBlank             ; this makes debugging your own emulator with this ROM much easier, since the test should always begin at the start of a frame.
 	LDA #0                        ; Initialize A to 0.
 	TAX                           ; Initialize X to 0.
