@@ -3092,7 +3092,7 @@ TEST_StaleSpriteShiftRegs:
 	;;; Test 2 [Stale Sprite Shift Registers]: Additional check that a sprite at X=$FF doesn't trigger a sprite zero hit. ;;;
 
 	JSR SetUpSpriteZero           ; Prepare sprite zero with the following values:
-	.byte $00, $FE, $03, $FF      ; 8x8 pixel box, but it's placed at X=$FF.	
+	.byte $03, $C5, $03, $FF      ; 1x8 pixel stripe, but it's placed at X=$FF.	
 	LDA #2                        ; 
 	STA $4014                     ; OAM DMA with page 2.
 	
@@ -3115,7 +3115,8 @@ TEST_StaleSpriteShiftRegs:
 	;;; Test 3 [Stale Sprite Shift Registers]: Can a sprite at X=$FF trigger a sprite zero hit by preventing the shifter from reloading during HBlank? ;;;
 	; Disabling rendering on dot 257 (or 258 depending on clock alignment) will prevent the sprite shifters from being reloaded.
 	; Sprite zero's shifter was never fully shifted, and will stop shifting during HBlank.
-	; So if we re-enable rendering during the ppu idle period, we can shift the rest of sprite zero's shifter on the following scanline to trigger the sprite zero hit.
+	; So if we re-enable rendering during the ppu idle period*, we can shift the rest of sprite zero's shifter on the following scanline to trigger the sprite zero hit.
+	;  *I had alignmnet-specific results on my actual console when this test re-enabled during the idle peried, so I instead wait for approx. for 0.
 
 	; More info about how the sprite shifters work in case you need it:
 	; The sprites are only drawn after their "shifter counter" reaches zero. (each sprite being drawn has their own shifter counter)
@@ -3132,7 +3133,7 @@ TEST_StaleSpriteShiftRegs:
 	LDA #0                        ; A value of 0 to disable rendering.
 	STA $2001                     ; this instruction begins on scanline 4, dot 248. Accounding for the delay, rendering should be disabled around dot 258 or 259.
 	LDA #$1E                      ; A value of $1E to enable both sprites and the background, including the 8 pixels on the left edge of the screen.
-	JSR Clockslide_17             ; stall 17 CPU cycles to wait for the end of HBlank.
+	JSR Clockslide_20             ; stall 17 CPU cycles to wait for the end of HBlank.
 	STA $2001                     ; this instruction begins on scanline 4, dot 332. Accounding for the delay, rendering should be enabled around dot 0 or 1.
 	JSR WaitForVBlank             ; Wait for the end of the frame
 	LDA $2002                     ; Check for sprite zero hits.
