@@ -6458,10 +6458,17 @@ TEST_NMI_Control:
 	BNE FAIL_NMI_Control2
 	INC <ErrorCode
 	
-	;;; Test 8 [NMI Control]: The NMI should occur 2 instructions after the NMI is enabled. ;;;
+	;;; Test 8 [NMI Control]: The NMI is polled before the write cycle of STA. ;;;
+	; This means that there is a gap between enabling the NMI and the NMI occuring:
+	
 	; STA $2000
 	; LDX #$10
 	; [NMI]	
+	
+	; In this example, the interrupt is polled before the write cycle of STA. (the NMI was not yet enabled)
+	; Then the NMI was enabled when the interrupt is polled during `LDX #$10`
+	; Therefore, the NMI occurs after the LDX, instead of immediately after the STA.
+	
 	JSR DisableNMI
 	LDX #0
 	JSR WaitForVBlank
@@ -6473,7 +6480,7 @@ TEST_NMI_Control:
 	STA $2000
 	LDX #$10
 	CPX #$11
-	BNE FAIL_NMI_Control2	; If the NMI happened before the LDA #$10 (incorrect), then X will be 1, thus failing the test.
+	BNE FAIL_NMI_Control2	; If the NMI happened before the LDX #$10 (incorrect), then X will be 1, thus failing the test.
 	;; END OF TEST ;;
 	JSR DisableNMI
 	LDA #1
