@@ -6480,7 +6480,23 @@ TEST_NMI_Control:
 	STA $2000
 	LDX #$10
 	CPX #$11
-	BNE FAIL_NMI_Control2	; If the NMI happened before the LDX #$10 (incorrect), then X will be 1, thus failing the test.
+	BNE FAIL_NMI_Control2	; If the NMI happened before the LDX #$10 (incorrect), then X will be $11, thus failing the test.
+	INC <ErrorCode
+
+	;;; Test 9 [NMI Control]: The NMI is polled between wrice cycles of a read-modify-write instruction. ;;;
+
+	JSR DisableNMI
+	LDX #0
+	JSR WaitForVBlank
+	JSR Clockslide_29780 ; Wait 1 frame.
+	; Instead of using JSR EnableNMI, I need to actually write it all out here.
+	LDA <PPUCTRL_COPY
+	STA $2002 ; prepare the PPU Open Bus
+	INC $2000
+	LDX #$10
+	CPX #$11
+	BEQ FAIL_NMI_Control2	; If the NMI happened after the LDX #$10 (incorrect), then X will be $10, thus failing the test.
+	
 	;; END OF TEST ;;
 	JSR DisableNMI
 	LDA #1

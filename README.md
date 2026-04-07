@@ -526,6 +526,7 @@ or
   6: The NMI should not occur a second time if writing $80 to $2000 when the NMI flag is already enabled, and the NMI flag was enabled going into VBlank.  
   7: The NMI should occur an additional time if you disable and then re-enable the NMI.  
   8: The NMI is polled before the write cycle of STA, resulting in a gap between enabling the NMI and the NMI occurring. (See Interrupt flag latency.)  
+  9: The NMI is polled between the write cycles of INC, resulting the NMI occurring immediately after the INC. (See Interrupt flag latency.)  
 
 ### NMI Timing
   1: The NMI did not occur on the correct PPU cycle.  
