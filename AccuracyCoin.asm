@@ -2438,7 +2438,7 @@ TEST_BGSerialIn:
 	JSR DisableRendering       ; Disable rendering so the following can happen even out of vblank.
 	JSR ClearNametable2_With24 ; Clear nametable 2 with tile $24 (empty tiles)
 	JSR SetUpSpriteZero        ; Prepare sprite zero with the following values:
-	.byte $00, $C0, $03, $92   ; Single dot on scanline 1, X = 80
+	.byte $00, $C0, $03, $92   ; Single dot on scanline 1, X = 92
 	JSR PrintCHR               ; Update the color palette so the visual artifacts of this test are visible.
 	.word $3F0D                ; Starting with index 01 of palette 3:
 	.byte $0F, $30, $26, $FF   ; Black, White, Red. (terminator byte)
@@ -2955,7 +2955,7 @@ TEST_2007StressTest_Exit:
 	; The PPU Read Buffer should be set up 4 ppu cycles after the CPU Read to $2007 ends. Read up on the PPU DATA State Machine, as mentioned above.
 	; Sprite fetch should not be performing attribute table fetches, rather it should perform two nametable fetches in a row.
 	; The "Dummy Background Fetch" phase should not be performing attribute table fetches, rather it should perform two nametable fetches in a row, and the first cycle of a pattern fetch.
-	; The dummy nametable fetch on dot 257 should be reading from the OLD high byte of v before the v register is "horizontally reset".
+	; The dummy nametable fetch on dot 257 should be reading from the OLD value of v before the v register is "horizontally reset".
 	;;;;;;;;;;;;;;;;;;;
 
 	; Honestly, this test is a lot less intimidating than it could be, since I cannot require the analogue behavior to behave in a specific way.
@@ -3115,17 +3115,23 @@ TEST_StaleSpriteShiftRegs:
 	;;; Test 3 [Stale Sprite Shift Registers]: Can a sprite at X=$FF trigger a sprite zero hit by preventing the shifter from reloading during HBlank? ;;;
 	; Disabling rendering on dot 257 (or 258 depending on clock alignment) will prevent the sprite shifters from being reloaded.
 	; Sprite zero's shifter was never fully shifted, and will stop shifting during HBlank.
-	; So if we re-enable rendering during the ppu idle period*, we can shift the rest of sprite zero's shifter on the following scanline to trigger the sprite zero hit.
-	;  *I had alignmnet-specific results on my actual console when this test re-enabled during the idle peried, so I instead wait for approx. for 0.
+	; So if we re-enable rendering during the ppu idle period, we can shift the rest of sprite zero's shifter on the following scanline to trigger the sprite zero hit.
 
 	; More info about how the sprite shifters work in case you need it:
 	; The sprites are only drawn after their "shifter counter" reaches zero. (each sprite being drawn has their own shifter counter)
 	; This shifter counter is initialized during sprite fetch when the X position of a sprite is determined. (using the value of the X position.)
+	; The shifter counter has two modes: "halted" and "counting".
+	; - When halted, the sprite is being drawn, and teh sprite shifter is shifting.
+	; - when counting, the counter is simply decremented until it reaches zero. Once it reaches zero, it switches to "halted" mode.
+	; - If the ppu is rendering on dot 339, then the shifter counters are set to "counting". 
+	;   - If rendering was not enabled on dot 339, the shifter counters will be in whatever state they were previously in, which is likely "halted".
 	; So when we run this test, it will be set up with $FF.
 	; Then every visible ppu cycle, this counter is decremented until 0 where the sprite is drawn and the sprite shifter will begin shifting.
 	; This results in a single pixel drawn at X=$FF for sprite zero.
+	; Since the sprite shifters do not shift while rendering is disabled (or blanked) they stop shifting during HBlank.
 	; Then we disable rendering until the ppu idle period, skipping the re-initialization of the counter.
 	; Since the counter is still zero, and the shift register still has contents, the sprite will be drawn immediately as soon as rendering is re-enabled.
+	; Rendering will be enabled before dot 339, but since sprite zero's shifter counter is already at zero, it will just be set to halted mode again, and immediately draw the sprite on the first pixel.
 
 	JSR Sync_ToLine0Dot1          ; sync the CPU to dot 1 of scanline 0.
 	JSR ClockslideFromWord        ; stall 535 CPU cycles.
@@ -3134,7 +3140,7 @@ TEST_StaleSpriteShiftRegs:
 	STA $2001                     ; this instruction begins on scanline 4, dot 248. Accounding for the delay, rendering should be disabled around dot 258 or 259.
 	LDA #$1E                      ; A value of $1E to enable both sprites and the background, including the 8 pixels on the left edge of the screen.
 	JSR Clockslide_20             ; stall 17 CPU cycles to wait for the end of HBlank.
-	STA $2001                     ; this instruction begins on scanline 4, dot 332. Accounding for the delay, rendering should be enabled around dot 0 or 1.
+	STA $2001                     ; this instruction begins on scanline 4, dot 326. Accounding for the delay, rendering should be enabled around dot 336 or 337.
 	JSR WaitForVBlank             ; Wait for the end of the frame
 	LDA $2002                     ; Check for sprite zero hits.
 	AND #$40                      ; bit 6 is the sprite zero hit flag.
