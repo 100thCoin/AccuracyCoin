@@ -592,7 +592,7 @@ or
 ### Address $2004 Behavior
   1: Writes to $2004 should update OAM and increment the OAM address by 1.  
   2: Reads from $2004 should give you a value in OAM, but do not increment the OAM address.  
-  3: Reads from the attribute bytes should be missing bits 2 through 5.  
+  3: Reads from the attribute bytes should be missing bits 2 through 4.  
   4: Reads from $2004 during PPU cycles 1 to 64 of a visible scanline (with rendering enabled) should always read $FF.  
   5: Reads from $2004 during PPU cycles 1 to 64 of a visible scanline (with rendering disabled) should do a regular read of $2004.  
   6: Writing to $2004 on a visible scanline should increment the OAM address by 4.  
