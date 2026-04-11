@@ -1678,10 +1678,11 @@ BranchDummyRead_RevE:
 	STA $1FA4
 	LDA #$50
 	STA $1FA5
-	STX $1FA6 ; X=60. RTS
+	LDA #$60
+	STA $1FA6 ; A=60. RTS
 	; $1FA4 now reads: INC <$50, RTS
 
-	LDA #$60
+	
 	JSR SetPPUReadBufferToA ; For a revision E or earlier ppu.
 	
 	LDA #$10
@@ -3347,13 +3348,13 @@ TEST_OpenBus_PrepIRQLoop:
 
 	NOP
 	NOP ; I need address $A0A0 to be something very specific (in order to prevent an incorrect emulation from crashing), so I'm adding some NOPs here.
-	BNE TEST_OpenBus_ContinueTest4 ; Skip to TEST_OpenBus_ContinueTest4
+	BNE TEST_OpenBus_ContinueTest5 ; Skip to TEST_OpenBus_ContinueTest4
 	;; If you are reading this for test 4, just ignore these next few lines. ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 TEST_OpenBusA0A0:              ; This is a fail-safe for test 8. It needed to be at address $A0A0.	         ;;
 	SEI						   ; The RTI instruction pulled off some junk and we need to re-set the i flag.  ;;
 	LDX #1                     ; X=1, which is used to tell test 8 that it failed.                           ;;
 	JMP TEST_OpenBus_PostTest8 ; Jump to the end of test 8.                                                  ;;
-TEST_OpenBus_ContinueTest4:    ; Anyway, that was the greatest crime against programming I've ever committed.;;
+TEST_OpenBus_ContinueTest5:    ; Anyway, that was the greatest crime against programming I've ever committed.;;
 	;; And now, back to your regularly scheduled program. ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	
 	LDA $3FFF,X
