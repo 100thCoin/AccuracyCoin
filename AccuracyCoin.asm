@@ -7757,7 +7757,7 @@ Address2004_PreRevisionG:
 	JSR Print_PreRevGBehavior
 	JSR PrintTextCentered
 	.word $2370
-	.byte " Missing reads from $2004.", $FF
+	.byte "    Missing reads from $2004.   ", $FF
 Address2004_PreRevG_SkipMSG:
 	LDA #$39 ; Success code "E", referring to a pre revision G ppu.
 	RTS
