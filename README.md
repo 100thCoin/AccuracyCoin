@@ -470,7 +470,7 @@ or
 ## Page 16: PPU Behavior  
 
 ### CHR ROM is not Writable
-  1: Writes to the PPU Address space from the range $0000 through $1FFF should not overwrite teh CHR data if the cartridge has CHR ROM instead of CHR RAM.  
+  1: Writes to the PPU Address space from the range $0000 through $1FFF should not overwrite the CHR data if the cartridge has CHR ROM instead of CHR RAM.  
 
 ### PPU Register Mirroring
   1: PPU registers should be mirrored through $3FFF.  

@@ -2937,6 +2937,9 @@ TEST_2007StressTest_Exit:
 	; $640:  ?? 00 ?? C0 ?? 66 ?? 66 ?? 01 ?? C0 ?? 38 ?? 38 ; Background fetch
 	; $650:  ?? 02 ?? 02 ??                                  ; Dummy Background fetch
 	; * During "Sprite Fetch" and the "Dummy Background Fetch", the AT reads are NT reads.
+	
+	; A console with a 2C05-99 PPU has been seen to have unstable attribute fetches sometimes, assumed to be clock alignment related.
+	;	- For better or worse, I'm considering that situation a "fail", and looking for stable attribute fetches for this test.
 
 	; The answer key below only includes the non-?? bytes.
 	
@@ -11574,7 +11577,7 @@ TEST_ImpliedDummyRead_BRKed5:
 	STA <$60	; write to $51. $50 currently has the backup of address $A5 in it.
 	JMP TEST_ImpliedDummyRead_Post5
 	
-	TEST_ImpliedDummyRead_BRKed6:
+TEST_ImpliedDummyRead_BRKed6:
 	; This is where the PC *should* go after reading an opcode from $4015 during the third loop of tests.
 	PLA
 	; Check if we ran a BRK or if this was an IRQ.
