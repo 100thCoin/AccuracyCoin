@@ -14492,6 +14492,8 @@ TEST_AllNops_StoreFlags:
 TEST_AllNops_Evaluate_Fail
 	PLA
 	PLA
+	PLA
+	PLA
 	JMP TEST_Fail	
 ;;;;;;;;;;;;;;;;;
 
