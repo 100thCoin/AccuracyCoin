@@ -8614,10 +8614,11 @@ TEST_ControllerStrobing:
 	;
 	; This results in a 1-cycle strobe of the controller ports!
 	; - if that 1-cycle strobe happens on a get cycle, the controllers actually aren't strobed at all! (See the next error code)
+	; - But if the strobe occurs on a put cycle, the controllers DO get strobed.
 	JSR WaitForVBlank
 	LDA #2
-	STA $4014 ; sync CPU with put cycle.
-	DEC $4016 ; this should strobe the controller.
+	STA $4014 ; sync CPU with "get" cycle.
+	DEC $4016 ; (get) (put) (get) (put) (get) [PUT] [GET] : this should strobe the controller.
 	JSR ReadControllerInto50_and_A
 	AND #$7F
 	BNE FAIL_ControllerStrobing	; the result should be $00
@@ -8627,9 +8628,9 @@ TEST_ControllerStrobing:
 	; This results in a 1-cycle strobe of the controller ports, however they actually aren't strobed at all!
 	JSR WaitForVBlank
 	LDA #2
-	STA $4014 ; sync CPU with put cycle.
-	LDA <$00  ; 3 CPU cycles.
-	DEC $4016 ; this should not strobe the controller.
+	STA $4014 ; sync CPU with "get" cycle.
+	LDA <$00  ; (get) (put) (get) 3 CPU cycles.
+	DEC $4016 ; (put) (get) (put) (get) (put) [GET] [PUT] this should not strobe the controller.
 	JSR ReadControllerInto50_and_A
 	CMP #$FF
 	BNE FAIL_ControllerStrobing	; the result should be $FF
