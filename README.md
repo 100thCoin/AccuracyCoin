@@ -3,7 +3,7 @@ AccuracyCoin is a large collection of NES accuracy tests on a single NROM cartri
 
 This ROM was designed for an NTSC console with an RP2A03G CPU and RP2C02G PPU. Some tests might be automatically skipped on hardware with a different revision.
 
-This ROM currently has 138 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
+This ROM currently has 139 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
 Here's an example of the menu in this ROM shown on an emulator failing a few tests, passing others, and a few tests on screen haven't been run yet. (The cursor is currently next to the "The Decimal Flag" test.)
 
@@ -732,6 +732,11 @@ or
   2: JSR should push the return address to the stack between reading the first and second operand.
   3: Your emulator has incorrect open bus emulation.  
   4: JSR should leave the value of the second operand on the data bus.  
+
+### Internal Data Bus
+  1: Reading from open bus should work correctly when crossing a page boundary.  
+  2: The DMC DMA Bus Conflict with $4015 cannot affect the internal data bus.  
+  2: Reads from $4015 only update the internal data bus and cannot affect the external data bus.  
 
 # Success Codes
 Some tests have multiple acceptable behaviors that are tested for in this ROM. The behavior used will either be printed on screen after running the test, or you'll see a "success code" on the all-test table.  

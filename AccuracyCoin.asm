@@ -313,6 +313,9 @@ result_2002FlagClearTiming = $48D
 result_2007_Stress = $48E
 result_StaleSpriteShiftRegs = $48F
 
+result_InternalDataBus = $490
+
+
 result_DrawTest = $03FF	; page 3 omits the test from the all-test-result-table.
 
 ;$500 is dedicated to RAM needed for tests.
@@ -767,6 +770,7 @@ Suite_CPUBehavior2:
 	table "Implied Dummy Reads",	 $FF, result_ImpliedDummyRead,  TEST_ImpliedDummyRead
 	table "Branch Dummy Reads", 	 $FF, result_BranchDummyRead,   TEST_BranchDummyRead
 	table "JSR Edge Cases",          $FF, result_JSREdgeCases,      TEST_JSREdgeCases
+	table "Internal Data Bus",       $FF, result_InternalDataBus,   TEST_InternalDataBus
 
 	.byte $FF
 
@@ -3157,8 +3161,97 @@ TEST_StaleSpriteShiftRegs:
 	RTS
 ;;;;;;;
 
+
 FAIL_StaleSpriteShiftRegs:
+FAIL_InternalDataBus:
 	JMP TEST_Fail
+
+
+TEST_InternalDataBus:
+	;;; Test 1 [Internal Data Bus]: Verify Open Bus. ;;;
+	LDX #$10
+	LDA $41F8, X
+	CMP #$41
+	BNE FAIL_InternalDataBus
+	
+	; A copy/paste of DMA + Open Bus.
+	
+	JSR DMASync_50CyclesRemaining	; sync DMA
+	JSR Clockslide_47
+	LDA $4000 ; <------- [Opcode] [Operand1] [Operand2] [*DMA*] [Read]
+	BNE FAIL_InternalDataBus
+	
+	INC <ErrorCode
+	
+	;;; Test 2 [Internal Data Bus]: Verify that the External Data Bus can not change the Internal Data Bus. ;;;
+	; This test will trigger a DMC DMA during a read from $4015. More specifically, we'll be reading index $15 of the DPCM Sample as well!
+	; This sample will have bit 5 set.
+	; This does NOT set bit 5 of the $4015 read, as that is set exclusively by the Internal Data Bus.
+	
+	; The internal data bus is updated during every read/write, while the external data bus is updated on every read/write EXCEPT for *reads* from address $4015.
+	
+	JSR TEST_InternalDataBus_Sync ; Sync the DMC DMA to be between the operands and the read from memory, using index $15 of the sample.
+	NOP
+	NOP
+	NOP
+	NOP
+	LDA $4015 ; [Opcode] [Operand] [Operand] {DMC DMA} [Read from $4015]
+	AND #$20  ;                              This DMC DMA does not update the external data bus. Only the internal one.
+	BNE FAIL_InternalDataBus
+	
+	INC <ErrorCode
+	
+	;;; Test 3 [Internal Data Bus]: Verify that the Internal Data Bus can not change the External Data Bus. ;;;
+	
+	JSR TEST_InternalDataBus_Sync ; Sync the DMC DMA to be between the operands and the read from memory, using index $15 of the sample.
+	LDX #$16
+	LDA $00FF, X
+	LDA $40FF, X ; [Opcode] [Operand] [Operand] [Read from $4015] {DMC DMA} [Read from Open Bus]
+	AND #$20     ;                                                This DMC DMA does not update the external data bus. Only the internal one.
+	BEQ FAIL_InternalDataBus
+	
+	;; END OF TEST ;;	
+	
+	LDA #1
+	RTS
+;;;;;;;
+
+
+
+TEST_InternalDataBus_Sync:
+	JSR DMASync_50CyclesRemaining
+	LDA #2		;+2
+	STA $4013	;+4 sample length = #2 * 16 + 1 = 33 (or $21 in hex)
+	LDA #$BB	;+2
+	STA $4012	;+4 Sample address is $EEC0 ($21 copies of $60. I just needed something with bit 5 set.)
+	LDA #$4F	;+2
+	STA $4010	;+4 fastest rate. (also loop, so it refreshes the address and length)
+	LDX #$0	;+2
+	
+	; 30 CPU cycles left.
+	JSR Clockslide_30
+	; DMA that reloads all the stuff.
+	; Next DMA in 428 cycles
+	LDA #$00
+	STA $4017	; Keep the interrupt flag set, but refresh the timer.
+	JSR ClockslideFromWord
+	.word 404
+	
+	LDX #$15
+TEST_InternalDataBus_Loop:
+	; Next DMA in 8 cycles
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	JSR ClockslideFromWord
+	.word 413
+	DEX
+	BNE TEST_InternalDataBus_Loop
+	    ; DMA in 9 cycles.
+	RTS ; -6. So the DMA is now in 3 cycles.
+;;;;;;;;
 
 	.bank 1
 	.org $A000	; This next line of code is located at address $A000 in the ROM.
@@ -15815,6 +15908,7 @@ SetPPUSCROLLFromWord:	; pretty much the same as SetPPUADDRFromWord, but it write
 	
 	.org $EEC0	
 DPCM_Sample_60:
+	.byte $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60
 	.byte $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60
 	.byte $60
 	
