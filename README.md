@@ -256,7 +256,7 @@ For more information, I recommend reading the fully commented assembly code for 
 ### APU Length Counter
   1: Reading from $4015 should not state that the pulse 1 channel is playing before you write to $4003.  
   2: Reading from $4015 should state that the pulse 1 channel is playing after you write to $4003.  
-  3: The audio caannel should automatically stop playing if you wait for the length counter to expire.  
+  3: The audio channel should automatically stop playing if you wait for the length counter to expire.  
   4: Writing $80 to $4017 should immediately clock the Length Counter.  
   5: Writing $00 to $4017 should not clock the Length Counter.  
   6: Disabling the audio channel should immediately clear the length counter to zero.  

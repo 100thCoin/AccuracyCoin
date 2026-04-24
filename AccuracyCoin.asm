@@ -767,6 +767,7 @@ Suite_CPUBehavior2:
 	table "Implied Dummy Reads",	 $FF, result_ImpliedDummyRead,  TEST_ImpliedDummyRead
 	table "Branch Dummy Reads", 	 $FF, result_BranchDummyRead,   TEST_BranchDummyRead
 	table "JSR Edge Cases",          $FF, result_JSREdgeCases,      TEST_JSREdgeCases
+
 	.byte $FF
 
 
@@ -5243,6 +5244,9 @@ TEST_SHA_9F_CorrectLength:
 	; Behavior 2: Hi = ($1E+1) & $AA = 0A	        :: write ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
 	; Behavior 3: Hi = ($1E+1) & ($55 & MAGIC) = ??	:: write ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
 	; Behavior 4: Hi = ($1E+1) & ($55 | $AA) = 1F   :: write ($1E+1) & $55 & ($AA | MAGIC) = ?? & $1F (we don't know what MAGIC is, but the result must be $1F or less)
+	;		"MAGIC" has been seen to be 00, F5, F9, FA, and FF. Probably other values too.
+
+	
 	JSR CopyLowestPageBytesTo60
 	LDA $0A00
 	CMP #$FF
@@ -5261,17 +5265,7 @@ TEST_SHA_Behavior2_9F_JMP:
 	JMP TEST_SHA_Behavior2_9F
 TEST_SHA_Behavior1_9F_JMP:
 	JMP TEST_SHA_Behavior1_9F
-	
-	; So there are 2 different behaviors you can expect here.
-	; H is the high byte of the address bus before indexing, +1
-	; 1. Write: A & X & H
-	; 2. Write: A & (X | Magic) & H :: *Magic CAN CHANGE!
-	;		Magic has been seen to be 00, F5, F9, FA, and FF.
-	
-	; When the Y register is used as an offset and causes the high byte to change, the high byte becomes "unstable".
-	; The behavior here IS correlated to the other set of behaviors.
-	; 1. Hi = Hi & A & X
-	; 2. Hi = Hi & X
+
 TEST_SHA_Behavior1_93:
 	LDA #$93
 	PHA
@@ -15852,7 +15846,7 @@ DMASync40_Loop:
 	LDA $5000 ; Open bus! Either we will read $40 from the high byte, or $00 from the DMA.
 	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
 	CMP #$40
-	BNE DMASync40_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
+	BNE DMASync40_Loop ; If the DMA occurs, LDA $5000 will read $40 (Setting zero flag) ; +2 (7)
 	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
 	RTS 
 ;;;;;;;
@@ -15867,7 +15861,7 @@ DMASync48_Loop:
 	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $48 from the DMA.
 	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
 	CMP #$48
-	BNE DMASync48_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
+	BNE DMASync48_Loop ; If the DMA occurs, LDA $4000 will read $48 (Setting zero flag) ; +2 (7)
 	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
 	RTS
 ;;;;;;;
@@ -15882,7 +15876,7 @@ DMASync60_Loop:
 	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $60 from the DMA.
 	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
 	CMP #$60
-	BNE DMASync60_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
+	BNE DMASync60_Loop ; If the DMA occurs, LDA $4000 will read $60 (Setting zero flag) ; +2 (7)
 	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
 	RTS
 ;;;;;;;
@@ -15897,7 +15891,7 @@ DMASyncA5_Loop:
 	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $A5 from the DMA.
 	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
 	CMP #$A5
-	BNE DMASyncA5_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
+	BNE DMASyncA5_Loop ; If the DMA occurs, LDA $4000 will read $A5 (Setting zero flag) ; +2 (7)
 	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
 	RTS
 ;;;;;;;
@@ -15912,7 +15906,7 @@ DMASync68_Loop:
 	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $68 from the DMA.
 	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
 	CMP #$68
-	BNE DMASync68_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
+	BNE DMASync68_Loop ; If the DMA occurs, LDA $4000 will read $68 (Setting zero flag) ; +2 (7)
 	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
 	RTS
 ;;;;;;;
@@ -15927,7 +15921,7 @@ DMASync90_Loop:
 	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $90 from the DMA.
 	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
 	CMP #$90
-	BNE DMASync90_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
+	BNE DMASync90_Loop ; If the DMA occurs, LDA $4000 will read $90 (Setting zero flag) ; +2 (7)
 	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
 	RTS
 ;;;;;;;
@@ -15942,7 +15936,7 @@ DMASync05_Loop:
 	LDA $4000 ; Open bus! Either we will read $40 from the high byte, or $05 from the DMA.
 	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
 	CMP #$05
-	BNE DMASync05_Loop ; If the DMA occurs, BIT $5000 will read $40 (Setting overflow flag) ; +2 (7)
+	BNE DMASync05_Loop ; If the DMA occurs, LDA $4000 will read $05 (Setting zero flag) ; +2 (7)
 	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
 	RTS
 ;;;;;;;
@@ -18454,7 +18448,7 @@ DMASync_TheGoodOne:
 	LDA #$FF
 	STA $4012 ; Sample address $FFC0.
 	LDA #0
-	STA $4013 ; #1 * 16 + 1 = 17 byte length.
+	STA $4013 ; #1 * 0 + 1 = 1 byte length. (IT MUST BE A 1-BYTE LONG SAMPLE! Some tests rely on the address counter being reset when the DMA occurs.)
 	LDA #$10
 	STA $4015 ; Start the DMC DMA loop
 	NOP
