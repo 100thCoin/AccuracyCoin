@@ -734,7 +734,7 @@ or
   4: JSR should leave the value of the second operand on the data bus.  
 
 ### Internal Data Bus
-  1: Reading from open bus should work correctly when crossing a page boundary.  
+  1: Reading from open bus should work correctly when crossing a page boundary. DMC DMA Timing should be correct.  
   2: The DMC DMA Bus Conflict with $4015 cannot affect the internal data bus.  
   2: Reads from $4015 only update the internal data bus and cannot affect the external data bus.  
 
