@@ -3177,10 +3177,10 @@ TEST_StaleSpriteShiftRegs:
 	JSR ClockslideFromWord        ; stall 446 CPU cycles.
 	.word 446                     ; ^
 	LDA #0                        ; A value of 0 to disable rendering.
-	STA $2001                     ; this instruction begins on scanline 4, dot 248. Accounting for the delay, rendering should be disabled around dot 258 or 259.
+	STA $2001                     ; this instruction begins on scanline 3, dot 322. Accounting for the delay, rendering should be disabled around dot 258 or 259.
 	JSR Clockslide_50             ; stall a while so HBlank can end.
 	LDA #$1E                      ; A value of $1E to enable both sprites and the background, including the 8 pixels on the left edge of the screen.
-	STA $2001                     ; this instruction begins on scanline 4, dot 326. Accounting for the delay, rendering should be enabled around dot 336 or 337.
+	STA $2001                     ; this instruction begins on scanline 4, dot 149. Accounting for the delay, rendering should be enabled around dot 336 or 337.
 	
 	JSR WaitForVBLSpriteZeroHit   ; Wait for vblank and load A with $2002.6
 	BEQ FAIL_StaleSpriteShiftRegs ; Fail the test if a sprite zero hit did NOT occur this time.
