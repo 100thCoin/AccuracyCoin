@@ -3133,8 +3133,8 @@ TEST_StaleSpriteShiftRegs:
 	STA $4014                     ; OAM DMA with page 2.
 
 	JSR Sync_ToLine0Dot1          ; sync the CPU to dot 1 of scanline 0.
-	JSR ClockslideFromWord        ; stall 563 CPU cycles. (stall until scanline 4 dot 325)
-	.word 563                     ; ^
+	JSR ClockslideFromWord        ; stall 562 CPU cycles. (stall until scanline 4 dot 322)
+	.word 562                     ; ^
 	LDA #0                        ;
 	STA $2001                     ; Disable rendering around dot 0-ish, while the background shifters are full.
 	JSR ClockslideFromWord        ; stall 1130 CPU cycles. (stall until scanline 14 dot 324)
@@ -3174,13 +3174,13 @@ TEST_StaleSpriteShiftRegs:
 	; Since they will be in the "halted" state as soon as rendering is enabled, the sprite will be draws as soon as rendering is enabled, triggering the sprite zero hit.
 
 	JSR Sync_ToLine0Dot1          ; sync the CPU to dot 1 of scanline 0.
-	JSR ClockslideFromWord        ; stall 446 CPU cycles.
-	.word 446                     ; ^
+	JSR ClockslideFromWord        ; stall 447 CPU cycles.
+	.word 447                     ; ^
 	LDA #0                        ; A value of 0 to disable rendering.
-	STA $2001                     ; this instruction begins on scanline 3, dot 322. Accounting for the delay, rendering should be disabled around dot 258 or 259.
+	STA $2001                     ; this instruction begins on scanline 3, dot 325. Accounting for the delay, rendering should be disabled around dot 334 or 335.
 	JSR Clockslide_50             ; stall a while so HBlank can end.
 	LDA #$1E                      ; A value of $1E to enable both sprites and the background, including the 8 pixels on the left edge of the screen.
-	STA $2001                     ; this instruction begins on scanline 4, dot 149. Accounting for the delay, rendering should be enabled around dot 336 or 337.
+	STA $2001                     ; this instruction begins on scanline 4, dot 152. Accounting for the delay, rendering should be enabled around dot 161 or 162.
 	
 	JSR WaitForVBLSpriteZeroHit   ; Wait for vblank and load A with $2002.6
 	BEQ FAIL_StaleSpriteShiftRegs ; Fail the test if a sprite zero hit did NOT occur this time.
