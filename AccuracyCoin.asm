@@ -2436,7 +2436,7 @@ TEST_2007_Stress:
 	;;; Test 1 [$2007 Stress Test]: Pre test to make sure the emulator won't crash  ;;;
 
 	LDA <result_VblankSync_PreTest
-	BEQ TEST_2002FCT_Fail ; jus tre-use this fail case.
+	BEQ TEST_2002FCT_Fail ; just re-use this fail case.
 	INC <ErrorCode
 
 	; With that taken care of, let's run some preparations
