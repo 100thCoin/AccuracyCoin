@@ -1928,7 +1928,7 @@ TEST_2004_Stress:
 	;;; Test 1 [$2004 Stress Test]: Pre test to make sure the emulator won't crash  ;;;
 
 	LDA <result_VblankSync_PreTest
-	BNE FAIL_2004_Stress
+	BEQ FAIL_2004_Stress
 	INC <ErrorCode
 
 
@@ -2428,104 +2428,15 @@ Test_2002_FlagSet_Loop:
 	JMP Test_2002_FlagSet_Loop
 
 TEST_2002_FlagSet_DataComplete:
-
 	RTS
 ;;;;;;;	
-
-FAIL_BGSerialIn:
-	JSR WaitForVBlank
-	JSR SetUpDefaultPalette
-	JMP TEST_Fail
-;;;;;;;;;;;;;;;;;
-
-TEST_BGSerialIn:
-	;;; Test 1 [BG Serial In]: Pre-test, verify sprite zero hits. ;;;
-	; To be honest, this is an insane test that makes a sprite zero hit occur when the nametable is entirely translucent pixels.
-	; We just need to confirm that the sprite zero hit doesn't happen :)
-	JSR DisableRendering       ; Disable rendering so the following can happen even out of vblank.
-	JSR ClearNametable2_With24 ; Clear nametable 2 with tile $24 (empty tiles)
-	JSR SetUpSpriteZero        ; Prepare sprite zero with the following values:
-	.byte $00, $C0, $03, $92   ; Single dot on scanline 1, X = 92
-	JSR PrintCHR               ; Update the color palette so the visual artifacts of this test are visible.
-	.word $3F0D                ; Starting with index 01 of palette 3:
-	.byte $0F, $30, $26, $FF   ; Black, White, Red. (terminator byte)
-	JSR SetPPUADDRFromWord     ; Move t register to $2C00
-	.byte $2C, $00             ; 
-	JSR EnableRendering        ; Enable rendering.
-	JSR WaitForVBlank          ; Wait for vblank. The prep work is now complete.
-	
-	JSR WaitForVBLSpriteZeroHit; Wait for vblank and load A with $2002.6
-	BNE FAIL_BGSerialIn        ; If a sprite zero hit did somehow occur, fail the test.
-	INC <ErrorCode             ; And increment the error code to 2.
-	
-	;;; Test 2 [BG Serial In]: Can we make a sprite zero hit occur on an empty nametable by preventing the BG shift registers from loading pattern data? ;;;
-	; The background shift registers are loaded with pattern data every 8 ppu cycles. (from the range of dots 0 to 255, and dots 320 to 335)
-	; If you were to disable rendering just before the data would be loaded, and re-enable rendering just after the data would have been loaded, you could draw the Serial Input values for the shift registers.
-	; Let's have a quick crash course on the timing of this all, and what the shift registers are doing. (https://www.nesdev.org/wiki/PPU_signals)
-	; On dots 0 through 255, (and dots 320 through 335) the PPU:
-	; reads from the nametable       (dot % 8 == 0 and 1), 
-	; reads from the attribute table (dot % 8 == 2 and 3), 
-	; reads from the pattern table   (dot % 8 == 4 and 5), 
-	; reads from the pattern table   (dot % 8 == 6 and 7). 
-	;
-	; So what are the background shift registers doing during this time?
-	; The background shift registers are shifted on all of these cycles.
-	; So for instance, using the example [00110011 00110011]...
-	; would be shifted left to the value [01100110 01100110].
-	; The lowest bit (the new value shifted in on the right) is a 0 for the low bit plane, and a 1 for the high bit plane.
-	; So if this was the high bit plane, using the example [00110011 00110011]...
-	; instead the value would be shifted left to the value [01100110 01100111].
-	
-	; Since the data read from the pattern tables is loaded into the shift registers on (dot % 8 == 7),
-	; If we disable rendering on (dot % 8 == 6) and re-enable rendering on (dot % 8 == 0), then we can draw a large amount of these '1' bits that keep getting shifted in.
-	;
-	; Keep in mind, writes to $2001 don't happen immediately when the CPU writes there, and has a delay of 2 to 5 ppu cycles, depending on the ppu and the clock alignments.
-	; This just means that it's really tedious to test for this, since (depending on the ppu or the alignment) the writes to disable/enable rendering could happen in most of the range form dots 0 to 7.
-
-	JSR Sync_ToPreRenderDot324 ; It's actually syncing to (scanline 0, dot 1) - 18 ppu cycles.
-	JSR Clockslide_100         ; I'm going to stall until a specific ppu cycle.
-	JSR Clockslide_49          ; Somewhere, middle of the screen-ish, after a few scanlines.
-	LDY #120                   ; Y only ticks down in 2/3rds of the iterations in the upcoming loop. This will run 180 times.
-	LDX #3                     ; Since there are 113.666 cpu cycles per scanline, I run 114, 114, then 113 in a repeating pattern. This keeps the action relatively in the same place each scanline.
-TEST_BGSerialIn_Loop:
-	LDA #$0   ; (counting ppu cycles % 8)                        ; +2
-	STA $3E01 ; disable rendering (4-5-6)                        ; +4 = 6   ; Additional comment: Writing to a mirror of $2001. This prevents a hardware issue where the wrong value is written to the ppu register for a single ppu cycle.
-	LDA #$1E  ; (7-0-1) (2-3-4)                                  ; +2 = 8
-	STA $2001 ; (5-6-7) (0-1-2) (3-4-5) (6-7-0) enable rendering ; +4 = 12  ; Additional comment: The write to $2001 happens on ppu dot%8 == 6, but adding the smallest known delay of 2 brings us to dot%8 == 0.
-	JSR Clockslide_50                                            ; +50 = 62 ; Additional comment: The rest of this incredibly sloppy loop here is just counting cycles to make this happen in approximately the same place next scanline.
-	JSR Clockslide_37                                            ; +37 = 99
-	DEX                                                          ; +2 = 101
-	BNE TEST_BGSerialIn_WasteACycle                              ; +2 or 3 = 103 or 104
-	LDX #3                                                       ; +2 = 105
-	NOP                                                          ; +2 = 107
-	LDA <$00                                                     ; +3 = 110
-	JMP TEST_BGSerialIn_Loop                                     ; +3 = 113
-TEST_BGSerialIn_WasteACycle:
-	DEY                                                          ; +2 = 106
-	BEQ TEST_BGSerialIn_Exit ; Exit the loop if Y = 0.           ; +2 = 108
-	LDA <$00                                                     ; +3 = 111
-	JMP TEST_BGSerialIn_Loop                                     ; +3 = 114
-TEST_BGSerialIn_Exit:
-	LDA $2002                ; Anyway, I could've just done that once instead of across the entire screen, but it was suggested to make it more visible.
-	AND #$40                 ; Keep in mind, this value should show up as a white line, (color %10 of palette %11) instead of red, color %11 of palette %11.
-	BEQ FAIL_BGSerialIn2     ; So we check if a sprite zero hit occured, masked away everything but the sprite zero hit flag, and fail the test if no hit occured.
-	;; END OF TEST ;;
-
-	JSR WaitForVBlank        ; Wait for vblank...
-	JSR SetUpDefaultPalette  ; Fix the color palette.
-	LDA #1                   ; Return 1 to indicate a pass.
-	RTS
-;;;;;;;
-FAIL_BGSerialIn2:
-	JMP FAIL_BGSerialIn
-;;;;;;;;;;;;;;;;;
 
 TEST_2007_Stress:
 
 	;;; Test 1 [$2007 Stress Test]: Pre test to make sure the emulator won't crash  ;;;
 
 	LDA <result_VblankSync_PreTest
-	BNE FAIL_BGSerialIn2 ; jus tre-use this fail case.
+	BEQ TEST_2002FCT_Fail ; jus tre-use this fail case.
 	INC <ErrorCode
 
 	; With that taken care of, let's run some preparations
@@ -3235,95 +3146,7 @@ TEST_StaleSpriteShiftRegs:
 
 
 FAIL_StaleSpriteShiftRegs:
-FAIL_InternalDataBus:
 	JMP TEST_Fail
-
-
-TEST_InternalDataBus:
-	;;; Test 1 [Internal Data Bus]: Verify Open Bus. ;;;
-	LDX #$10
-	LDA $41F8, X
-	CMP #$41
-	BNE FAIL_InternalDataBus
-	
-	; A copy/paste of DMA + Open Bus.
-	
-	JSR DMASync_50CyclesRemaining	; sync DMA
-	JSR Clockslide_47
-	LDA $4000 ; <------- [Opcode] [Operand1] [Operand2] [*DMA*] [Read]
-	BNE FAIL_InternalDataBus
-	
-	INC <ErrorCode
-	
-	;;; Test 2 [Internal Data Bus]: Verify that the External Data Bus can not change the Internal Data Bus. ;;;
-	; This test will trigger a DMC DMA during a read from $4015. More specifically, we'll be reading index $15 of the DPCM Sample as well!
-	; This sample will have bit 5 set.
-	; This does NOT set bit 5 of the $4015 read, as that is set exclusively by the Internal Data Bus.
-	
-	; The internal data bus is updated during every read/write, while the external data bus is updated on every read/write EXCEPT for *reads* from address $4015.
-	
-	JSR TEST_InternalDataBus_Sync ; Sync the DMC DMA to be between the operands and the read from memory, using index $15 of the sample.
-	NOP
-	NOP
-	NOP
-	NOP
-	LDA $4015 ; [Opcode] [Operand] [Operand] {DMC DMA} [Read from $4015]
-	AND #$20  ;                              This DMC DMA does not update the external data bus. Only the internal one.
-	BNE FAIL_InternalDataBus
-	
-	INC <ErrorCode
-	
-	;;; Test 3 [Internal Data Bus]: Verify that the Internal Data Bus can not change the External Data Bus. ;;;
-	
-	JSR TEST_InternalDataBus_Sync ; Sync the DMC DMA to be between the operands and the read from memory, using index $15 of the sample.
-	LDX #$16
-	LDA $00FF, X
-	LDA $40FF, X ; [Opcode] [Operand] [Operand] [Read from $4015] {DMC DMA} [Read from Open Bus]
-	AND #$20     ;                                                This DMC DMA does not update the external data bus. Only the internal one.
-	BEQ FAIL_InternalDataBus
-	
-	;; END OF TEST ;;	
-	
-	LDA #1
-	RTS
-;;;;;;;
-
-
-
-TEST_InternalDataBus_Sync:
-	JSR DMASync_50CyclesRemaining
-	LDA #2		;+2
-	STA $4013	;+4 sample length = #2 * 16 + 1 = 33 (or $21 in hex)
-	LDA #$BB	;+2
-	STA $4012	;+4 Sample address is $EEC0 ($21 copies of $60. I just needed something with bit 5 set.)
-	LDA #$4F	;+2
-	STA $4010	;+4 fastest rate. (also loop, so it refreshes the address and length)
-	LDX #$0	;+2
-	
-	; 30 CPU cycles left.
-	JSR Clockslide_30
-	; DMA that reloads all the stuff.
-	; Next DMA in 428 cycles
-	LDA #$00
-	STA $4017	; Keep the interrupt flag set, but refresh the timer.
-	JSR ClockslideFromWord
-	.word 404
-	
-	LDX #$15
-TEST_InternalDataBus_Loop:
-	; Next DMA in 8 cycles
-	NOP
-	NOP
-	NOP
-	NOP
-	NOP
-	JSR ClockslideFromWord
-	.word 413
-	DEX
-	BNE TEST_InternalDataBus_Loop
-	    ; DMA in 9 cycles.
-	RTS ; -6. So the DMA is now in 3 cycles.
-;;;;;;;;
 
 	.bank 1
 	.org $A000	; This next line of code is located at address $A000 in the ROM.
@@ -15848,6 +15671,184 @@ TEST_RenderingFlagBehaviorCleanUp:
 	.byte $24, $24, $FF ; two solid white boxes at X= $78
 	RTS
 ;;;;;;;
+
+FAIL_InternalDataBus:
+	JMP TEST_Fail
+
+
+TEST_InternalDataBus:
+	;;; Test 1 [Internal Data Bus]: Verify Open Bus. ;;;
+	LDX #$10
+	LDA $41F8, X
+	CMP #$41
+	BNE FAIL_InternalDataBus
+	
+	; A copy/paste of DMA + Open Bus.
+	
+	JSR DMASync_50CyclesRemaining	; sync DMA
+	JSR Clockslide_47
+	LDA $4000 ; <------- [Opcode] [Operand1] [Operand2] [*DMA*] [Read]
+	BNE FAIL_InternalDataBus
+	
+	INC <ErrorCode
+	
+	;;; Test 2 [Internal Data Bus]: Verify that the External Data Bus can not change the Internal Data Bus. ;;;
+	; This test will trigger a DMC DMA during a read from $4015. More specifically, we'll be reading index $15 of the DPCM Sample as well!
+	; This sample will have bit 5 set.
+	; This does NOT set bit 5 of the $4015 read, as that is set exclusively by the Internal Data Bus.
+	
+	; The internal data bus is updated during every read/write, while the external data bus is updated on every read/write EXCEPT for *reads* from address $4015.
+	
+	JSR TEST_InternalDataBus_Sync ; Sync the DMC DMA to be between the operands and the read from memory, using index $15 of the sample.
+	NOP
+	NOP
+	NOP
+	NOP
+	LDA $4015 ; [Opcode] [Operand] [Operand] {DMC DMA} [Read from $4015]
+	AND #$20  ;                              This DMC DMA does not update the external data bus. Only the internal one.
+	BNE FAIL_InternalDataBus
+	
+	INC <ErrorCode
+	
+	;;; Test 3 [Internal Data Bus]: Verify that the Internal Data Bus can not change the External Data Bus. ;;;
+	
+	JSR TEST_InternalDataBus_Sync ; Sync the DMC DMA to be between the operands and the read from memory, using index $15 of the sample.
+	LDX #$16
+	LDA $00FF, X
+	LDA $40FF, X ; [Opcode] [Operand] [Operand] [Read from $4015] {DMC DMA} [Read from Open Bus]
+	AND #$20     ;                                                This DMC DMA does not update the external data bus. Only the internal one.
+	BEQ FAIL_InternalDataBus
+	
+	;; END OF TEST ;;	
+	
+	LDA #1
+	RTS
+;;;;;;;
+
+
+
+TEST_InternalDataBus_Sync:
+	JSR DMASync_50CyclesRemaining
+	LDA #2		;+2
+	STA $4013	;+4 sample length = #2 * 16 + 1 = 33 (or $21 in hex)
+	LDA #$BB	;+2
+	STA $4012	;+4 Sample address is $EEC0 ($21 copies of $60. I just needed something with bit 5 set.)
+	LDA #$4F	;+2
+	STA $4010	;+4 fastest rate. (also loop, so it refreshes the address and length)
+	LDX #$0	;+2
+	
+	; 30 CPU cycles left.
+	JSR Clockslide_30
+	; DMA that reloads all the stuff.
+	; Next DMA in 428 cycles
+	LDA #$00
+	STA $4017	; Keep the interrupt flag set, but refresh the timer.
+	JSR ClockslideFromWord
+	.word 404
+	
+	LDX #$15
+TEST_InternalDataBus_Loop:
+	; Next DMA in 8 cycles
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	JSR ClockslideFromWord
+	.word 413
+	DEX
+	BNE TEST_InternalDataBus_Loop
+	    ; DMA in 9 cycles.
+	RTS ; -6. So the DMA is now in 3 cycles.
+;;;;;;;;
+
+FAIL_BGSerialIn:
+	JSR WaitForVBlank
+	JSR SetUpDefaultPalette
+	JMP TEST_Fail
+;;;;;;;;;;;;;;;;;
+
+TEST_BGSerialIn:
+	;;; Test 1 [BG Serial In]: Pre-test, verify sprite zero hits. ;;;
+	; To be honest, this is an insane test that makes a sprite zero hit occur when the nametable is entirely translucent pixels.
+	; We just need to confirm that the sprite zero hit doesn't happen :)
+	JSR DisableRendering       ; Disable rendering so the following can happen even out of vblank.
+	JSR ClearNametable2_With24 ; Clear nametable 2 with tile $24 (empty tiles)
+	JSR SetUpSpriteZero        ; Prepare sprite zero with the following values:
+	.byte $00, $C0, $03, $92   ; Single dot on scanline 1, X = 92
+	JSR PrintCHR               ; Update the color palette so the visual artifacts of this test are visible.
+	.word $3F0D                ; Starting with index 01 of palette 3:
+	.byte $0F, $30, $26, $FF   ; Black, White, Red. (terminator byte)
+	JSR SetPPUADDRFromWord     ; Move t register to $2C00
+	.byte $2C, $00             ; 
+	JSR EnableRendering        ; Enable rendering.
+	JSR WaitForVBlank          ; Wait for vblank. The prep work is now complete.
+	
+	JSR WaitForVBLSpriteZeroHit; Wait for vblank and load A with $2002.6
+	BNE FAIL_BGSerialIn        ; If a sprite zero hit did somehow occur, fail the test.
+	INC <ErrorCode             ; And increment the error code to 2.
+	
+	;;; Test 2 [BG Serial In]: Can we make a sprite zero hit occur on an empty nametable by preventing the BG shift registers from loading pattern data? ;;;
+	; The background shift registers are loaded with pattern data every 8 ppu cycles. (from the range of dots 0 to 255, and dots 320 to 335)
+	; If you were to disable rendering just before the data would be loaded, and re-enable rendering just after the data would have been loaded, you could draw the Serial Input values for the shift registers.
+	; Let's have a quick crash course on the timing of this all, and what the shift registers are doing. (https://www.nesdev.org/wiki/PPU_signals)
+	; On dots 0 through 255, (and dots 320 through 335) the PPU:
+	; reads from the nametable       (dot % 8 == 0 and 1), 
+	; reads from the attribute table (dot % 8 == 2 and 3), 
+	; reads from the pattern table   (dot % 8 == 4 and 5), 
+	; reads from the pattern table   (dot % 8 == 6 and 7). 
+	;
+	; So what are the background shift registers doing during this time?
+	; The background shift registers are shifted on all of these cycles.
+	; So for instance, using the example [00110011 00110011]...
+	; would be shifted left to the value [01100110 01100110].
+	; The lowest bit (the new value shifted in on the right) is a 0 for the low bit plane, and a 1 for the high bit plane.
+	; So if this was the high bit plane, using the example [00110011 00110011]...
+	; instead the value would be shifted left to the value [01100110 01100111].
+	
+	; Since the data read from the pattern tables is loaded into the shift registers on (dot % 8 == 7),
+	; If we disable rendering on (dot % 8 == 6) and re-enable rendering on (dot % 8 == 0), then we can draw a large amount of these '1' bits that keep getting shifted in.
+	;
+	; Keep in mind, writes to $2001 don't happen immediately when the CPU writes there, and has a delay of 2 to 5 ppu cycles, depending on the ppu and the clock alignments.
+	; This just means that it's really tedious to test for this, since (depending on the ppu or the alignment) the writes to disable/enable rendering could happen in most of the range form dots 0 to 7.
+
+	JSR Sync_ToPreRenderDot324 ; It's actually syncing to (scanline 0, dot 1) - 18 ppu cycles.
+	JSR Clockslide_100         ; I'm going to stall until a specific ppu cycle.
+	JSR Clockslide_49          ; Somewhere, middle of the screen-ish, after a few scanlines.
+	LDY #120                   ; Y only ticks down in 2/3rds of the iterations in the upcoming loop. This will run 180 times.
+	LDX #3                     ; Since there are 113.666 cpu cycles per scanline, I run 114, 114, then 113 in a repeating pattern. This keeps the action relatively in the same place each scanline.
+TEST_BGSerialIn_Loop:
+	LDA #$0   ; (counting ppu cycles % 8)                        ; +2
+	STA $3E01 ; disable rendering (4-5-6)                        ; +4 = 6   ; Additional comment: Writing to a mirror of $2001. This prevents a hardware issue where the wrong value is written to the ppu register for a single ppu cycle.
+	LDA #$1E  ; (7-0-1) (2-3-4)                                  ; +2 = 8
+	STA $2001 ; (5-6-7) (0-1-2) (3-4-5) (6-7-0) enable rendering ; +4 = 12  ; Additional comment: The write to $2001 happens on ppu dot%8 == 6, but adding the smallest known delay of 2 brings us to dot%8 == 0.
+	JSR Clockslide_50                                            ; +50 = 62 ; Additional comment: The rest of this incredibly sloppy loop here is just counting cycles to make this happen in approximately the same place next scanline.
+	JSR Clockslide_37                                            ; +37 = 99
+	DEX                                                          ; +2 = 101
+	BNE TEST_BGSerialIn_WasteACycle                              ; +2 or 3 = 103 or 104
+	LDX #3                                                       ; +2 = 105
+	NOP                                                          ; +2 = 107
+	LDA <$00                                                     ; +3 = 110
+	JMP TEST_BGSerialIn_Loop                                     ; +3 = 113
+TEST_BGSerialIn_WasteACycle:
+	DEY                                                          ; +2 = 106
+	BEQ TEST_BGSerialIn_Exit ; Exit the loop if Y = 0.           ; +2 = 108
+	LDA <$00                                                     ; +3 = 111
+	JMP TEST_BGSerialIn_Loop                                     ; +3 = 114
+TEST_BGSerialIn_Exit:
+	LDA $2002                ; Anyway, I could've just done that once instead of across the entire screen, but it was suggested to make it more visible.
+	AND #$40                 ; Keep in mind, this value should show up as a white line, (color %10 of palette %11) instead of red, color %11 of palette %11.
+	BEQ FAIL_BGSerialIn2     ; So we check if a sprite zero hit occured, masked away everything but the sprite zero hit flag, and fail the test if no hit occured.
+	;; END OF TEST ;;
+
+	JSR WaitForVBlank        ; Wait for vblank...
+	JSR SetUpDefaultPalette  ; Fix the color palette.
+	LDA #1                   ; Return 1 to indicate a pass.
+	RTS
+;;;;;;;
+FAIL_BGSerialIn2:
+	JMP FAIL_BGSerialIn
+;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                ENGINE                   ;;
