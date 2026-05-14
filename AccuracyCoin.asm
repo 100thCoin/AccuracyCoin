@@ -612,7 +612,7 @@ Suite_UnofficialOps__AX:
 	table "$AF   LAX absolute",   $FF, result_UnOp_LAX_AF, TEST_LAX_AF
 	table "$B3   LAX indirect,Y", $FF, result_UnOp_LAX_B3, TEST_LAX_B3
 	table "$B7   LAX zeropage,Y", $FF, result_UnOp_LAX_B7, TEST_LAX_B7
-	table "$BF   LAX absolute,X", $FF, result_UnOp_LAX_BF, TEST_LAX_BF
+	table "$BF   LAX absolute,Y", $FF, result_UnOp_LAX_BF, TEST_LAX_BF
 	.byte $FF
 	
 	;; Unofficial Instructions: DCP ;;
