@@ -15430,6 +15430,16 @@ TEST_Scanline0Sprites_ClearPg2: ; clear page 2 (used for OAM DMA) with all zeroe
 
 	JSR SetUpSpriteZero ; And set up sprite zero in this way.
 	.byte $00, $C6, $00, $80
+	; CHR $C6 is a single pixel on row 5:
+	;
+	; . . . . . . . .
+	; . . . . . . . .
+	; . . . . . . . .
+	; . . . . . . . .
+	; . . . . . . . .
+	; # . . . . . . .
+	; . . . . . . . .
+	; . . . . . . . .
 
 	JSR PrintCHR
 	.word $2000
@@ -15453,7 +15463,7 @@ TEST_Scanline0Sprites_ClearPg2: ; clear page 2 (used for OAM DMA) with all zeroe
 	; See https://forums.nesdev.org/viewtopic.php?t=26291
 	
 	; In summary, OAM data can be drawn on scanline 0, since the pre-render line is treated as scanline 5 for the in-range checks occuring during dots 256 to 319
-	; (evaluated as line (261 & 255) = scanline 5)
+	; (evaluated as line (261 & 255) = scanline 5. That's also why CHR $C6 (the character used for sprite zero during this test) has a single pixel on row 5.)
 	; This results in the existing data in secondary OAM being put into the sprite shifters on the pre-render line. (only if the sprite is "in-range" of scanline 5.)
 	; The data in secondary OAM would either exist due to the previous frame's scanline 239, or whatever was in secondary OAM before rendering was disabled. (F-Blank)
 
@@ -15463,6 +15473,8 @@ TEST_Scanline0Sprites_ClearPg2: ; clear page 2 (used for OAM DMA) with all zeroe
 	STA $701
 	LDA #HIGH(RunScanline0Sprite_NMI)
 	STA $702
+
+	; This subroutine will basically verify that a sprite zero hit is occuring on scanline 0.
 
 	JSR RunScanline0SpriteTest ; The test occurs in this subroutine. I use a subroutine so I can change very few things and run the same code again.
 	
@@ -15481,9 +15493,13 @@ TEST_Scanline0Sprites_ClearPg2: ; clear page 2 (used for OAM DMA) with all zeroe
 	JSR Clockslide_29780
 
 	; The pre-render line skips the last dot, resulting in an interesting side effect.
-	; The background jitters, and the first pixel of the sprite shift registers gets drawn at x=0 instead of the intended x position. 
+	; The first pixel of the sprite shift registers gets drawn at x=0 instead of the intended x position. 
 	; The 7 remaining pixels are drawn as normal, but shifted left by 1 pixel.
-	; In other words, we're going to test for sprite zero hits at X=0 now.
+	;
+	; Basically, this will cause an alternating pattern, where on one frame the sprite on scnaline 0 will be shifted at x=0, and on the next frame it will not.
+	; I'm going to verify this behavior by checking if the sprite zero hit alternates each frame.
+	;
+	; Let's run this test again for sprite zero hits at X=0 now.
 
 	JSR RunScanline0SpriteTest ; The test occurs in this subroutine again. (The nametable was modified.)
 
@@ -15510,27 +15526,27 @@ TEST_Scanline0Sprites_ClearPg2: ; clear page 2 (used for OAM DMA) with all zeroe
 	EOR $501 ; Did any of these fail?
 	BEQ Scanline0Sprites_RGB
 	; non-RGB detected. Check the second set of tests.
-	;;; Test 3 (Composite) [Sprites On Scanline 0]: On a composite PPU, you should also have a sprite zero hit at x=0 ;;;	
+	;;; Test 3 (Composite) [Sprites On Scanline 0]: On a composite PPU, alternating frames should draw a single pixel of sprite zero at X=0 instead of the expected X position of the object ;;;	
 	
 	LDA $502
 	ORA $503
 	BEQ FAIL_Scanline0Sprites ; if neither test passed, that's a fail!
-	INC <ErrorCode
 	; And verify that only 1 from this set passed.
-	;;; Test 4 (Composite) [Sprites On Scanline 0]: You should have only 1 sprite zero hit at x=0 ;;;	
-	
-	LDA $502
-	EOR $503 ; Did any of these fail?
-	BEQ FAIL_Scanline0Sprites
+
 	; Final confirmation. The results MUST either be 40 00 00 40, or 00 40 40 00
-	LDA $500
-	EOR $502
+	; If you are failing this test, use the debug menu or a custom RAM watch to see what values you have.
+	
+	LDA $502 ; Address $502
+	EOR $503 ; Does NOT match address $503
 	BEQ FAIL_Scanline0Sprites
-	LDA $500
-	CMP $503
+	LDA $500 ; Address $500
+	EOR $502 ; does NOT match address $502
+	BEQ FAIL_Scanline0Sprites
+	LDA $500 ; Address $500
+	CMP $503 ; DOES match address $503
 	BNE FAIL_Scanline0Sprites
-	LDA $501
-	CMP $502
+	LDA $501 ; Address $501
+	CMP $502 ; DOES match address $502
 	BNE FAIL_Scanline0Sprites
 	
 	; GG, that's a verified composite PPU

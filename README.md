@@ -646,9 +646,8 @@ or
 ### Sprites On Scanline 0
   1: Sprites at Y=0 should actually be drawn at Y=1.  
   2: A sprite should be able to be drawn at Y=0 via the pre-render scanline's sprite fetch with stale secondary OAM data.  
-  3: (Composite PPU Only) Consecutive frames should shift the background on scanline 0, causing the sprite zero hit to miss on every other frame. (Tested at X=$80)  
   3: (RGB PPU Only) Sprite zero hits should not occur at X=$00 during this test on an RGB PPU.  
-  4: (Composite PPU Only) Consecutive frames should shift the background on scanline 0, causing the sprite zero hit to miss on every other frame. (Tested at X=$00)  
+  3: (Composite PPU Only) Sprites on scanline zero with non-zero X positions in OAM will draw a single pixel at X=0 on frames after the pre-render line skips a cycle.  
 
 ### $2004 Stress Test  
   1: This emulator failed to sync the CPU to VBlank during a test that ran when the ROM boots.  
