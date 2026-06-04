@@ -314,6 +314,7 @@ result_2007_Stress = $48E
 result_StaleSpriteShiftRegs = $48F
 
 result_InternalDataBus = $490
+result_ALERead = $491
 
 
 result_DrawTest = $03FF	; page 3 omits the test from the all-test-result-table.
@@ -759,6 +760,7 @@ Suite_PPUMisc:
 	table "Sprites On Scanline 0",    $FF, result_Scanline0Sprites,      TEST_Scanline0Sprites
 	table "$2004 Stress Test",        $FF, result_2004_Stress,           TEST_2004_Stress
 	table "$2007 Stress Test",        $FF, result_2007_Stress,           TEST_2007_Stress
+	table "ALE + Read",               $FF, result_ALERead,               TEST_ALERead
 
 	;table "RMW $2007 Extra Write", $FF, result_RMW2007, TEST_RMW2007 ; Commented out for now. More research required.
 	;table "Palette Corruption", $FF, result_Unimplemented, DebugTest (I did not write a test for this, because it relies on a specific cpu/ppu clock alignment.)
@@ -2490,18 +2492,18 @@ TEST_2007StressTest_Loop2:
 	JSR Clockslide_50
 	JSR Clockslide_36
 	
-	LDA $2007 ; read on dot 0. Repeat this every 29781 cpu cycles.
-	LDA #0
-	STA $2001
-	LDA $2007 ;Read the contents of the buffer.
-	STA $500, X
+	LDA $2007   ; read on dot 0. Repeat this every 29781 cpu cycles.
+	LDA #0      ;
+	STA $2001   ; Disable rendering
+	LDA $2007   ; Read the contents of the buffer.
+	STA $500, X ; Store in RAM to be evaluated later.
 	
 	INX
-	BEQ TEST_2007StressTest_Cont
+	BEQ TEST_2007StressTest_Cont  ; if X overflowed, we need to start storign data at $600 instead.
 	
-	JSR ClockslideFromWord
+	JSR ClockslideFromWord        ; Wait for 27866 CPU cycles.
 	.word 27866
-	JMP TEST_2007StressTest_Loop2 
+	JMP TEST_2007StressTest_Loop2 ; And loop.
 TEST_2007StressTest_Cont:
 	JSR ClockslideFromWord
 	.word 27866+2
@@ -3143,10 +3145,117 @@ TEST_StaleSpriteShiftRegs:
 	LDA #1
 	RTS
 ;;;;;;;
-
-
+FAIL_ALERead:
+	JSR WaitForVBlank
+	JSR SetUpDefaultPalette
 FAIL_StaleSpriteShiftRegs:
 	JMP TEST_Fail
+
+TEST_ALERead:
+	;;; Test 1 [ALE + Read]: Verify sprite zero hits before running the actual test. ;;;
+	
+	JSR VerifySpriteZeroHits ; Use this subroutine to verify if sprite zero hits are working.
+	BEQ FAIL_ALERead           ; And if they aren't, fail the test.
+	INC <ErrorCode
+	
+	;;; Test 2 [ALE + Read]: Can a well-timed LDA $2007 corrupt a background's low-bit plane fetch? ;;;
+	; The answer is yes!
+	
+	; Just a heads up, if you haven't passed the $2007 Stress Test, you probably won't pass this one.
+	; Anyway, speaking of the $2007 Stress Test, I believe I said something about "Unstable Read Cadence" fetches.
+	; I am specifically making a "stable" read cadence fetch here for the test, but keep in mind that not every situation would be stable.
+	; In any case, here's what's going on.
+	
+	; This behavior was originally noticed in a rom called "boing2k7.nes" by Damian Yerrick.
+	; https://forums.nesdev.org/viewtopic.php?p=62806#p62806
+	; The only reason I'm running my version of the test so far to the right of the screen is because I'm attempting to recreate the conditions of that ROM.
+	; In theory, if you pass this test, you should see the same effect in that ROM.
+	
+	; We start running `LDA $2007` on dot 214 of a scanline.
+	; After the $2007 state machine runs, we will encounter an amusing edge case on dot 229.
+	; Let's see what happens leading up to it:
+	; On dot 227, ALE is set from both $2007 and the background read cadence.
+	; - The background read cadence appears to take priority, so the address bus and octal latch are prepared with those values:
+	; - The Pattern-Address-Register (PAR) determines we're going to read from $2FC7 for the attribute table read next cycle.
+	; - So the Address bus is now $2FC7, and the octal latch is now $C7.
+
+	; On dot 228, the background cadence reads from address $2FC7.
+	; - This reads a value of $FF from the attribute table.
+	; - Since the address bus and the data bus share 8 pins, all 14 of these pins would read $2FFF. This will be relevant next cycle.
+	
+	; On dot 229, both ALE and Read are set.
+	; - Both ALE and Read are set, so the Octal Latch is put in a feedback loop.
+	;   - The address bus is currently $2FFF, and ALE is set. So $FF goes into the octal latch. (It was already $FF)
+	;   - But since we are also reading, we read from $2FFF, and get the value $FF, which goes on the data bus.
+	;   - Since ALE is set, this vale ($FF) would then go back into the octal latch.
+	;   - Which would then mean that we are reading from $2FFF... and so on.
+	;   - I have strategically set this test up such that this unstable feedback loop is actually stable!
+	;   - It has the value of $FF in the octal latch, and it reads $FF! Nothing to worry about.
+	;   - But you can imagine how this feedback loop can be unstable if the values weren't both $FF.
+	; - The Pattern-Address-Register (PAR) determines we're reading from address $0F03. (Row 3 of CHR $F0)
+	; - So now the address bus is $0F03.
+	; - Notably, the octal latch is still $FF. To be honest, I'm not sure why it wasn't updated to $03, but that's how it appears to work out when both ALE and Read are set.
+	; - But wait! We need to update the read buffer, since we just read from $2007 and the Read line is set!
+	; - The Octal Latch is $FF, so we read from address $0FFF. The PPU Address bus is now $0FFF, which will affect the read on the following ppu cycle.
+	
+	; On dot 230:
+	; - The PAR address might be $0F03, but the octal latch is still $FF, so the read is actually from address $0FFF.
+	; - So the low bit plane will be prepared with the value read from $0FFF ($FF).
+	
+	; And just like that, the shift register is set to %0000000011111111 despite the nametable being entirely translucent pixels.
+	; Dots 241 through 248 will be drawn as a Palette 3, color 1.
+	; And a sprite zero hit can detect this!
+
+	JSR DisableRendering       ; Overwrite the background. This requires disabling rendering.
+	JSR ClearNametable2_WithF0 ; CHR $F0 is another transparent tile, but I specifically wanted to grab from the $fx row of CHR data.
+	JSR WriteToPPUADDRWithByte ; Update palette 3 so the artifact is visible.
+	.byte $3F, $0D             ; Color 1 of palette 3
+	.byte $21, $FF             ; Bright blue. (and terminator byte)
+	JSR ResetScroll_2C00       ; Reset scroll to nametable 2.
+	JSR SetUpSpriteZero        ; Set up sprite zero hit to collide with the artifact.
+	.byte $02, $C0, $00, $F4   ; Scanline 3, X=$F4, CHR $C0 is a single pixel in this character's upper left corner.
+	JSR Sync_ToLine0Dot1       ; Sync to dot 1 of scanline 0.
+	
+	JSR ClockslideFromWord
+	.word 412
+	
+	LDA $2007             ; Read from $2007 to corrupt the background read cadence.
+	NOP                   ; Wait a bit...
+	NOP                   ; And a little bit more...
+	LDA $2002             ; Read from $2002 to check if a sprite zero hit occured.
+	AND #$40              ; Mask away just the Sprite Zero Hit bit.
+	BNE TEST_ALERead_Pass ; And if we detected it, pass the test. woo!
+	
+	; If we didn't, there's still a chance the test would pass, since there's a single alignmnet in which the timing is slightly different.
+	; And now to check for alignment 3.
+	JSR SetUpSpriteZero      ; The same sprite zero data, except one scanline lower.
+	.byte $03, $C0, $00, $F4 ;
+	JSR Sync_ToLine0Dot1     ; Sync to dot 1 of scanline 0.
+	
+	JSR ClockslideFromWord
+	.word 526
+	
+	LDA $2007        ; Read from $2007 to corrupt the background read cadence.
+	NOP              ; Wait a bit...
+	NOP              ; And a little bit more...
+	LDA $2002        ; Read from $2002 to check if a sprite zero hit occured.
+	AND #$40         ; Mask away just the Sprite Zero Hit bit.
+	BEQ FAIL_ALERead ; If the hit did not occur, then fail the test.
+	
+TEST_ALERead_Pass:
+	; You did it!
+	
+	;; END OF TEST ;;	
+	
+	JSR DisableRendering
+	JSR WaitForVBlank
+	JSR SetUpDefaultPalette
+
+	LDA #1
+	RTS
+;;;;;;;
+
+
 
 	.bank 1
 	.org $A000	; This next line of code is located at address $A000 in the ROM.
@@ -15556,7 +15665,7 @@ TEST_Scanline0Sprites_ClearPg2: ; clear page 2 (used for OAM DMA) with all zeroe
 	STA <dontSetPointer
 	JSR WaitForVBlank						; Wait for VBlank so we're not updating the nametable out of VBlank.
 	JSR PrintTextCentered 					; And write the following message to address $2370.
-	.word $2370
+	.word $2330
 	.byte "Composite PPU Detected", $FF
 	JSR ResetScroll
 Scanline0Sprites_SkipComp:
@@ -18703,6 +18812,9 @@ TEST_DoesTheDMA_Fail:
 	JMP DMASync
 ;;;;;;;;;;;;;;;	
 
+ClearNametable2_WithF0:
+	LDA #$F0
+	.byte $2C ; BIT Absolute. (skip the LDA #24)
 ClearNametable2_With24:
 	LDA #$24
 	.byte $2C ; BIT Absolute. (skip the LDA #0)
@@ -18728,13 +18840,6 @@ TEST_RMW2007_ClearNametable2Loop:
 	RTS
 ;;;;;;;
 
-	NOP ; Unused byte.
-	
-VblSync_ABORT:	; This emulator failed the pre-test, implying that this will loop infinitely, so instead of doing that, just don't bother.
-	PLA
-	RTS
-;;;;;;;
-
 	.org $FFC0
 	; 17 00s. This will be the DPCM "audio sample" played during the DMC DMA Sync loop. It should just be silence.
 	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
@@ -18753,6 +18858,11 @@ VblSync_Plus_A_Loop:
 	ADC #$FF 				; + 2
 	BCS VblSync_Plus_A_Loop ; + 3 if looping, 2 otherwise. (29781 CPU cycles if looping. Each frame is 29780.67 CPU cycles long, so this advances 1 PPU cycle)
 	JMP VblSync_Plus_A_End	; I ran out of space, so I moved it up there.
+	
+	VblSync_ABORT:	; This emulator failed the pre-test, implying that this will loop infinitely, so instead of doing that, just don't bother.
+	PLA
+	RTS
+;;;;;;;
 	
 	.org $FFF5
 TEST_AddrMode_Relative_FFF5:
