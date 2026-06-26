@@ -3237,8 +3237,8 @@ TEST_ALERead:
 	
 	; If we didn't, there's still a chance the test would pass, since there's a single alignmnet in which the timing is slightly different.
 	; And now to check for alignment 3.
-	JSR SetUpSpriteZero      ; The same sprite zero data, except one scanline lower.
-	.byte $03, $C0, $00, $F4 ;
+	INC $200 ; Move sprite zero down one scanline.
+
 	JSR Sync_ToLine0Dot1     ; Sync to dot 1 of scanline 0.
 	
 	JSR ClockslideFromWord
@@ -3292,12 +3292,11 @@ TEST_HybridAddresses:
 	.byte $03, $C0, $00, $C8 ;
 	
 	JSR Sync_ToLine0Dot1     ; Sync to dot 1 of scanline 0.
-	JSR Clockslide_500
+	JSR ClockslideFromWord   ; stall 504 CPU cycles.
+	.word 504 
 	LDA #$2F
 	STA $2006
 	LDA #0
-	NOP
-	NOP
 	STA $2006
 	
 	; Okay, what happens here?
@@ -3308,8 +3307,27 @@ TEST_HybridAddresses:
 	; And of course, that leads to a sprite zero hit.
 
 	JSR WaitForVBLSpriteZeroHit   ; Wait for vblank and load A with $2002.6
-	BEQ FAIL_HybridAddresses ; Fail the test if a sprite zero hit did NOT occur this time.
+	BNE TEST_HybridAddresses_Pass ; Pass the test if the sprite zero hit occured. Otherwise, check for alignment 2's timing.
+	
+	; If the console is in alignment 2, then I need to run the test one scanline later.
+	; This is the exact same test, but on scanline 5 instead.
+	
+	INC $200 ; Move sprite zero down one scanline.
+	
+	JSR Sync_ToLine0Dot1     ; Sync to dot 1 of scanline 0.
+	JSR ClockslideFromWord   ; stall 504 CPU cycles.
+	.word 618 
+	LDA #$2F
+	STA $2006
+	LDA #0
+	STA $2006
 
+	JSR WaitForVBLSpriteZeroHit   ; Wait for vblank and load A with $2002.6
+	BEQ FAIL_HybridAddresses ; Pass the test if the sprite zero hit occured. Otherwise, check for alignment 2's timing.
+
+TEST_HybridAddresses_Pass
+
+	;; END OF TEST ;;	
 
 	LDA #1
 	RTS
