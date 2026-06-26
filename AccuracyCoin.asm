@@ -1736,6 +1736,178 @@ BranchDummyRead_RevE:
 	RTS
 ;;;;;;;
 
+TEST_2002FlagTiming:
+	;;; Test 1 [$2002 Flag Timing]: Verify the timing in which the sprite zero and sprite overflow flags are cleared. ;;;	
+	
+	; Just so you are aware, all the flags are cleared on dot 1 of the pre-render line.
+	; This is a fact.
+	
+	; The vblank flag is cleard on the same ppu cycle as the sprite zero and overflow flags.
+	; It's true.
+	
+	; If you are failing this test, you might be inclined to scoot the sprite flags over, so they get cleared on dot 0, but that's not the proper solution.
+	; Here's what's going on:
+	
+	; Reads from $2002 will latch the state of the vblank flag at the beginning of the read (when M2 goes high),
+	; but the sprite flags are not latched, so the value you get back is the state of the sprite flags at the end of the read. (when M2 goes low)
+	; On a revision G CPU, M2 has a duty cycle of 15/24, meaning that there are 7.5 master clock cycles between M2 going high and M2 going low.
+	; In other words, the sprite flags are read approximately 1.875 PPU cycles after the vblank flag is read.
+	
+	; That is why you will see in the results, the vblank flag appears to be cleared later.
+	
+	JSR InitializeSpriteX
+	.byte $80, $FE, $00, $80
+	
+	INX
+	BNE TEST_2002FlagTiming
+	DEC $200 ; make sprite zero one scanline earlier.
+	; okay, now every object will be drawn at Y=$00, X=$80
+	JSR DisableRendering
+	JSR ClearNametable2_With24 ; Nametable 2 is polluted from other tests. Since it gets drawn during this test, let's clear it first.
+	
+	JSR PrintCHR
+	.word $2E10
+	.byte $FE, $FF
+
+	JSR SetPPUADDRFromWord
+	.byte $2C, $00
+	; Now the background is set up for the test.
+	JSR Sync_ToLine0Dot1
+	
+	; we are on dot 1 of scanline 0
+	; The plan:
+	; Enable rendering on dot 320 of scanline 0. (ignore the fact that it's already enabled. this is for future loops.)
+	; Stall until the flags get cleared on the pre-render line.
+	; Disable rendering on the pre-render line so we skip the even/odd dot issue.
+	; Re-Enable rendering on dot 320 of scanline 0.
+	JSR Clockslide_100Minus12
+	NOP
+	NOP
+	NOP
+	LDA <$00
+	LDX #0
+TEST_2002FlagTimingLoop:
+	LDA #$18
+	NOP
+	STA $2001 ; rendering enabled on dot 321 of scanline 0. (this first time this is ran, at least.)
+	JSR ReadFrom2002WithExactTiming ; I'm re-using the logic for this elsewhere, so I made it a subroutine to save bytes.
+	TYA
+	AND #$E0
+	STA <$6C, X ; store test results.
+	LDA <$00
+	INX
+	CPX #$4
+	BNE TEST_2002FlagTimingLoop
+	
+	LDX #0
+TEST_2002FCT_CheckAnswerLoop:
+	LDA <$6C, X
+	CMP TEST_2002FCT_AnswerKey, X
+	BNE TEST_2002FCT_CheckAltAnswer
+	INX
+	CPX #4
+	BNE TEST_2002FCT_CheckAnswerLoop
+	JMP TEST_2002FCT_Pass
+	
+TEST_2002FCT_CheckAltAnswer:
+	LDX #0
+TEST_2002FCT_CheckAltAnswerLoop:
+	LDA <$6C, X
+	CMP TEST_2002FCT_AltAnswerKey, X
+	BNE TEST_2002FCT_Fail
+	INX
+	CPX #4
+	BNE TEST_2002FCT_CheckAltAnswerLoop
+	
+TEST_2002FCT_Pass:
+	INC <ErrorCode
+
+	;;; Test 2 [$2002 Flag Timing]: Verify the timing in which the sprite zero and sprite overflow flags are set. ;;;	
+
+	JSR Test_2002_FlagSet_RunTest
+
+	; evaluate the $2002 flag timing test results.
+	
+	; sanitize the results.
+	LDX #8
+TEST_2002FCT_Sanitize:
+	LDA <$50, X
+	AND #$E0
+	STA <$50, X
+	DEX
+	BNE TEST_2002FCT_Sanitize
+	
+	
+	LDA <$53 ; This byte should be $00
+	BNE TEST_2002FCT_Fail
+	LDA <$54  ; This byte should be $00 or $40, depending on clock alignment. (alignments 0 and 1 are $00, alignments 2 and 3 are $40)
+	BEQ TEST_2002FCT_Next
+	CMP #$40
+	BNE TEST_2002FCT_Fail
+TEST_2002FCT_Next:
+	LDA <$55 ; This byte should be $60
+	CMP #$60
+	BNE TEST_2002FCT_Fail
+
+	;; END OF TEST ;;
+	LDA #1
+	RTS
+;;;;;;;
+
+TEST_2002FCT_Fail:
+	JMP TEST_Fail
+
+TEST_2002FCT_AnswerKey:
+	.byte $E0, $E0, $80, $00
+TEST_2002FCT_AltAnswerKey:
+	.byte $E0, $80, $80, $00
+
+
+Test_2002_FlagSet_RunTest:
+
+	JSR Test_2004_Stress_Delay ; just re-use this.
+	JSR Clockslide_42
+	LDX #1
+	
+Test_2002_FlagSet_Loop:
+	; And the test begins.
+	; the LDA instruction starts a bit early, but the read cycle will END on dot 0.
+	LDA $2002 ; dot 0.
+	STA <$50, X
+	JSR Clockslide_200
+	JSR Clockslide_50
+	INX
+	CPX #8
+	BEQ TEST_2002_FlagSet_DataComplete
+	; Since we're not disabling rendering for extended periods, OAM Decay is not a threat!
+	; We are current on scanline 130, dot 101 + Y
+	; so VBlank is in 37409 ppu cycles, or 12469.66 ppu cycles.
+
+	JSR ClockslideFromWord
+	.word 13000
+	; I went a little overboard. We are now on scanline 244, dot 227 + Y
+	LDA #0
+	STA $2001 ; disable rendering.
+	
+	LDA #$2C
+	STA $2006
+	LDA #0
+	STA $2006
+	; We want to re-enable this as close to scanline 0, dot 320 as possible.
+	; in other words, we have exactly 2071 CPU cycles until we want to re-enable rendering.
+	JSR ClockslideFromWord
+	.word 2054
+	; 5 cycles to go.
+	LDA #$18 ; 3 cycles to go
+	STA $2001 ; cool.
+	; okay, now scanline $80 dot 1 is 14438 CPU cycles away,
+	JSR ClockslideFromWord
+	.word 14436
+	JMP Test_2002_FlagSet_Loop
+
+TEST_2002_FlagSet_DataComplete:
+	RTS
+;;;;;;;	
 
 ReadFrom2002WithExactTiming:
 	; stall for 29550 cycles.
@@ -2258,189 +2430,15 @@ Test_2004_Stress_AnswerKey2:
 	.byte $88, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80
 	.byte $80, $80, $80, $80, $80, $80
 
-
-
-
-
-TEST_2002FlagTiming:
-	;;; Test 1 [$2002 Flag Timing]: Verify the timing in which the sprite zero and sprite overflow flags are cleared. ;;;	
-	
-	; Just so you are aware, all the flags are cleared on dot 1 of the pre-render line.
-	; This is a fact.
-	
-	; The vblank flag is cleard on the same ppu cycle as the sprite zero and overflow flags.
-	; It's true.
-	
-	; If you are failing this test, you might be inclined to scoot the sprite flags over, so they get cleared on dot 0, but that's not the proper solution.
-	; Here's what's going on:
-	
-	; Reads from $2002 will latch the state of the vblank flag at the beginning of the read (when M2 goes high),
-	; but the sprite flags are not latched, so the value you get back is the state of the sprite flags at the end of the read. (when M2 goes low)
-	; On a revision G CPU, M2 has a duty cycle of 15/24, meaning that there are 7.5 master clock cycles between M2 going high and M2 going low.
-	; In other words, the sprite flags are read approximately 1.875 PPU cycles after the vblank flag is read.
-	
-	; That is why you will see in the results, the vblank flag appears to be cleared later.
-	
-	JSR InitializeSpriteX
-	.byte $80, $FE, $00, $80
-	
-	INX
-	BNE TEST_2002FlagTiming
-	DEC $200 ; make sprite zero one scanline earlier.
-	; okay, now every object will be drawn at Y=$00, X=$80
-	JSR DisableRendering
-	JSR ClearNametable2_With24 ; Nametable 2 is polluted from other tests. Since it gets drawn during this test, let's clear it first.
-	
-	JSR PrintCHR
-	.word $2E10
-	.byte $FE, $FF
-
-	JSR SetPPUADDRFromWord
-	.byte $2C, $00
-	; Now the background is set up for the test.
-	JSR Sync_ToLine0Dot1
-	
-	; we are on dot 1 of scanline 0
-	; The plan:
-	; Enable rendering on dot 320 of scanline 0. (ignore the fact that it's already enabled. this is for future loops.)
-	; Stall until the flags get cleared on the pre-render line.
-	; Disable rendering on the pre-render line so we skip the even/odd dot issue.
-	; Re-Enable rendering on dot 320 of scanline 0.
-	JSR Clockslide_100Minus12
-	NOP
-	NOP
-	NOP
-	LDA <$00
-	LDX #0
-TEST_2002FlagTimingLoop:
-	LDA #$18
-	NOP
-	STA $2001 ; rendering enabled on dot 321 of scanline 0. (this first time this is ran, at least.)
-	JSR ReadFrom2002WithExactTiming ; I'm re-using the logic for this elsewhere, so I made it a subroutine to save bytes.
-	TYA
-	AND #$E0
-	STA <$6C, X ; store test results.
-	LDA <$00
-	INX
-	CPX #$4
-	BNE TEST_2002FlagTimingLoop
-	
-	LDX #0
-TEST_2002FCT_CheckAnswerLoop:
-	LDA <$6C, X
-	CMP TEST_2002FCT_AnswerKey, X
-	BNE TEST_2002FCT_CheckAltAnswer
-	INX
-	CPX #4
-	BNE TEST_2002FCT_CheckAnswerLoop
-	JMP TEST_2002FCT_Pass
-	
-TEST_2002FCT_CheckAltAnswer:
-	LDX #0
-TEST_2002FCT_CheckAltAnswerLoop:
-	LDA <$6C, X
-	CMP TEST_2002FCT_AltAnswerKey, X
-	BNE TEST_2002FCT_Fail
-	INX
-	CPX #4
-	BNE TEST_2002FCT_CheckAltAnswerLoop
-	
-TEST_2002FCT_Pass:
-	INC <ErrorCode
-
-	;;; Test 2 [$2002 Flag Timing]: Verify the timing in which the sprite zero and sprite overflow flags are set. ;;;	
-
-	JSR Test_2002_FlagSet_RunTest
-
-	; evaluate the $2002 flag timing test results.
-	
-	; sanitize the results.
-	LDX #8
-TEST_2002FCT_Sanitize:
-	LDA <$50, X
-	AND #$E0
-	STA <$50, X
-	DEX
-	BNE TEST_2002FCT_Sanitize
-	
-	
-	LDA <$53 ; This byte should be $00
-	BNE TEST_2002FCT_Fail
-	LDA <$54  ; This byte should be $00 or $40, depending on clock alignment. (alignments 0 and 1 are $00, alignments 2 and 3 are $40)
-	BEQ TEST_2002FCT_Next
-	CMP #$40
-	BNE TEST_2002FCT_Fail
-TEST_2002FCT_Next:
-	LDA <$55 ; This byte should be $60
-	CMP #$60
-	BNE TEST_2002FCT_Fail
-
-	;; END OF TEST ;;
-	LDA #1
-	RTS
-;;;;;;;
-
-TEST_2002FCT_Fail:
+TEST_2007Stress_Fail:
 	JMP TEST_Fail
-
-TEST_2002FCT_AnswerKey:
-	.byte $E0, $E0, $80, $00
-TEST_2002FCT_AltAnswerKey:
-	.byte $E0, $80, $80, $00
-
-
-Test_2002_FlagSet_RunTest:
-
-	JSR Test_2004_Stress_Delay ; just re-use this.
-	JSR Clockslide_42
-	LDX #1
-	
-Test_2002_FlagSet_Loop:
-	; And the test begins.
-	; the LDA instruction starts a bit early, but the read cycle will END on dot 0.
-	LDA $2002 ; dot 0.
-	STA <$50, X
-	JSR Clockslide_200
-	JSR Clockslide_50
-	INX
-	CPX #8
-	BEQ TEST_2002_FlagSet_DataComplete
-	; Since we're not disabling rendering for extended periods, OAM Decay is not a threat!
-	; We are current on scanline 130, dot 101 + Y
-	; so VBlank is in 37409 ppu cycles, or 12469.66 ppu cycles.
-
-	JSR ClockslideFromWord
-	.word 13000
-	; I went a little overboard. We are now on scanline 244, dot 227 + Y
-	LDA #0
-	STA $2001 ; disable rendering.
-	
-	LDA #$2C
-	STA $2006
-	LDA #0
-	STA $2006
-	; We want to re-enable this as close to scanline 0, dot 320 as possible.
-	; in other words, we have exactly 2071 CPU cycles until we want to re-enable rendering.
-	JSR ClockslideFromWord
-	.word 2054
-	; 5 cycles to go.
-	LDA #$18 ; 3 cycles to go
-	STA $2001 ; cool.
-	; okay, now scanline $80 dot 1 is 14438 CPU cycles away,
-	JSR ClockslideFromWord
-	.word 14436
-	JMP Test_2002_FlagSet_Loop
-
-TEST_2002_FlagSet_DataComplete:
-	RTS
-;;;;;;;	
 
 TEST_2007_Stress:
 
 	;;; Test 1 [$2007 Stress Test]: Pre test to make sure the emulator won't crash  ;;;
 
 	LDA <result_VblankSync_PreTest
-	BEQ TEST_2002FCT_Fail ; just re-use this fail case.
+	BEQ TEST_2007Stress_Fail ; just re-use this fail case.
 	INC <ErrorCode
 
 	; With that taken care of, let's run some preparations
