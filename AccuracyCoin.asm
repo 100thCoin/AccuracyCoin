@@ -3299,9 +3299,14 @@ TEST_HybridAddresses:
 	NOP
 	NOP
 	STA $2006
+	
+	; Okay, what happens here?
+	; In this case, the moment the write to $2006 updates the v register, the PPU Address bus was $2C19
+	; This was on the second cycle of an 8-cycle read of the background, so under normal conditions, we would read from address $2C19.
+	; Since we are updating v this cycle, we update the address bus. The high byte is modified by the write to $2006, but the low byte is modified by the octal latch. (which is $19)
+	; Since the values written to v would result in address $2F00, and the octal latch is $19, the "hybrid address" is $2F19, and that's where we read from for this nametable fetch.
+	; And of course, that leads to a sprite zero hit.
 
-	NOP
-	NOP
 	JSR WaitForVBLSpriteZeroHit   ; Wait for vblank and load A with $2002.6
 	BEQ FAIL_HybridAddresses ; Fail the test if a sprite zero hit did NOT occur this time.
 
