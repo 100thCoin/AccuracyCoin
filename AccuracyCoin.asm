@@ -315,6 +315,7 @@ result_StaleSpriteShiftRegs = $48F
 
 result_InternalDataBus = $490
 result_ALERead = $491
+result_HybridAddresses = $492
 
 
 result_DrawTest = $03FF	; page 3 omits the test from the all-test-result-table.
@@ -721,6 +722,7 @@ Suite_PPUBehavior:
 	table "Palette RAM Quirks",      $FF, result_PaletteRAMQuirks,      TEST_PaletteRAMQuirks
 	table "Rendering Flag Behavior", $FF, result_RenderingFlagBehavior, TEST_RenderingFlagBehavior
 	table "$2007 read w/ rendering", $FF, result_Rendering2007Read,     TEST_Rendering2007Read
+	table "Attributes As Tiles",     $FF, result_AttributesAsTiles,     TEST_AttributesAsTiles
 	.byte $FF
 	
 	;; PPU VBL Timing ;;
@@ -752,7 +754,6 @@ Suite_SpriteZeroHits:
 	;; PPU Misc ;;
 Suite_PPUMisc:
 	.byte "PPU Misc.", $FF
-	table "Attributes As Tiles",      $FF, result_AttributesAsTiles,     TEST_AttributesAsTiles
 	table "t Register Quirks",        $FF, result_tRegisterQuirks,       TEST_tRegisterQuirks
 	table "Stale BG Shift Registers", $FF, result_StaleBGShiftRegisters, TEST_StaleBGShiftRegisters
 	table "Stale Sprite Shift Regs",  $FF, result_StaleSpriteShiftRegs,  TEST_StaleSpriteShiftRegs
@@ -761,6 +762,7 @@ Suite_PPUMisc:
 	table "$2004 Stress Test",        $FF, result_2004_Stress,           TEST_2004_Stress
 	table "$2007 Stress Test",        $FF, result_2007_Stress,           TEST_2007_Stress
 	table "ALE + Read",               $FF, result_ALERead,               TEST_ALERead
+	table "Hybrid Addresses",         $FF, result_HybridAddresses,       TEST_HybridAddresses
 
 	;table "RMW $2007 Extra Write", $FF, result_RMW2007, TEST_RMW2007 ; Commented out for now. More research required.
 	;table "Palette Corruption", $FF, result_Unimplemented, DebugTest (I did not write a test for this, because it relies on a specific cpu/ppu clock alignment.)
@@ -2893,6 +2895,15 @@ TEST_2007StressTest_Exit:
 	; Remember how if the ppu clock is low when the read from $2007 ends, then you pretty much need to wait an entire extra cycle for the state machine to work? 
 	; Wow! Now we know the cause of the alignment-specific behavior for this test!
 	
+	; If you are looking at all of this glossy-eyed due to the 360 lines of comments and are hoping for somebody to simplify this, allow me to answer those prayers.
+	;;;;;;;;;;;;;;;;;;;;;;
+	; SIMPLE EXPLANATION ;
+	;;;;;;;;;;;;;;;;;;;;;;
+	; There's a slight delay between the read from $2007 and the PPU Read Buffer getting updated.
+	; If this buffer is updated when rendering is enabled (outside of VBlank), then the PPU was already reading stuff, so the contents of the buffer are whatever was already being read.
+	; For instance, if the background Nametable fetch reads $02 on the same cycle the PPU Read Buffer is supposed to be updated, then $02 goes into the buffer.
+	; This test will read from $2007 on every cycle of a visible scanline, and store the result in RAM from $500 through $654
+	
 	; Check if the entire thing is off by a byte.
 	LDA $503
 	CMP #$C0                           ; Address $503 is consistently $C0, and the neighboring bytes are NOT $C0, even with analogue behavior (as far as I can tell.)
@@ -3255,6 +3266,51 @@ TEST_ALERead_Pass:
 	RTS
 ;;;;;;;
 
+FAIL_HybridAddresses:
+	JMP TEST_Fail
+
+TEST_HybridAddresses:
+
+	;;; Test 1 [Hybrid Addresses]: Verify sprite zero hits before running the actual test. ;;;
+
+	JSR VerifySpriteZeroHits ; Use this subroutine to verify if sprite zero hits are working.
+	BEQ FAIL_HybridAddresses; And if they aren't, fail the test.
+	INC <ErrorCode
+
+	;;; Test 2 [Hybrid Addresses]: Can a well-timed STA $2006 corrupt a nametable fetch? ;;;
+	; The answer shouldn't surprise you at this point, because it is yes.
+	
+	; If you have made it passed the ALE + Read test, then I assume you have implemented proper 2-cycle-long-reads with the PPU.
+	; To make a long story short, if the write to $2006 goes through at the right time, the high byte will be determined by new value of the v register,
+	; and the low byte will be determined by the octal latch set on the previous cycle.
+	
+	JSR WriteToPPUADDRWithByte    ; 
+	.byte $2F, $19                ; Aaddress $2F19
+	.byte $CA, $FF                ; CHR $CA, (a single pixel on row 2) followed by the terminator byte.
+	
+	JSR ResetScroll_2C00
+	
+	JSR SetUpSpriteZero      ; A single pixel, (scanline 4, dot 200)
+	.byte $03, $C0, $00, $C8 ;
+	
+	JSR Sync_ToLine0Dot1     ; Sync to dot 1 of scanline 0.
+	JSR Clockslide_500
+	LDA #$2F
+	STA $2006
+	LDA #0
+	NOP
+	NOP
+	STA $2006
+
+	NOP
+	NOP
+	JSR WaitForVBLSpriteZeroHit   ; Wait for vblank and load A with $2002.6
+	BEQ FAIL_HybridAddresses ; Fail the test if a sprite zero hit did NOT occur this time.
+
+
+	LDA #1
+	RTS
+;;;;;;;
 
 
 	.bank 1

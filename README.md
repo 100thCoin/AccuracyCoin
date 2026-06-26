@@ -3,7 +3,7 @@ AccuracyCoin is a large collection of NES accuracy tests on a single NROM cartri
 
 This ROM was designed for an NTSC console with an RP2A03G CPU and RP2C02G PPU. Some tests might be automatically skipped on hardware with a different revision.
 
-This ROM currently has 140 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
+This ROM currently has 141 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
 Here's an example of the menu in this ROM shown on an emulator failing a test, passing others, a few tests on screen haven't been run yet, and a test marked to be skipped. (The cursor is currently next to the "Dummy Read Cycles" test.)
 
@@ -509,6 +509,10 @@ or
   1: Sprite Zero Hits should be working.  
   2: Reading from $2007 while rendering is enabled should result in a vertical increment of v.  
 
+### Attributes as Tiles
+  1: Moving the PPU t register to an attribute table should render the attribute bytes as tile data in scanlines 0 to 15. Results are tested via a sprite zero hit.  
+  2: With the t register pointing to an attribute table, scanlines 16 to 239 should be from the same nametable as the attributes.  
+
 ## Page 17: PPU VBlank Timing
 
 ### VBlank Beginning
@@ -614,10 +618,6 @@ or
 
 ## Page 19: PPU Misc.
 
-### Attributes as Tiles
-  1: Moving the PPU t register to an attribute table should render the attribute bytes as tile data in scanlines 0 to 15. Results are tested via a sprite zero hit.  
-  2: With the t register pointing to an attribute table, scanlines 16 to 239 should be from the same nametable as the attributes.  
-
 ### t Register Quirks
   1: Sprite Zero Hits should be working.  
   2: Writing to $2006 should overwrite some of the bits set up by writing to $2005.  
@@ -661,6 +661,10 @@ or
 ### ALE + Read
   1: Sprite Zero Hits should be working.  
   2: A well timed read from $2007 should be able to affect the PPU Address Bus during the background read cadence, reading a bit plane from an unintended address.  
+
+### Hybrid Addresses
+  1: Sprite Zero Hits should be working.  
+  2: A well timed to $2006 should be able to affect the PPU Address Bus during the background read cadence, performing a nametable fetch from an unintended address.  
 
 ## Page 20: CPU Behavior 2
 
