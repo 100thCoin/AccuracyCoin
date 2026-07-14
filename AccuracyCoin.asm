@@ -11692,10 +11692,18 @@ TEST_DMC_Test3:
 	AND #$40
 	BNE FAIL_DMC_Conflicts	; so if this is non-zero, the flag was still set, failing the test.
 	
-	;; END OF TEST ;;
 	LDA #$00
     STA $4015	; disable all audio channels.
+	
+	INC <ErrorCode
+	;;; Test 4 [DMA Bus Conflicts]: Final check that the controller has floating bits at all, otherwise this can return incorrectly. ;;;
 	LDA <$50
+	AND #$0F ; mask away upper nybble.
+	BEQ FAIL_DMC_Conflicts
+	
+	;; END OF TEST ;;
+	; This should return a 1 (front loader), a 5 (top loader), or a 9 (famicom).
+	
 	RTS
 ;;;;;;;
 	
@@ -18513,7 +18521,7 @@ ClockslideFromWord: ; Delay somewhere between 256 and 65536 CPU cycles.
 	LDA <$00        ; Since LDA (indirect), Y can take an extra cycle if a page boundary is crossed...
 	CMP #$FF        ; we need to account for that.
 	BNE CSWaste1Cy  ; Branches take 2 or 3 cycles depending on if it was taken or not.
-CSWaste1Cy:         ; If we took 2 extra cycles from the LDA (indirect), Y's let's fall behidn two cycles.
+CSWaste1Cy:         ; If we took 2 extra cycles from the LDA (indirect), Y's let's fall behind two cycles.
 	BNE CSWaste1Cy2 ; Waste a second cycle.
 CSWaste1Cy2:        ; ^
 	CMP #$FE        ; And if we need to lose only a single cycle, do it again, but once.

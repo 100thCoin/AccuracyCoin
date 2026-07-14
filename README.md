@@ -198,7 +198,6 @@ For more information, I recommend reading the fully commented assembly code for 
   D: Error code E requires proper open bus emulation to verify the behavior, and your emulator did not pass a pre-requisite open bus test.  
   E: An interrupt polled successfully on the first poll of a branch, cleared, and then polled again, should still occur.  
 
-
 ### NMI Overlap BRK
   1: BRK Returned to the wrong address.  
   2: Either NMI timing is off, or interrupt hijacking is incorrectly handled.  
@@ -236,6 +235,7 @@ For more information, I recommend reading the fully commented assembly code for 
   1: The DMA did not occur on the correct CPU cycle.  
   2: The DMC DMA did not correctly emulate the bus conflict with the APU registers.  
   3: The DMC DMA bus conflict should clear the APU Frame Counter Interrupt Flag.  
+  4: Reading from the controller port should have some bits that are open bus. These bits are different depending on the model of the console.  
 
 ### DMC DMA + OAM DMA
   1: The DMC DMA timing in your emulator is off.  
