@@ -3421,12 +3421,11 @@ TEST_OpenBus:
 	; And that's how open bus works!
 	; Open bus is typically from $4000 to $7FFF. (Except for addresses $4015 (APU_STATUS), $4016 (Controller port 1), and $4017 (Controller port 2)
 	; If the cartridge has "PRG RAM", which is typically from $6000 to $7FFF, then those addresses wouldn't be open bus since they are mapped to something.
-	; This cartridge doesn't have any PRG RAM, but I'm only going to test from the $4018 to $5FFF range.
+	; This cartridge doesn't have any PRG RAM, but I'm only going to test from the $4000 to $5FFF range.
 	; Most emulators assume that (unless specified) the cartridge has PRG RAM from $6000 to $7FFF.
-	;
-	; This test only checks for open bus from $4020 through $5FFF. 
-	; Though I think it should be implied that $6000 through $7FFF should be open bus as well, the iNES format implies 8 KiB of PRG RAM at $6000–$7FFF
+	; I personally think that PRG RAM should not exist by default, but the iNES format would disagree.
 	; Therefore this ROM needs to be NES 2.0 just to guarantee the open bus there, assuming the emulator is NES 2.0 compliant.
+	; But for simplicity, this ROM isn't using a NES 2.0 header, so I'll just avoid checking that range entirely.
 	;
 	; anyway, some emulators might just assume reading from this range always returns 00, which is incorrect. Let's test for that!
 	LDA $5000
