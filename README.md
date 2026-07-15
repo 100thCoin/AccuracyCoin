@@ -783,12 +783,12 @@ Some tests have multiple acceptable behaviors that are tested for in this ROM. T
   2: The controller was read the way a Famicom should read controllers.  
 
 ### PPU Read Buffer
-  E: The Picture Processing Unit behavide like revision E or earlier.
-  G: The Picture Processing Unit behavide like revision G or earlier.
+  E: The Picture Processing Unit behaved like revision E or earlier.
+  G: The Picture Processing Unit behaved like revision G or earlier.
 
 ### Address $2004 Behavior
-  E: The Picture Processing Unit behavide like revision E or earlier.
-  G: The Picture Processing Unit behavide like revision G or earlier.
+  E: The Picture Processing Unit behaved like revision E or earlier.
+  G: The Picture Processing Unit behaved like revision G or earlier.
 
 ### Sprites on Scanline 0
   1: This test was ran on a composite PPU.  
