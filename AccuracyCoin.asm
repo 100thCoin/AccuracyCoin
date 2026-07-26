@@ -3813,33 +3813,6 @@ TEST_DummyReads_BPLFail2:
 	RTS
 ;;;;;;;
 
-TEST_DummyWrites_Prep:
-	; Load VRAM[2400] with #0
-	; Load VRAM[2401] with #1
-	; Load VRAM[2402] with #2
-	; Load VRAM[2403] with #3
-	; keep Y unchanged.
-	STY <$FE
-	LDA $2002
-	LDA #$24
-	STA $2006
-	LDA #0
-	STA $2006
-	TAX
-	LDY #10
-TEST_DummyWritesPrepLoop:
-	STX $2007
-	INX
-	DEY
-	BNE TEST_DummyWritesPrepLoop
-	LDA #$24
-	STA $2006
-	LDA #0
-	STA $2006
-	LDY <$FE
-	RTS
-;;;;;;;
-
 TEST_FailPPUOpenBus:
 	JSR ResetScroll
 	JMP TEST_Fail
@@ -13782,8 +13755,8 @@ TEST_SHA_Behavior3:
 	; I guess if you didn't even implement the ABH corruption into your emulator you get to pass the SHA and SHS instructions, but I will judge you. Heh.
 	PLA
 	JSR TEST_UnOp_Setup; Set the opcode
-	; This test for "behavior 3" differs from all know documentation, and is honestly annoying to work with, and was a nightmare to reserach.
-	; Special thanks to SNS_Dominic for their Verilog reserach allowing us to discover there's a magic number affecting ABH.
+	; This test for "behavior 3" differs from all know documentation, and is honestly annoying to work with, and was a nightmare to research.
+	; Special thanks to SNS_Dominic for their Verilog research allowing us to discover there's a magic number affecting ABH.
 	; Write: A & (X | Magic) & H
 	; Hi = Hi & (X | Magic) ; NOTE: this magic number is not the same magic number used in the value written
 	
@@ -14232,7 +14205,7 @@ TEST_OAM_Corruption:
 	STA $2002
 	LDA $2004
 	CMP #$A5
-	BEQ FAIL_OAM_Corruption_RevE ; Revision E dectected.
+	BEQ FAIL_OAM_Corruption_RevE ; Revision E detected.
 	CMP #$5A
 	BNE FAIL_OAM_Corruption	
 	INC <ErrorCode
@@ -14368,7 +14341,7 @@ JSREdgeCases_160:
 	LDX #$68
 	TXS
 	TAX
-	JSR $0650 ; This will actually JSR to address $0150. That's because the high byte is overwritten by the JSR isntruction as it is being executed.
+	JSR $0650 ; This will actually JSR to address $0150. That's because the high byte is overwritten by the JSR instruction as it is being executed.
 	TXS
 	RTS
 ;;;;;;;
@@ -14397,12 +14370,12 @@ TEST_JSREdgeCases:
 	; 6: Read the second operand, and update the program counter.
 
 	; To test this, I'll write a JSR to address $0650, but the test will run from address $0160.
-	; However, the stack pointer will be at $162, overwriting it with 01 before the high byte oeprand is read.
+	; However, the stack pointer will be at $162, overwriting it with 01 before the high byte operand is read.
 	
 	; Address $166: 20 50 06
 	
 	; Despite appearing to be a JSR to $0650, this jumps to $0150 instead.
-	; This code also avoids crashes with the alternate incorrect asnwer, where you incorrectly JSR to $0168 (if both writes to the stack incorrectly occur before reading either operand.)
+	; This code also avoids crashes with the alternate incorrect answer, where you incorrectly JSR to $0168 (if both writes to the stack incorrectly occur before reading either operand.)
 	
 	; Let's set up some code at those locations.
 	LDA #$C8 ; INY
@@ -15157,9 +15130,9 @@ FAIL_INC4014:
 	JMP TEST_Fail
 
 TEST_INC4014:
-	;;; Test 1 [INC $4014]: This test relies on the DMC DMA udpating the data bus ;;;
+	;;; Test 1 [INC $4014]: This test relies on the DMC DMA updating the data bus ;;;
 	
-	LDA <result_DMCDMASync_PreTest	; This is written before the main menu loads when resetting the ROM. If you aren't passing this test (and using savestates), you'll need to reboot the ROM to update this value.
+	LDA <result_DMCDMASync_PreTest	; This is written before the main menu loads when resetting the ROM. If you aren't passing this test (and using save states), you'll need to reboot the ROM to update this value.
 	CMP #1
 TEST_INC4014_BNEFAIL: ; I ran out of bytes to branch from the bottom of this test to FAIL_INC4014, but since that branch is also a BNE, I'll just branch here if that one fails.
 	BNE FAIL_INC4014 ; Fail if the DMC DMA doesn't update the data bus.
@@ -15239,7 +15212,7 @@ TEST_INC4014_BNEFAIL: ; I ran out of bytes to branch from the bottom of this tes
 	
 	JSR ClockslideFromWord
 	.word 28800
-	JSR DisableNMI ; If it failed, the NMI has already occured.
+	JSR DisableNMI ; If it failed, the NMI has already occurred.
 	LDA <$50
 	BNE TEST_INC4014_BNEFAIL	
 	;; END OF TEST ;;
@@ -15496,7 +15469,7 @@ TEST_StaleBGShiftRegisters:
 
 	;;; Test 4 [Stale BG Shift Registers]: This is just testing a quirk of the sprite shifters, and how if rendering wasn't enabled when dot 339 occurs, all sprites are treated as X = 0 ;;;
 	JSR SetUpSpriteZero
-	.byte $06, $C8, $03, $80 ; X = 80. Sprite zero will be still drawn immediately after rendering is enabled. (Dot 339 occured while rendering was still disabled)
+	.byte $06, $C8, $03, $80 ; X = 80. Sprite zero will be still drawn immediately after rendering is enabled. (Dot 339 occurred while rendering was still disabled)
 	LDA #2
 	STA $4014
 	JSR Test_StaleShiftRegisters_Run
@@ -15652,7 +15625,7 @@ TEST_Scanline0Sprites_ClearPg2: ; clear page 2 (used for OAM DMA) with all zeroe
 	; Well, as it turns out, sprites *can* be drawn on scanline 0.
 	; See https://forums.nesdev.org/viewtopic.php?t=26291
 	
-	; In summary, OAM data can be drawn on scanline 0, since the pre-render line is treated as scanline 5 for the in-range checks occuring during dots 256 to 319
+	; In summary, OAM data can be drawn on scanline 0, since the pre-render line is treated as scanline 5 for the in-range checks occurring during dots 256 to 319
 	; (evaluated as line (261 & 255) = scanline 5. That's also why CHR $C6 (the character used for sprite zero during this test) has a single pixel on row 5.)
 	; This results in the existing data in secondary OAM being put into the sprite shifters on the pre-render line. (only if the sprite is "in-range" of scanline 5.)
 	; The data in secondary OAM would either exist due to the previous frame's scanline 239, or whatever was in secondary OAM before rendering was disabled. (F-Blank)
@@ -15664,7 +15637,7 @@ TEST_Scanline0Sprites_ClearPg2: ; clear page 2 (used for OAM DMA) with all zeroe
 	LDA #HIGH(RunScanline0Sprite_NMI)
 	STA $702
 
-	; This subroutine will basically verify that a sprite zero hit is occuring on scanline 0.
+	; This subroutine will basically verify that a sprite zero hit is occurring on scanline 0.
 
 	JSR RunScanline0SpriteTest ; The test occurs in this subroutine. I use a subroutine so I can change very few things and run the same code again.
 	
@@ -15686,7 +15659,7 @@ TEST_Scanline0Sprites_ClearPg2: ; clear page 2 (used for OAM DMA) with all zeroe
 	; The first pixel of the sprite shift registers gets drawn at x=0 instead of the intended x position. 
 	; The 7 remaining pixels are drawn as normal, but shifted left by 1 pixel.
 	;
-	; Basically, this will cause an alternating pattern, where on one frame the sprite on scnaline 0 will be shifted at x=0, and on the next frame it will not.
+	; Basically, this will cause an alternating pattern, where on one frame the sprite on scanline 0 will be shifted at x=0, and on the next frame it will not.
 	; I'm going to verify this behavior by checking if the sprite zero hit alternates each frame.
 	;
 	; Let's run this test again for sprite zero hits at X=0 now.
@@ -15828,7 +15801,7 @@ TEST_RenderingFlagBehavior:
 	LDA #$00 ; Disable rendering entirely
 	STA <$50
 	JSR TEST_RenderingFlagBehavior1
-	BNE FAIL_RenderingFlagBehavior ; The sprite zero hit should not have occured.
+	BNE FAIL_RenderingFlagBehavior ; The sprite zero hit should not have occurred.
 	INC <ErrorCode
 
 	;;; Test 2 [Rendering Flag Behavior]: And now we confirm the theory by only disabling the background in the exact same situation, causing the sprite zero hit to occur. ;;;
@@ -15836,7 +15809,7 @@ TEST_RenderingFlagBehavior:
 	LDA #$10 ; only render sprites
 	STA <$50
 	JSR TEST_RenderingFlagBehavior1
-	BEQ FAIL_RenderingFlagBehavior ; The sprite zero hit should have occured.
+	BEQ FAIL_RenderingFlagBehavior ; The sprite zero hit should have occurred.
 	INC <ErrorCode
 	
 	;;; Test 3 [Rendering Flag Behavior]: Likewise, sprite evaluation will occur even if only the background is enabled. ;;;
@@ -15845,7 +15818,7 @@ TEST_RenderingFlagBehavior:
 	LDA #$08 ; only render background
 	STA <$50
 	JSR TEST_RenderingFlagBehavior3
-	BEQ FAIL_RenderingFlagBehavior ; The sprite zero hit should have occured.
+	BEQ FAIL_RenderingFlagBehavior ; The sprite zero hit should have occurred.
 
 	JSR TEST_RenderingFlagBehaviorCleanUp
 
@@ -15865,7 +15838,7 @@ TEST_RenderingFlagBehaviorMerged:
 	STA $3E01         ; Using a mirror of $2001.
 	NOP               ; Stall for a few CPU cycles for good measure
 	LDA $2002         ; And read from $2002
-	AND #$40          ; bitwise AND to jsut keep the sprite zero hit info.
+	AND #$40          ; bitwise AND to just keep the sprite zero hit info.
 	RTS
 ;;;;;;;
 
@@ -16052,7 +16025,7 @@ TEST_BGSerialIn_WasteACycle:
 TEST_BGSerialIn_Exit:
 	LDA $2002                ; Anyway, I could've just done that once instead of across the entire screen, but it was suggested to make it more visible.
 	AND #$40                 ; Keep in mind, this value should show up as a white line, (color %10 of palette %11) instead of red, color %11 of palette %11.
-	BEQ FAIL_BGSerialIn2     ; So we check if a sprite zero hit occured, masked away everything but the sprite zero hit flag, and fail the test if no hit occured.
+	BEQ FAIL_BGSerialIn2     ; So we check if a sprite zero hit occurred, masked away everything but the sprite zero hit flag, and fail the test if no hit occured.
 	;; END OF TEST ;;
 
 	JSR WaitForVBlank        ; Wait for vblank...
@@ -16147,7 +16120,7 @@ DPCM_Sample_90:
 	.byte $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90
 	.byte $90
 	
-DMASyncWithXX_Start: ; I moved this to a subroutien so I can save bytes.
+DMASyncWithXX_Start: ; I moved this to a subroutine so I can save bytes.
 	PHA
 	LDA #$4F ; loop, max speed.
 	STA $4010
@@ -18234,8 +18207,8 @@ Clockslide_100:
 ;A frame has about 29780 cycles, so let's make a few around that number.
 ; I use these clockslides enough that it actually saves bytes to do this.
 ; NOTE: Don't optimize these using ClockslideFromWord.
-; Some tests rely on an interrupt occuring during the clocksldie and changing some registers,
-; while ClockslideFromWord resotres the registers at the end.
+; Some tests rely on an interrupt occurring during the clockslide and changing some registers,
+; while ClockslideFromWord restores the registers at the end.
 Clockslide_29750:
 	JSR Clockslide_100Minus12
 	JSR Clockslide_50	;150
@@ -18310,7 +18283,7 @@ VerifySpriteZeroHits:
 	JSR WaitForVBlank          ; Wait for vblank
 	JSR EnableRendering        ; Draw both the background and sprites.	
 	JSR WaitForVBLSpriteZeroHit; Wait for vblank and load A with $2002.6
-	BNE VerifySpriteZeroHits_F ; Fail the test if the sprite zero hit occured.
+	BNE VerifySpriteZeroHits_F ; Fail the test if the sprite zero hit occurred.
 	INC $200                   ; Move this sprite to scanline 5.
 	LDA #2                     ; Page 2 for the OAM DMA
 	STA $4014                  ; Trigger the OAM DMA
@@ -18337,7 +18310,7 @@ Sync_ToSpriteFlagsClearing:
 	STA $4014
 	JSR DisableRendering
 	; Assume we're on scanline 245, dot 336.
-	; Aim for the end of the CPU read occuring on scanline 0 dot 1.
+	; Aim for the end of the CPU read occurring on scanline 0 dot 1.
 	
 	JSR ClockslideFromWord
 	.word 1914
