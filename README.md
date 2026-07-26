@@ -64,7 +64,7 @@ For more information, I recommend reading the fully commented assembly code for 
 ### The B Flag
   1: The B flag of the 6502 processor flags should be set by PHP.  
   2: The B flag of the 6502 processor flags should be set by BRK.  
-  3: An IRQ should have occured.  
+  3: An IRQ should have occurred.  
   4: The B flag of the 6502 processor flags should not be set by an IRQ.  
   5: The B flag of the 6502 processor flags should not be set by an NMI.  
   6: Bit 5 of the 6502 processor flags should be set by PHP.  
@@ -97,8 +97,8 @@ For more information, I recommend reading the fully commented assembly code for 
   4: Moving the program counter to open bus should read instructions from the floating data bus values. Write cycles should update the data bus.  
   5: Dummy reads should update the data bus.  
   6: The upper 3 bits when reading from the controller should be open bus.  
-  7: Reading from $4015 should not update the databus.  
-  8: Writing should always update the databus, even writing to $4015.  
+  7: Reading from $4015 should not update the data bus.  
+  8: Writing should always update the data bus, even writing to $4015.  
   9: Bit 5 of address $4015 should be open bus.  
 
 ### All NOP Instructions
@@ -318,9 +318,9 @@ For more information, I recommend reading the fully commented assembly code for 
   G: Reading $4015 1 cycle later than the previous test should not clear the IRQ flag. (it gets set again on this CPU cycle)  
   H: Reading $4015 1 cycle later than the previous test should clear the IRQ flag.  
   I: The Frame Counter Interrupt flag should not have been set 29827 cycles after resetting the frame counter.  
-  J: The Frame Counter Interrupt flag should have been set 29828 cycles after resetting the frame counter, even if supressing Frame Counter Interrupts.  
-  K: The Frame Counter Interrupt flag should have been set 29829 cycles after resetting the frame counter, even if supressing Frame Counter Interrupts.  
-  L: The Frame Counter Interrupt flag should not have been set 29830 cycles after resetting the frame counter if supressing Frame Counter Interrupts.  
+  J: The Frame Counter Interrupt flag should have been set 29828 cycles after resetting the frame counter, even if suppressing Frame Counter Interrupts.  
+  K: The Frame Counter Interrupt flag should have been set 29829 cycles after resetting the frame counter, even if suppressing Frame Counter Interrupts.  
+  L: The Frame Counter Interrupt flag should not have been set 29830 cycles after resetting the frame counter if suppressing Frame Counter Interrupts.  
   M: Despite the Frame Counter Interrupt flag being set for those 2 CPU cycles, if suppressing Frame Counter Interrupts, an IRQ should not occur.  
   N: The IRQ Occurs on the wrong CPU cycle.  
   O: The IRQ Occurs on the wrong CPU cycle.  
@@ -344,7 +344,7 @@ For more information, I recommend reading the fully commented assembly code for 
 ### Delta Modulation Channel
   1: Reading address $4015 should set bit 4 when the DMC is playing and clear bit 4 when the sample ends.  
   2: Restarting the DMC should re-load the sample length.  
-  3: Writing $10 to $4015 should start palying a new sample if the previous one ended.  
+  3: Writing $10 to $4015 should start playing a new sample if the previous one ended.  
   4: Writing $10 to $4015 while a sample is currently playing shouldn't affect anything.  
   5: Writing $00 to $4015 should immediately stop the sample.  
   6: Writing to $4013 shouldn't change the sample length of the currently playing sample.  
@@ -398,7 +398,7 @@ For more information, I recommend reading the fully commented assembly code for 
   "Reset Flag Detected!" will be printed if the write was unsuccessful.  
 
 ### DRAW CPU RAM
-  This test prints uninitialzed RAM values from address $300 through $31F. Some known examples include the following:  
+  This test prints uninitialized RAM values from address $300 through $31F. Some known examples include the following:  
 <pre>
 F0 F0 0F 0F F0 F0 0F 0F
 F0 F0 0F 0F F0 F0 0F 0F
@@ -426,7 +426,7 @@ Processor Flags 04
 </pre>
 
 ### DRAW PPU RAM
-  This test prints uninitialzed RAM values from VRAM address $2C00 through $2C1F. Some known examples include the following:  
+  This test prints uninitialized RAM values from VRAM address $2C00 through $2C1F. Some known examples include the following:  
 <pre>
 F0 F0 0F 0F F0 F0 0F 0F
 F0 F0 0F 0F F0 F0 0F 0F
@@ -443,7 +443,7 @@ or
   Other known patterns include all `00`s or all `FF`s.  
 
 ### DRAW Palette RAM
-  This test prints uninitialzed RAM values from Palette RAM, $3F00 through $3F1F.  
+  This test prints uninitialized RAM values from Palette RAM, $3F00 through $3F1F.  
   Note that pre-G PPUs are unable to read palette RAM.  
   Additionally, every console tested appears to have a unique and consistent power on state for palette RAM. My console has the following:  
 <pre>
@@ -589,7 +589,7 @@ or
   2: Misaligned OAM should stay misaligned until an object's Y position is out of the range of this scanline, at which point the OAM address is incremented by 4 and bitwise ANDed with $FC.  
   3: If Secondary OAM is full when the Y position is out of range, instead of incrementing the OAM Address by 4 and bitwise ANDing with $FC, you should instead only increment the OAM address by 5.  
   4: Misaligned OAM should realign if an object's X position is out of the range of this scanline, at which point the OAM address is incremented by 1 and bitwise ANDed with $FC.  
-  5: A combination of tests 3 and 4 but occuring on the same scanline.  
+  5: A combination of tests 3 and 4 but occurring on the same scanline.  
   6: The same as test 4, but the initial OAM address was $02 instead of $01. If you see this error code, you might have a false positive on test 4.  
   7: The same as test 5, but the initial OAM address was $03 instead of $01. If you see this error code, you might have a false positive on test 5.  
 
@@ -656,7 +656,7 @@ or
 
 ### $2007 Stress Test  
   1: This emulator failed to sync the CPU to VBlank during a test that ran when the ROM boots.  
-  2: Reading from $2007 should set up the PPU Read Buffer two ppu cycles after the CPU Read ends. Reading from $2007 (with rendering enabled) should set up the PPU Read Buffer with the same value as the resulting read from the background or sprite fetch that occured on the same ppu cycle as the read for the PPU Read Buffer. If you fail this test, you are likely reading from memory to set up the PPU Read Buffer on the wrong ppu cycle, missing dummy nametable reads during sprite fetch, or missing dummy nametable reads at the end of a scanline.  
+  2: Reading from $2007 should set up the PPU Read Buffer two ppu cycles after the CPU Read ends. Reading from $2007 (with rendering enabled) should set up the PPU Read Buffer with the same value as the resulting read from the background or sprite fetch that occurred on the same ppu cycle as the read for the PPU Read Buffer. If you fail this test, you are likely reading from memory to set up the PPU Read Buffer on the wrong ppu cycle, missing dummy nametable reads during sprite fetch, or missing dummy nametable reads at the end of a scanline.  
 
 ### ALE + Read
   1: Sprite Zero Hits should be working.  
@@ -699,7 +699,7 @@ or
   0: Your emulator did not pass the "SLO Absolute, X" test.  
   1: There were unexpected extra bits when reading from a controller port that should not have been set.  
   2: Your emulator did not implement the frame counter interrupt flag properly.  
-  3: Your emulator did not update the data bus when the DMC DMA occured, or your DMA timing is off.  
+  3: Your emulator did not update the data bus when the DMC DMA occurred, or your DMA timing is off.  
   4: Your emulator did not correctly emulate open bus behavior. (Or if your emulator crashes here, the cycles of JSR are in the wrong order.)  
   5: ASL A should perform a dummy read on cycle 2. (The PC was incremented after reading the opcode in the previous cycle, so these dummy reads should occur from the new location of the PC.)  
   6: CLC should perform a dummy read on cycle 2.  
@@ -759,8 +759,8 @@ Some tests have multiple acceptable behaviors that are tested for in this ROM. T
   3: The Address-Bus-High-Byte-Corruption included a magic number to be bitwise ORed with ABH, or did not occur at all.  
 
 ### DMA + $2002 Read
-  1: The DMC Load DMA occured after 2 APU cycles. (The common behavior)  
-  2: The DMC Load DMA occured after 3 APU cycles. (The uncommon behavior)  
+  1: The DMC Load DMA occurred after 2 APU cycles. (The common behavior)  
+  2: The DMC Load DMA occurred after 3 APU cycles. (The uncommon behavior)  
 
 ### DMA + $4016 Read
   1: The controller was read the way a US-released NES / AV Famicom should read controllers.  
