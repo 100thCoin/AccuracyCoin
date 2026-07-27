@@ -9658,7 +9658,7 @@ TEST_IFlagLatency_RTI:
 	; DMA should happen here.
 	JSR Clockslide_50 ; Wait for IRQ to be ready
 	LDA #0
-	PLA
+	PHA
 	PLP	; Pull off the flags. I flag is NOT set.
 	INX
 	; IRQ should happen here.
@@ -18617,7 +18617,7 @@ New_VBL_Sync_Loop2:
 DMASyncWithoutOpenBus:
 	; This function *should* exit with exactly 406 CPU cycles until the DMA occurs.
 	; It's a very slightly modified version of the DMA sync routine made by blargg in 2005. (This version has an exit condition in case the DMA timing is so off that it would loop forever.)
-	; It doesn't rely on reading open bus, rather is just simply relies on perfectly timed DMAs, and the 2 or 3 cpu cycle delay after writing to $4015.
+	; It doesn't rely on reading open bus, rather ii just simply relies on perfectly timed DMAs, and the 2 or 3 cpu cycle delay after writing to $4015.
 	; It's worth noting that function *is* consistent on hardware, and it does work. However, despite this, a lot of emulators have incorrect timing for reads from $4015, and won't actually be in sync after this runs.
 	; Hence the existence of the open bus DMA Sync routine, but wouldn't you know it- even fewer emulators implement the DMC DMA updating the data bus, so... not much I can do about that.
 	STX <Copy_X
