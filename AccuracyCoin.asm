@@ -3319,7 +3319,7 @@ TEST_HybridAddresses:
 	STA $2006
 
 	JSR WaitForVBLSpriteZeroHit   ; Wait for vblank and load A with $2002.6
-	BEQ FAIL_HybridAddresses ; Pass the test if the sprite zero hit occurred. Otherwise, check for alignment 2's timing.
+	BEQ FAIL_HybridAddresses ; Pass the test if the sprite zero hit occurred.
 
 TEST_HybridAddresses_Pass
 
@@ -15892,19 +15892,17 @@ TEST_InternalDataBus:
 	NOP
 	NOP
 	LDA $4015 ; [Opcode] [Operand] [Operand] {DMC DMA} [Read from $4015]
-	AND #$20  ;                              This DMC DMA does not update the external data bus. Only the internal one.
+	AND #$20  ;                              This DMC DMA does not update the internal data bus. Only the external one. Hence the read from $4015 not reflecting the DMA's read in bit 5.
 	BNE FAIL_InternalDataBus
 	
 	INC <ErrorCode
 	
 	;;; Test 3 [Internal Data Bus]: Verify that the Internal Data Bus can not change the External Data Bus. ;;;
 	
-	JSR TEST_InternalDataBus_Sync ; Sync the DMC DMA to be between the operands and the read from memory, using index $15 of the sample.
 	LDX #$16
-	LDA $00FF, X
-	LDA $40FF, X ; [Opcode] [Operand] [Operand] [Read from $4015] {DMC DMA} [Read from Open Bus]
-	AND #$20     ;                                                This DMC DMA does not update the external data bus. Only the internal one.
-	BEQ FAIL_InternalDataBus
+	LDA $40FF, X ; [Opcode] [Operand] [Operand] [Read from $4015] [Read from Open Bus]
+	AND #$10     ; The DMC bit of a $4015 read should still be set. But alas, that only updates the internal data bus, so the read from open bus on the following cycle will still be $40 from the high byte opearnd.
+	BNE FAIL_InternalDataBus
 	
 	;; END OF TEST ;;	
 	
