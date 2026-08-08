@@ -9769,7 +9769,7 @@ TEST_NmiAndBrk:
 	STA $703                           ;
 	LDA #High(TEST_NmiAndBrk_NMI)      ; change the NMI pointer.
 	STA $704                           ;
-	;;; Test 1 [NMI overlap BRK]: What happens when the NMI runs during a BRK instruction? ;;;
+	;;; Test 1 [NMI overlap BRK]: BRK should skip the following byte. ;;;
 	; This test is about Interrupt Hijacking.
 	; Here's how it works:
 	; After an NMI or BRK, read the value pushed to the stack, and store at $500,X or $520,X respectively.
@@ -9794,7 +9794,7 @@ TEST_NmiAndBrk:
 TEST_NmiAndBrk_Loop:                   ; We intend to run 29780.66666667 CPU cycles per loop, pushing the NMI closer by 1 PPU cycle each loop.
 	NOP                                ; 2 cycles of padding.
 	BRK                                ; BRK will return *after* this upcoming INY, since it only gets compiled to [$00]. 180 CPU cycles will pass before the INX instruction.
-	NOP	                               ; This should get skipped! I repeat: you should not execute this NOP instruction. The RTI instruction will return the PC to the INX instruction.
+	INY	                               ; This should get skipped! I repeat: you should not execute this INY instruction. The RTI instruction will return the PC to the INX instruction.
 	INC <$50                           ; +3 cycles, Address $50 is the loop counter.
 	LDA <$51                           ; +3
 	BNE TEST_NmiAndBrk_ConfirmNMI      ; +3 or +90
@@ -9811,16 +9811,23 @@ TEST_NmiAndBrk_ConfirmBRK:             ;
 	LDX <$50                           ; +3, load X from the loop counter.
 	CPX #$20                           ; +2, Check if X=20, in which case we're done here.
 	BEQ TEST_NmiAndBrk_PostLoop        ; else, +2	
+	CPY #0                             ;
+	BNE FAIL_NmiAndBrk                 ;
 	                                   ; If you count all the CPU cycles of the instructions in this loop, then we have exactly 29510 CPU cycles to get rid of in order to make this loop happen 1 ppu cycle later each iteration relative to vblank.
 	JSR ClockslideFromWord             ;
-	.word 29507                        ;	
+	.word 29501                        ;	
 	JSR EnableNMI                      ; 30 CPU cycles.
 	LDA #0                             ; +2
 	STA <$51                           ; +3
 	STA <$52                           ; +3
+	CLC                                ; +2
 	JMP TEST_NmiAndBrk_Loop            ; +3 and loop.
 	                                   ;
 TEST_NmiAndBrk_PostLoop:               ;
+	INC <ErrorCode                     ;
+	
+;;; Test 2 [NMI overlap BRK]: Check the answer key ;;;
+
 	LDX #0                             ; Reset X to check the table.
 TEST_NmiAndBrk_AnswerNMILoop:          ;
 	LDA $500, X                        ; Read from the data in RAM
@@ -9941,7 +9948,7 @@ TEST_NmiAndIrq_ConfirmIRQ:             ;
 	BEQ TEST_NmiAndIrq_PostLoop        ; else, +2	
 	                                   ; If you count all the CPU cycles of the instructions in this loop, then we have exactly 29510 CPU cycles to get rid of in order to make this loop happen 1 ppu cycle later each iteration relative to vblank.
 	JSR ClockslideFromWord             ;
-	.word 29489                        ;	
+	.word 29490                        ;	
 	JSR EnableNMI                      ; 30 CPU cycles.
 	LDA #0                             ; +2
 	STA <$51                           ; +3

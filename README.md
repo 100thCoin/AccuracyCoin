@@ -671,29 +671,32 @@ or
 ### Instruction Timing
   1: The DMA should update the data bus.  
   2: The DMA timing is not accurate enough to test this.  
-  3: The immediate addressed instructions should take 2 CPU cycles.  
-  4: The zero page addressing mode for non-read-modify-write instructions should take 3 cycles.  
-  5: The zero page addressing mode for read-modify-write instructions should take 5 cycles.  
-  6: The indexed zero page addressing mode for non-read-modify-write instructions should take 4 cycles.  
-  7: The indexed zero page addressing mode for read-modify-write instructions should take 6 cycles.  
-  8: The absolute addressing mode for non-read-modify-write instructions should take 4 cycles.  
-  9: The absolute addressing mode for read-modify-write instructions should take 6 cycles.  
-  A: The indexed absolute addressing mode for STA instructions should always take 5 cycles.  
-  B: The indexed absolute addressing mode for many instructions should take an extra cycle if the page boundary was crossed.  
-  C: The indexed absolute addressing mode for read-modify-write instructions should always take 7 cycles.  
-  D: The indirect, X instructions should always take 6 cycles (well, except for the unofficial ones).  
-  E: The indirect, Y instructions should take an extra cycle if a page boundary is crossed.  
-  F: The implied instructions should take 2 cycles.  
-  G: PHP should take 3 cycles.  
-  H: PHA should take 3 cycles.  
-  I: PLP should take 4 cycles.  
-  J: PLA should take 4 cycles.  
-  K: JMP should take 3 cycles.  
-  L: JSR should take 6 cycles.  
-  M: RTS should take 6 cycles.  
-  N: RTI should take 6 cycles.  
-  O: BRK should take 7 cycles.  
-  P: JMP (indirect) should take 5 cycles.  
+  3: JSR should take 6 CPU cycles.  
+  4: RTS should take 6 CPU cycles.  
+  5: BRK should take 7 CPU cycles.  
+  6: RTI should take 6 CPU cycles.  
+  7: PHP should take 3 CPU cycles.  
+  8: PLA should take 4 CPU cycles.  
+  9: PHP should take 3 CPU cycles.  
+  A: PLP should take 4 CPU cycles.  
+  B: JMP should take 3 CPU cycles.  
+  C: JMP (indirect) should take 5 CPU cycles.  
+  D: Instructions using immediate addressing should take 2 CPU cycles.  
+  E: Non-read-modify-write instructions using zero page addressing should take 3 CPU cycles.  
+  F: Read-modify-write instructions using zero page addressing should take 5 CPU cycles.  
+  G: Non-read-modify-write instructions using indexed zero page addressing should take 4 CPU cycles.  
+  H: Read-modify-write instructions using indexed zero page addressing should take 6 CPU cycles.  
+  I: Non-read-modify-write instructions using absolute addressing should take 4 CPU cycles.  
+  J: Read-modify-write instructions using absolute addressing should take 6 CPU cycles.  
+  K: STA instructions using indexed absolute addressing should always take 5 CPU cycles, even if a page boundary was not crossed.  
+  L: Non-read-modify-write instructions using indexed absolute addressing (excluding STA) should take 4 CPU cycles if a page boundary was not crossed, and 5 CPU cycles if a page boundary was crossed.  
+  M: Read-modify-write instructions using indexed absolute addressing should always take 7 CPU cycles, even if a page boundary was not crossed.  
+  N: Instructions using (indirect, X) addressing should take 6 CPU cycles.  
+  O: Instructions using (indirect), Y addressing should take 5 CPU cycles if a page boundary was not crossed, and 6 CPU cycles if a page boundary was crossed.  
+  P: Instructions using implied addressing should take 2 CPU cycles.  
+  Q: Branches that do not get taken should take 2 CPU cycles.  
+  R: Branches that get taken and do not cross a page boundary should take 3 CPU cycles.  
+  S: Branches that get taken and cross a page boundary should take 4 CPU cycles.  
 
 ### Implied Dummy Reads
   0: Your emulator did not pass the "SLO Absolute, X" test.  
