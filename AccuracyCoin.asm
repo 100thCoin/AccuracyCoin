@@ -8784,6 +8784,31 @@ TEST_ControllerStrobing:
 	RTS
 ;;;;;;;
 
+TEST_InstructionTiming_Looped_FFs:
+	STA <$50 ; Store the opcode of the test in RAM.
+	TXA 
+	PHA ; Push X to the stack.
+	LDX #$FF ; Set X to $FF. This is used for indexed absolute addressing that needs to cross a page boundary.
+	LDY #$FF ; Set Y to $FF. This is used for indexed absolute addressing that needs to cross a page boundary.
+	JMP TEST_InstructionTiming_Looped_Start ; Skip ahead.
+
+TEST_InstructionTiming_Looped: ; For the tests that run in loops, just jump to this subroutine.
+	STA <$50 ; Store the opcode of the test in RAM.
+	TXA  
+	PHA ; Push X to the stack.
+	LDX #0 ; Reset X.
+	LDY #0 ; Reset Y.
+TEST_InstructionTiming_Looped_Start:;
+	JSR CycleClockBegin ; Starts the clock.
+	JSR $0050 ; This takes 12 cycles + the cycles of the instruction being tested.
+	JSR CycleClockEnd ; Stop the clock, and put the total counted CPU cycles in the Y register.
+	PLA ; Pull the old X register off the stack.
+	TAX ; Restore X.
+	STY $500 ; Store the value of the Y register (the number of cycles we counted) at address $500 for easy debugging.
+	RTS
+;;;;;;;
+
+
 FAIL_InstructionTiming:
 	JMP TEST_Fail
 
@@ -8823,15 +8848,7 @@ TEST_InstructionTiming:
 	LDX #0	
 TEST_InstructionTiming_Loop_Imm:
 	LDA TEST_InstructionTiming_Immediates, X
-	STA <$50
-	TXA
-	PHA
-	JSR CycleClockBegin
-	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
-	JSR CycleClockEnd
-	PLA ; PLA before branching to a fail condition.
-	TAX 
-	STY $500  ; for easy debugging.
+	JSR TEST_InstructionTiming_Looped ; run the test
 	CPY #12+2 ; So let's see if this took 2 cycles.
 	BNE FAIL_InstructionTiming
 	INX
@@ -8843,15 +8860,7 @@ TEST_InstructionTiming_Loop_Imm:
 	LDX #0
 TEST_InstructionTiming_Loop_ZP:
 	LDA TEST_InstructionTiming_ZPs, X
-	STA <$50
-	TXA
-	PHA
-	JSR CycleClockBegin
-	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
-	JSR CycleClockEnd
-	PLA ; PLA before branching to a fail condition.
-	TAX
-	STY $500  ; for easy debugging.
+	JSR TEST_InstructionTiming_Looped ; run the test
 	CPY #12+3 ; So let's see if this took 3 cycles.
 	BNE FAIL_InstructionTiming2
 	INX
@@ -8863,15 +8872,7 @@ TEST_InstructionTiming_Loop_ZP:
 	LDX #0
 TEST_InstructionTiming_Loop_ZP2:
 	LDA TEST_InstructionTiming_ZP2s, X
-	STA <$50
-	TXA
-	PHA
-	JSR CycleClockBegin
-	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
-	JSR CycleClockEnd
-	PLA ; PLA before branching to a fail condition.
-	TAX
-	STY $500  ; for easy debugging.
+	JSR TEST_InstructionTiming_Looped ; run the test
 	CPY #12+5 ; So let's see if this took 5 cycles.
 	BNE FAIL_InstructionTiming2
 	INX
@@ -8883,17 +8884,7 @@ TEST_InstructionTiming_Loop_ZP2:
 	LDX #0
 TEST_InstructionTiming_Loop_iZP:
 	LDA TEST_InstructionTiming_iZPs, X
-	STA <$50
-	TXA
-	PHA
-	LDX #0
-	LDY #0
-	JSR CycleClockBegin
-	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
-	JSR CycleClockEnd
-	PLA ; PLA before branching to a fail condition.
-	TAX
-	STY $500  ; for easy debugging.
+	JSR TEST_InstructionTiming_Looped ; run the test
 	CPY #12+4 ; So let's see if this took 4 cycles.
 	BNE FAIL_InstructionTiming2
 	INX
@@ -8905,16 +8896,7 @@ TEST_InstructionTiming_Loop_iZP:
 	LDX #0
 TEST_InstructionTiming_Loop_i2ZP:
 	LDA TEST_InstructionTiming_iZP2s, X
-	STA <$50
-	TXA
-	PHA
-	LDX #0
-	LDY #0
-	JSR CycleClockBegin
-	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
-	JSR CycleClockEnd
-	PLA ; PLA before branching to a fail condition.
-	TAX
+	JSR TEST_InstructionTiming_Looped ; run the test
 	STY $500  ; for easy debugging.
 	CPY #12+6 ; So let's see if this took 6 cycles.
 	BNE FAIL_InstructionTiming2
@@ -8931,17 +8913,7 @@ FAIL_InstructionTiming_Continue:
 	LDX #0
 TEST_InstructionTiming_Loop_A:
 	LDA TEST_InstructionTiming_As, X
-	STA <$50
-	TXA
-	PHA
-	LDX #0
-	LDY #0
-	JSR CycleClockBegin
-	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
-	JSR CycleClockEnd
-	PLA ; PLA before branching to a fail condition.
-	TAX
-	STY $500  ; for easy debugging.
+	JSR TEST_InstructionTiming_Looped ; run the test
 	CPY #12+4 ; So let's see if this took 4 cycles.
 	BNE FAIL_InstructionTiming2
 	INX
@@ -8953,17 +8925,7 @@ TEST_InstructionTiming_Loop_A:
 	LDX #0
 TEST_InstructionTiming_Loop_A2:
 	LDA TEST_InstructionTiming_A2s, X
-	STA <$50
-	TXA
-	PHA
-	LDX #0
-	LDY #0
-	JSR CycleClockBegin
-	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
-	JSR CycleClockEnd
-	PLA ; PLA before branching to a fail condition.
-	TAX
-	STY $500  ; for easy debugging.
+	JSR TEST_InstructionTiming_Looped ; run the test
 	CPY #12+6 ; So let's see if this took 4 cycles.
 	BNE FAIL_InstructionTiming2
 	INX
@@ -8975,17 +8937,7 @@ TEST_InstructionTiming_Loop_A2:
 	LDX #0
 TEST_InstructionTiming_Loop_iA:
 	LDA TEST_InstructionTiming_iAs, X
-	STA <$50
-	TXA
-	PHA
-	LDX #0
-	LDY #0
-	JSR CycleClockBegin
-	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
-	JSR CycleClockEnd
-	PLA ; PLA before branching to a fail condition.
-	TAX
-	STY $500  ; for easy debugging.
+	JSR TEST_InstructionTiming_Looped ; run the test
 	CPY #12+5 ; So let's see if this took 5 cycles.
 	BNE FAIL_InstructionTiming2
 	INX
@@ -8995,17 +8947,7 @@ TEST_InstructionTiming_Loop_iA:
 	LDX #0
 TEST_InstructionTiming_Loop_iA_2:
 	LDA TEST_InstructionTiming_iAs, X
-	STA <$50
-	TXA
-	PHA
-	LDX #$FF
-	LDY #$FF
-	JSR CycleClockBegin
-	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
-	JSR CycleClockEnd
-	PLA ; PLA before branching to a fail condition.
-	TAX
-	STY $500  ; for easy debugging.
+	JSR TEST_InstructionTiming_Looped_FFs ; run the test with the X and Y registers set to $FF
 	CPY #12+5 ; So let's see if this took 5 cycles.
 	BNE FAIL_InstructionTiming3
 	INX
@@ -9017,17 +8959,7 @@ TEST_InstructionTiming_Loop_iA_2:
 	LDX #0
 TEST_InstructionTiming_Loop_iAp:
 	LDA TEST_InstructionTiming_iAs_plus, X
-	STA <$50
-	TXA
-	PHA
-	LDX #0
-	LDY #0
-	JSR CycleClockBegin
-	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
-	JSR CycleClockEnd
-	PLA ; PLA before branching to a fail condition.
-	TAX
-	STY $500  ; for easy debugging.
+	JSR TEST_InstructionTiming_Looped ; run the test
 	CPY #12+4 ; So let's see if this took 4 cycles.
 	BNE FAIL_InstructionTiming3
 	INX
@@ -9037,17 +8969,7 @@ TEST_InstructionTiming_Loop_iAp:
 	LDX #0
 TEST_InstructionTiming_Loop_i2Ap:
 	LDA TEST_InstructionTiming_iAs_plus, X
-	STA <$50
-	TXA
-	PHA
-	LDX #$FF
-	LDY #$FF
-	JSR CycleClockBegin
-	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
-	JSR CycleClockEnd
-	PLA ; PLA before branching to a fail condition.
-	TAX
-	STY $500  ; for easy debugging.
+	JSR TEST_InstructionTiming_Looped_FFs ; run the test with the X and Y registers set to $FF
 	CPY #12+5 ; So let's see if this took 5 cycles.
 	BNE FAIL_InstructionTiming3
 	INX
@@ -9063,17 +8985,7 @@ TEST_InstructionTiming_Cont2:
 	LDX #0
 TEST_InstructionTiming_Loop_RMWiA:
 	LDA TEST_InstructionTiming_iA2s, X
-	STA <$50
-	TXA
-	PHA
-	LDX #0
-	LDY #0
-	JSR CycleClockBegin
-	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
-	JSR CycleClockEnd
-	PLA ; PLA before branching to a fail condition.
-	TAX
-	STY $500  ; for easy debugging.
+	JSR TEST_InstructionTiming_Looped ; run the test
 	CPY #12+7 ; So let's see if this took 7 cycles.
 	BNE FAIL_InstructionTiming3
 	INX
@@ -9083,17 +8995,7 @@ TEST_InstructionTiming_Loop_RMWiA:
 	LDX #0
 TEST_InstructionTiming_Loop_2RMWiA:
 	LDA TEST_InstructionTiming_iA2s, X
-	STA <$50
-	TXA
-	PHA
-	LDX #$FF
-	LDY #$FF
-	JSR CycleClockBegin
-	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
-	JSR CycleClockEnd
-	PLA ; PLA before branching to a fail condition.
-	TAX
-	STY $500  ; for easy debugging.
+	JSR TEST_InstructionTiming_Looped_FFs ; run the test with the X and Y registers set to $FF
 	CPY #12+7 ; So let's see if this took 7 cycles.
 	BNE FAIL_InstructionTiming3
 	INX
@@ -9108,17 +9010,7 @@ TEST_InstructionTiming_Loop_2RMWiA:
 	LDX #0
 TEST_InstructionTiming_Loop_indX:
 	LDA TEST_InstructionTiming_inX, X
-	STA <$50
-	TXA
-	PHA
-	LDX #$00
-	LDY #$00
-	JSR CycleClockBegin
-	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
-	JSR CycleClockEnd
-	PLA ; PLA before branching to a fail condition.
-	TAX
-	STY $500  ; for easy debugging.
+	JSR TEST_InstructionTiming_Looped ; run the test
 	CPY #12+6 ; So let's see if this took 5 cycles.
 	BNE FAIL_InstructionTiming3
 	INX
@@ -9130,17 +9022,7 @@ TEST_InstructionTiming_Loop_indX:
 	LDX #0
 TEST_InstructionTiming_Loop_Yind:
 	LDA TEST_InstructionTiming_inY, X
-	STA <$50
-	TXA
-	PHA
-	LDX #$00
-	LDY #$00
-	JSR CycleClockBegin
-	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
-	JSR CycleClockEnd
-	PLA ; PLA before branching to a fail condition.
-	TAX
-	STY $500  ; for easy debugging.
+	JSR TEST_InstructionTiming_Looped ; run the test
 	CPY #12+5 ; So let's see if this took 5 cycles.
 	BNE FAIL_InstructionTiming4
 	INX
@@ -9149,17 +9031,7 @@ TEST_InstructionTiming_Loop_Yind:
 	LDX #0
 TEST_InstructionTiming_Loop_Y2ind:
 	LDA TEST_InstructionTiming_inY, X
-	STA <$50
-	TXA
-	PHA
-	LDX #$00
-	LDY #$FF
-	JSR CycleClockBegin
-	JSR $0050 ; this takes 12 cycles + the cycles of the instruction being tested.
-	JSR CycleClockEnd
-	PLA ; PLA before branching to a fail condition.
-	TAX
-	STY $500  ; for easy debugging.
+	JSR TEST_InstructionTiming_Looped_FFs ; run the test with the X and Y registers set to $FF
 	CPY #12+6 ; So let's see if this took 6 cycles.
 	BNE FAIL_InstructionTiming4
 	INX
@@ -9831,245 +9703,304 @@ FAIL_IFlagLatency:
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
 
+
 TEST_NmiAndBrk_BRK:
-	STX <$50
-	TSX
-	JSR Clockslide_50
-	LDA $101,X ; read the flags without running PLA, since PLA pokes them a bit.
-	LDX <$50
-	STA $520,X ; Store the results at $520.
-	RTI
-
-TEST_NmiAndBrk_NMI:
-TEST_NmiAndIrq_NMI:
-	STX <$50
-	TSX
-	JSR Clockslide_50
-	LDA $101,X ; read the flags without running PLA, since PLA pokes them a bit.
-	LDX <$50
-	STA $500,X ; Store the results at $500.
-	RTI
-
-TEST_NmiAndBrk_Prep:
-	LDA #$09
-	STA $600
-	STA $700
-	LDA #$80
-	STA $601
-	STA $701
-	LDA #$4C
-	STA $602
-	STA $702
-	LDA #LOW(TEST_NmiAndBrk_BRK)
-	STA $603
-	LDA #HIGH(TEST_NmiAndBrk_BRK)	; change the IRQ pointer.
-	STA $604
-	LDA #LOW(TEST_NmiAndBrk_NMI)
-	STA $703
-	LDA #HIGH(TEST_NmiAndBrk_NMI)	; change the NMI pointer.
-	STA $704
-	RTS
-;;;;;;;
-
-TEST_NmiAndBrk:
-	JSR TEST_NmiAndBrk_Prep
-	;;; Test 1 [NMI overlap BRK]: What happens when the NMI runs during a BRK instruction? (Error 1 means BRK didn't skip the following byte) ;;;
-	; Also known as Interrupt Hijacking, this test will simply sync the CPU such that the NMI will occur in 8-A cycles. Then it will run this 16 times, incrementing A by 1 for each test.
-	; Here's how it works:
-	; After an NMI or BRK, read the value pushed to the stack, and store at <$50,X or <$60,X respectively.
-	; Then just read all the values and compare with an answer key.
-	JSR WaitForVBlank
-	SEI
-	CLC
-	JSR DisableRendering
-	LDX #0
-	LDY #0
-TEST_NmiAndBrkLoop:
-	STX <$51
-	JSR DisableNMI
-	LDA #0
-	JSR VblSync_Plus_A
-	JSR ClockslideFromWord
-	.word 29700
-	; 80 CPU cycles until VBlank.
-	JSR EnableNMI ; +31 CPU cycles. (49 cycles until VBlank)
-	LDX <$51	  ; +3
-	TXA			  ; +2 (44 cycles)
-	JSR Clockslide37_Plus_A ; + 36 + A
-	; 8-A CPU cycles until VBlank.
-	; stall for an extra 6 cycles.
-	BRK ; BRK will return *after* this upcoming INY, since it only gets compiled to [$00].
-	INY	; This should get skipped!
-	TYA
-	BNE FAIL_NmiAndBrk
-	INX ; X+=1
-	CPX #32
-	BNE TEST_NmiAndBrkLoop
-	INC <ErrorCode
-	
-	;;; Test 2 [NMI overlap BRK]: Check the answer key. ;;;
-	; And now we check with the answer key.
-	JSR DisableNMI
-	LDX #0
-TEST_NmiAndBrkAnswerLoop:
-	LDA $500,X
-	CMP TEST_NmiAndBrkAnswerKey, X
-	BNE TEST_NmiAndBrk_TryKey2
-	INX
-
-	CPX #64
-	BNE TEST_NmiAndBrkAnswerLoop
-	
-	;; END OF TEST ;;
-	LDA #1
-	RTS
-;;;;;;;
-
-TEST_NmiAndBrk_TryKey2:
-	LDX #0
-TEST_NmiAndBrkAnswerLoop2:
-	LDA $500,X
-	CMP TEST_NmiAndBrkAnswerKey_Alignment2, X
-	BNE FAIL_NmiAndBrk
-	INX
-
-	CPX #64
-	BNE TEST_NmiAndBrkAnswerLoop2
-	
-	;; END OF TEST ;;
-	LDA #1
-	RTS
-;;;;;;;
-
-
-FAIL_NmiAndBrk:
-	JMP TEST_Fail
-	
-
-TEST_NmiAndBrkAnswerKey:   
-	.byte $A5, $A5, $A4, $A5, $A4, $35, $34, $35, $34, $35, $24, $25, $24, $25, $24, $25, $24, $25, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
-	.byte $35, $35, $34, $35, $34, $00, $00, $00, $00, $00, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35
-TEST_NmiAndBrkAnswerKey_Alignment2: ; CPU/PPU clock alignment 2 has different results:
-	.byte $A5, $A5, $A4, $A5, $34, $35, $34, $35, $34, $25, $24, $25, $24, $25, $24, $25, $24, $25, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
-	.byte $35, $35, $34, $35, $00, $00, $00, $00, $00, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35, $34, $35
-
-TEST_NmiAndIrq_Prep:
-	LDA #$4C
-	STA $602
-	STA $700
-	LDA #LOW(TEST_NmiAndIrq_IRQ)
-	STA $603
-	LDA #HIGH(TEST_NmiAndIrq_IRQ)	; change the IRQ pointer.
-	STA $604
-	LDA #LOW(TEST_NmiAndIrq_NMI)
-	STA $701
-	LDA #HIGH(TEST_NmiAndIrq_NMI)	; change the NMI pointer.
-	STA $702
-	LDA #$A9
-	STA $600
-	LDA #$FF
-	STA $601
-	RTS
-;;;;;;;
+	INC <$52          ; Increment $52 (We use this outside this routine to check if this routine ran at all.)
+	JSR Clockslide_50 ; We need to make sure a significantly incorrect NMI timing won't result in the value of the stack pointer getting stored in <$50
+	TSX               ; We want to read the status flags that the BRK pushed to the stack. Transfer the stack pointer to X.
+	LDA $101,X        ; Read the flags without running PLA, since PLA pokes them a bit.
+	LDX <$50          ; Load X from the loop counter.
+	STA $520,X        ; Store the results at $520, X.
+	RTI               ; Return.
+;;;;;;;;;;;;;;;;;;;;;;;
 
 TEST_NmiAndIrq_IRQ:
-	STX <Copy_X
-	TSX
-	JSR Clockslide_50
-	LDA $101,X ; read the flags without running PLA, since PLA pokes them a bit.
-	; Okay cool, now set the I flag there.
-	ORA #4
-	STA $101,X ; I'd prefer if this didn't infinitely loop, and I'd also like to not have to wait for the IRQ line to be set again, so we're not acknowledging it.
-	LDX <Copy_X
-	STA $510,X ; Store the results at $520.
-	RTI
-;;;;;;;
+	INC <$52          ; Increment $52 (We use this outside this routine to check if this routine ran at all.)
+	JSR Clockslide_50 ; We need to make sure a significantly incorrect NMI timing won't result in the value of the stack pointer getting stored in <$50
+	TSX               ; We want to read the status flags that the BRK pushed to the stack. Transfer the stack pointer to X.
+	LDA $101,X        ; Read the flags without running PLA, since PLA pokes them a bit.
+	ORA #4            ;
+	STA $101,X        ; I'd prefer if this didn't infinitely loop, and I'd also like to not have to wait for the IRQ line to be set again, so we're not acknowledging it.
+	LDX <$50          ; Load X from the loop counter.
+	STA $540,X        ; Store the results at $520, X.
+	RTI               ; Return.
+;;;;;;;;;;;;;;;;;;;;;;;
 
-TEST_NmiAndIrq_SetIRQ:
-	JSR DMASync_50CyclesRemaining
-	LDX #0		; +2
-	LDA #$8F	; +2
-	STA $4010	; +4 (enable the DMA IRQ)
-	JSR Clockslide_34 ; +34
-	RTS			; +6
-;;;;;;;
+TEST_NmiAndBrk_NMI:
+	INC <$51          ; Increment $51 (We use this outside this routine to check if this routine ran at all.)
+	JSR Clockslide_50 ; We're just copying what TEST_NmiAndBrk_BRK did for simplicity.
+	TSX               ; We want to read the status flags that the BRK pushed to the stack. Transfer the stack pointer to X.
+	LDA $101,X        ; read the flags without running PLA, since PLA pokes them a bit.
+	LDX <$50          ; Load X from the loop counter.
+	STA $500,X        ; Store the results at $500, X.
+	RTI               ; Return.
+;;;;;;;;;;;;;;;;;;;;;;;
 
+TEST_NmiAndIrq_NMI:
+	INC <$51          ; Increment $52 (We use this outside this routine to check if this routine ran at all.)
+	JSR Clockslide_50 ; We need to make sure a significantly incorrect NMI timing won't result in the value of the stack pointer getting stored in <$50
+	TSX               ; We want to read the status flags that the BRK pushed to the stack. Transfer the stack pointer to X.
+	LDA $101,X        ; Read the flags without running PLA, since PLA pokes them a bit.
+	ORA #4            ;
+	STA $101,X        ; I'd prefer if this didn't infinitely loop, and I'd also like to not have to wait for the IRQ line to be set again, so we're not acknowledging it.
+	LDX <$50          ; Load X from the loop counter.
+	STA $500,X        ; Store the results at $520, X.
+	RTI               ; Return.
+;;;;;;;;;;;;;;;;;;;;;;;
+	
+	;;;;;;;;;;;;;;;;;;;;;;;
+	;;; NMI Overlap BRK ;;;
+	;;;;;;;;;;;;;;;;;;;;;;;	
+TEST_NmiAndBrk:
+	LDA #$09                           ; We want to write `ORA #$80` at the start of the NMI/BRK routines. This would set the CPU's Negative Flag, which we can see get pushed to the stack if the interrupts are spaced out.
+	STA $600                           ; So we write to $600 and $700.
+	STA $700                           ;
+	LDA #$80                           ;
+	STA $601                           ;
+	STA $701                           ;
+	LDA #$4C                           ; JMP opcode.
+	STA $602                           ;
+	STA $702                           ;
+	LDA #Low(TEST_NmiAndBrk_BRK)       ;
+	STA $603                           ;
+	LDA #High(TEST_NmiAndBrk_BRK)      ; change the IRQ pointer.
+	STA $604                           ;
+	LDA #Low(TEST_NmiAndBrk_NMI)       ;
+	STA $703                           ;
+	LDA #High(TEST_NmiAndBrk_NMI)      ; change the NMI pointer.
+	STA $704                           ;
+	;;; Test 1 [NMI overlap BRK]: What happens when the NMI runs during a BRK instruction? ;;;
+	; This test is about Interrupt Hijacking.
+	; Here's how it works:
+	; After an NMI or BRK, read the value pushed to the stack, and store at $500,X or $520,X respectively.
+	; Then just read all the values and compare with an answer key.
+	;
+	; We're going to need to count cycles for every instruction so we can line this up.
+	; In an older form of this test, I re-synced to VBlank for every loop, and that resulted in this test taking around 11.5 seconds.
+	; I would like this updated version of this test to *not* take that long, so we're only going to sync to VBlank once and then count cycles to make the NMI land at the right time each loop.
+	LDX #0                             ; Set X to zero for this upcoming loop.
+	LDA #0                             ;
+	JSR VblSync_Plus_A                 ; Sync the next instruction to scanline 241, dot 0. (This takes upwards of a third of a second.)
+	                                   ; Rendering is already disabled.
+	                                   ; The next NMI is in one frame. (and one ppu cycle... and then one and a half more cpu cycles.)
+	LDA $2002                          ; +4 cycles, prevent the NMI from happening
+	JSR EnableNMI                      ; +25 cycles.
+	JSR ClockslideFromWord             ; Wait until the BRK instruction would land just briefly before vblank.
+	.word 29729                        ;
+	SEI                                ; Set up the flags for the test.
+	CLC                                ; Set up the flags for the test.
+	CLV                                ; Set up the flags for the test.
+	LDA #0                             ; Set up the flags for the test.
+TEST_NmiAndBrk_Loop:                   ; We intend to run 29780.66666667 CPU cycles per loop, pushing the NMI closer by 1 PPU cycle each loop.
+	NOP                                ; 2 cycles of padding.
+	BRK                                ; BRK will return *after* this upcoming INY, since it only gets compiled to [$00]. 180 CPU cycles will pass before the INX instruction.
+	NOP	                               ; This should get skipped! I repeat: you should not execute this NOP instruction. The RTI instruction will return the PC to the INX instruction.
+	INC <$50                           ; +3 cycles, Address $50 is the loop counter.
+	LDA <$51                           ; +3
+	BNE TEST_NmiAndBrk_ConfirmNMI      ; +3 or +90
+	                                   ; We have just confirmed the NMI did not happen, which means we need to add an additional 87 CPU cycles. (+1 because the branch here was not taken)
+	JSR Clockslide_100Minus12          ; Stall for 88 cycles.
+TEST_NmiAndBrk_ConfirmNMI:             ;
+	LDA <$52                           ; +3
+	BNE TEST_NmiAndBrk_ConfirmBRK      ; +3 or +90
+	                                   ; We have just confirmed the BRK did not happen, which means we need to add an additional 87 CPU cycles. (+1 because the branch here was not taken)
+	JSR Clockslide_100Minus12          ; Stall for 88 cycles.
+TEST_NmiAndBrk_ConfirmBRK:             ;
+	                                   ; At this point, we have ran 194 cycles. (not including the NOP at the top of the loop)
+	JSR DisableNMI                     ; 30 CPU cycles.
+	LDX <$50                           ; +3, load X from the loop counter.
+	CPX #$20                           ; +2, Check if X=20, in which case we're done here.
+	BEQ TEST_NmiAndBrk_PostLoop        ; else, +2	
+	                                   ; If you count all the CPU cycles of the instructions in this loop, then we have exactly 29510 CPU cycles to get rid of in order to make this loop happen 1 ppu cycle later each iteration relative to vblank.
+	JSR ClockslideFromWord             ;
+	.word 29507                        ;	
+	JSR EnableNMI                      ; 30 CPU cycles.
+	LDA #0                             ; +2
+	STA <$51                           ; +3
+	STA <$52                           ; +3
+	JMP TEST_NmiAndBrk_Loop            ; +3 and loop.
+	                                   ;
+TEST_NmiAndBrk_PostLoop:               ;
+	LDX #0                             ; Reset X to check the table.
+TEST_NmiAndBrk_AnswerNMILoop:          ;
+	LDA $500, X                        ; Read from the data in RAM
+	CMP TEST_NmiAndBrk_AnswerNMI, X    ; Compare with the answer key.
+	BNE TEST_NmiAndBrk_AnswerLoopOff   ; If it doesn't match the key, check if everything is off by one ppu cycle. A specific CPU/PPU clock alignment can do that. 
+	INX                                ; X++
+	CPX #$20                           ; Loop until X = $20
+	BNE TEST_NmiAndBrk_AnswerNMILoop   ;
+	LDX #0                             ; Reset X to check this next table.
+TEST_NmiAndBrk_AnswerBRKLoop:          ;
+	LDA $520, X                        ;
+	CMP TEST_NmiAndBrk_AnswerBRK, X    ;
+	BNE FAIL_NmiAndBrk                 ; If the first one was not off by one, and this one was, then that's a fail.
+	INX                                ;
+	CPX #$20                           ;
+	BNE TEST_NmiAndBrk_AnswerBRKLoop   ;
+	;; End Of Test ;;                  ;
+	LDA #1                             ;
+	RTS                                ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+TEST_NmiAndBrk_AnswerLoopOff:          ;
+	LDX #0                             ;
+TEST_NmiAndBrk_AnswerNMILoopOff:       ;
+	LDA $500, X                        ;
+	CMP TEST_NmiAndBrk_AnswerNMI+1, X  ;
+	BNE FAIL_NmiAndBrk                 ;
+	INX                                ;
+	CPX #$20                           ;
+	BNE TEST_NmiAndBrk_AnswerNMILoopOff;
+	LDX #0                             ;
+TEST_NmiAndBrk_AnswerBRKLoopOff:       ;
+	LDA $520, X                        ;
+	CMP TEST_NmiAndBrk_AnswerBRK+1, X  ;
+	BNE FAIL_NmiAndBrk                 ; If the first one was not off by one, and this one was, then that's a fail.
+	INX                                ;
+	CPX #$20                           ;
+	BNE TEST_NmiAndBrk_AnswerBRKLoopOff;
+	;; End Of Test ;;                  ;
+	LDA #1                             ;
+	RTS                                ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+FAIL_NmiAndBrk:
+	JMP TEST_Fail	
+	
+TEST_NmiAndBrk_AnswerNMI:
+	.byte $A4, $A4, $A4, $A4, $A4, $A4, $A4, $A4, $A4, $A4, $36, $36, $36, $36, $36, $36, $36, $36, $36, $36, $36, $36, $36, $36, $36, $26, $26, $26, $26, $26, $26, $26, $26
+TEST_NmiAndBrk_AnswerBRK:
+	.byte $36, $36, $36, $36, $36, $36, $36, $36, $36, $36, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $36, $36, $36, $36, $36, $36, $36, $36
+
+	;;;;;;;;;;;;;;;;;;;;;;;
+	;;; NMI Overlap IRQ ;;;
+	;;;;;;;;;;;;;;;;;;;;;;;	
 TEST_NmiAndIrq:
-	JSR TEST_NmiAndIrq_Prep
-	JSR TEST_NmiAndIrq_SetIRQ
-	; Great! now we set the I flag so this IRQ never runs until we need it.
-	SEI
-	; This is very similar to the NMI and BRK test ,except instead of a BRK, we just have an IRQ to occur.
-	JSR DisableRendering
-	LDX #0
-TEST_NmiAndIrqLoop:
-	STX <Copy_X
-	JSR DisableNMI
-	LDA #0
-	JSR VblSync_Plus_A
-	JSR ClockslideFromWord
-	.word 29700
-	; 80 CPU cycles until VBlank.
-	JSR EnableNMI ; +31 CPU cycles. (49 cycles until VBlank)
-	LDA Copy_X	  ; +3
-	JSR Clockslide37_Plus_A ; + 36 + A
-	; 8-A CPU cycles until VBlank.
-	; stall for an extra 6 cycles.
-	CLI
-	LDA #0	; set the zero flag.
-	; Assuming you passed the Interrupt flag latency test, the IRQ will occur here!
-	NOP
-	LDX <Copy_X	  ; +3
-	INX ; X+=1
-	CPX #16
-	BNE TEST_NmiAndIrqLoop
-	
-	LDA #0
-	STA $4010 ; acknowledge the IRQ, now that we're done.
-	SEI
-	
-	;;; Test 1 [NMI and IRQ]: Check the answer key. ;;;
-	JSR DisableNMI
-	LDX #0
-TEST_NmiAndIrqAnswerLoop:
-	LDA $500,X
-	CMP TEST_NmiAndIqrAnswerKey, X
-	BNE TEST_NmiAndIrq_TryAlignment2
-	INX
-	CPX #32
-	BNE TEST_NmiAndIrqAnswerLoop
-	
-	;; END OF TEST ;;
-	LDA #1
-	RTS
-	
-TEST_NmiAndIrq_TryAlignment2:
-	LDX #0
-TEST_NmiAndIrqAnswerLoop2:
-	LDA $500,X
-	CMP TEST_NmiAndIqrAnswerKey_Alignment2, X
-	BNE FAIL_NmiAndIqr
-	INX
-	CPX #32
-	BNE TEST_NmiAndIrqAnswerLoop2
-	
-	;; END OF TEST ;;
-	LDA #1
-	RTS
-;;;;;;;
+	LDA #$09                           ; We want to write `ORA #$80` at the start of the NMI/BRK routines. This would set the CPU's Negative Flag, which we can see get pushed to the stack if the interrupts are spaced out.
+	STA $600                           ; So we write to $600 and $700.
+	STA $700                           ;
+	LDA #$80                           ;
+	STA $601                           ;
+	STA $701                           ;
+	LDA #$4C                           ; JMP opcode.
+	STA $602                           ;
+	STA $702                           ;
+	LDA #Low(TEST_NmiAndIrq_IRQ)       ;
+	STA $603                           ;
+	LDA #High(TEST_NmiAndIrq_IRQ)      ; change the IRQ pointer.
+	STA $604                           ;
+	LDA #Low(TEST_NmiAndIrq_NMI)       ;
+	STA $703                           ;
+	LDA #High(TEST_NmiAndIrq_NMI)      ; change the NMI pointer.
+	STA $704                           ;
+	;;; Test 1 [NMI overlap IRQ]: What happens when the NMI runs during an IRQ? ;;;
+	; This test is also about Interrupt Hijacking, but with an IRQ this time.
+	; Here's how it works:
+	; After an NMI or IRQ, read the value pushed to the stack, and store at $500,X or $520,X respectively.
+	; Then just read all the values and compare with an answer key.
+	;
+	; We're going to need to count cycles for every instruction so we can line this up.
+	; In an older form of this test, I re-synced to VBlank for every loop, and that resulted in this test taking around 11.5 seconds.
+	; I would like this updated version of this test to *not* take that long, so we're only going to sync to VBlank once and then count cycles to make the NMI land at the right time each loop.
+	JSR DMASync_50CyclesRemaining      ; Enable the DMC
+	LDA #$8F                           ;
+	STA $4010                          ; Enable the DMC IRQ
+	SEI                                ; And prevent the IRQ from occurring.
+	LDX #0                             ; Set X to zero for this upcoming loop.
+	LDA #0                             ;
+	JSR VblSync_Plus_A                 ; Sync the next instruction to scanline 241, dot 0. (This takes upwards of a third of a second.)
+	                                   ; Rendering is already disabled.
+	                                   ; The next NMI is in one frame. (and one ppu cycle... and then one and a half more cpu cycles.)
+	LDA $2002                          ; +4 cycles, prevent the NMI from happening
+	JSR EnableNMI                      ; +25 cycles.
+	JSR ClockslideFromWord             ; Wait until the IRQ instruction would land just briefly before vblank.
+	.word 29729                        ;
+	CLC                                ; Set up the flags for the test.
+	CLV                                ; Set up the flags for the test.
+	LDA #0                             ; Set up the flags for the test.
+TEST_NmiAndIrq_Loop:                   ; We intend to run 29780.66666667 CPU cycles per loop, pushing the NMI closer by 1 PPU cycle each loop.
+	CLI                                ; Enable interrupts.
+	NOP                                ; 2 cycles of padding.
+	; The IRQ goes here.               ;
+	SEI                                ;
+	INC <$50                           ; +3 cycles, Address $50 is the loop counter.
+	LDA <$51                           ; +3
+	BNE TEST_NmiAndIrq_ConfirmNMI      ; +3 or +96
+	                                   ; We have just confirmed the NMI did not happen, which means we need to add an additional 93 CPU cycles. (+1 because the branch here was not taken)
+	JSR Clockslide_45                  ; Stall for 95 cycles.
+	JSR Clockslide_50                  ;
+TEST_NmiAndIrq_ConfirmNMI:             ;
+	LDA <$52                           ; +3
+	BNE TEST_NmiAndIrq_ConfirmIRQ      ; +3 or +96
+	                                   ; We have just confirmed the IRQ did not happen, which means we need to add an additional 93 CPU cycles. (+1 because the branch here was not taken)
+	JSR Clockslide_45                  ; Stall for 95 cycles.
+	JSR Clockslide_50                  ;
+TEST_NmiAndIrq_ConfirmIRQ:             ;
+	JSR DisableNMI                     ; 30 CPU cycles.
+	LDX <$50                           ; +3, load X from the loop counter.
+	CPX #$40                           ; +2, Check if X=20, in which case we're done here.
+	BEQ TEST_NmiAndIrq_PostLoop        ; else, +2	
+	                                   ; If you count all the CPU cycles of the instructions in this loop, then we have exactly 29510 CPU cycles to get rid of in order to make this loop happen 1 ppu cycle later each iteration relative to vblank.
+	JSR ClockslideFromWord             ;
+	.word 29489                        ;	
+	JSR EnableNMI                      ; 30 CPU cycles.
+	LDA #0                             ; +2
+	STA <$51                           ; +3
+	STA <$52                           ; +3
+	JMP TEST_NmiAndIrq_Loop            ; +3 and loop.
+	                                   ;
+TEST_NmiAndIrq_PostLoop:               ;
+	LDX #0                             ; Reset X to check the table.
+TEST_NmiAndIrq_AnswerNMILoop:          ;
+	LDA $500, X                        ; Read from the data in RAM
+	CMP TEST_NmiAndIrq_AnswerNMI, X    ; Compare with the answer key.
+	BNE TEST_NmiAndIrq_AnswerLoopOff   ; If it doesn't match the key, check if everything is off by one ppu cycle. A specific CPU/PPU clock alignment can do that. 
+	INX                                ; X++
+	CPX #$40                           ; Loop until X = $40
+	BNE TEST_NmiAndIrq_AnswerNMILoop   ;
+	LDX #0                             ; Reset X to check this next table.
+TEST_NmiAndIrq_AnswerIRQLoop:          ;
+	LDA $540, X                        ;
+	CMP TEST_NmiAndIrq_AnswerIRQ, X    ;
+	BNE FAIL_NmiAndIrq                 ; If the first one was not off by one, and this one was, then that's a fail.
+	INX                                ;
+	CPX #$40                           ;
+	BNE TEST_NmiAndIrq_AnswerIRQLoop   ;
+	;; End Of Test ;;                  ;
+	LDA #1                             ;
+	RTS                                ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+TEST_NmiAndIrq_AnswerLoopOff:          ;
+	LDX #0                             ;
+TEST_NmiAndIrq_AnswerNMILoopOff:       ;
+	LDA $500, X                        ;
+	CMP TEST_NmiAndIrq_AnswerNMI+1, X  ;
+	BNE FAIL_NmiAndIrq                 ;
+	INX                                ;
+	CPX #$40                           ;
+	BNE TEST_NmiAndIrq_AnswerNMILoopOff;
+	LDX #0                             ;
+TEST_NmiAndIrq_AnswerIRQLoopOff:       ;
+	LDA $540, X                        ;
+	CMP TEST_NmiAndIrq_AnswerIRQ+1, X  ;
+	BNE FAIL_NmiAndIrq                 ; If the first one was not off by one, and this one was, then that's a fail.
+	INX                                ;
+	CPX #$40                           ;
+	BNE TEST_NmiAndIrq_AnswerIRQLoopOff;
+	;; End Of Test ;;                  ;
+	LDA #1                             ;
+	RTS                                ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-TEST_NmiAndIqrAnswerKey:
-	.byte $A5, $A5, $22, $23, $22, $23, $22, $23, $22, $21, $20, $25, $24, $25, $24, $25
-	.byte $27, $27, $26, $27, $26, $27, $26, $27, $26, $25, $24, $27, $26, $27, $26, $27
+FAIL_NmiAndIrq:
+	JMP TEST_Fail	
 	
-TEST_NmiAndIqrAnswerKey_Alignment2:
-	.byte $A5, $23, $22, $23, $22, $23, $22, $23, $20, $21, $24, $25, $24, $25, $24, $25
-	.byte $27, $27, $26, $27, $26, $27, $26, $27, $24, $25, $26, $27, $26, $27, $26, $27
+TEST_NmiAndIrq_AnswerNMI:
+	.byte $A4, $A4, $A4, $A4, $A4, $A4, $A4, $A4, $A4, $A4, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26
+	.byte $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26
 
-FAIL_NmiAndIqr:
-	JMP TEST_Fail
-;;;;;;;;;;;;;;;;;
+TEST_NmiAndIrq_AnswerIRQ:
+	.byte $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+	.byte $00, $00, $00, $00, $00, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26
 
 
 
