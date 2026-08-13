@@ -4981,11 +4981,11 @@ TEST_RLA:
 
 	JSR TEST_RunTest_AddrInitAXYF
 	.word $05BF
-	.byte $00
+	.byte $80
 	.byte $A5, $E1, $00, (flag_i | flag_z | flag_n)
 	.word $05BF
 	.byte $00
-	.byte $00, $E1, $00, (flag_i | flag_z)
+	.byte $00, $E1, $00, (flag_i | flag_z | flag_c)
 
 	;; END OF TEST ;;
 	LDA #1
