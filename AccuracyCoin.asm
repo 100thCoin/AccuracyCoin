@@ -11778,7 +11778,7 @@ ImpliedDummyRead_RTS: ; RTS
 	
 	
 	
-TEST_ImpliedDummyRead_Check:	; This loop tests the opcodes that don't have bit 5 set. ($20)
+TEST_ImpliedDummyRead_Check:
 	STA <$A5 ; Store the opcode you want to test.
 	TSX
 	STX <Copy_SP
@@ -12022,7 +12022,7 @@ TEST_ImpliedDummyReadPreReqContinue:
 	; And that should be all the pre-requisites.
 	INC <ErrorCode
 
-	;;; Test 5 [Implied Dummy Reads]: Do the implied instructions have dummy reads? (They should). ;;;
+	;;; Test 5 through X [Implied Dummy Reads]: Do the implied instructions have dummy reads? (They should) ;;;
 	; This test extends to every error code after this.
 	
 	; What are we testing for here?
@@ -12072,13 +12072,15 @@ TEST_ImpliedDummyRead_Loop:
 	STX <Copy_X
 	LDA TEST_ImpliedDummyRead_OpsToTest, X
 	SEI
-	JSR TEST_ImpliedDummyRead_Check	
+	JSR TEST_ImpliedDummyRead_Check	; This is where the test occurs, using the current value of the A register as the opcode to check the behavior of.
 	BEQ FAIL_ImpliedDummyRead2
 	INC <ErrorCode
 	LDX <Copy_X
 	INX
 	CPX #29	; this loops tests 29 opcodes.
 	BNE TEST_ImpliedDummyRead_Loop
+
+	;;; Test Y [Implied Dummy Reads]: Does cycle 6 of an RTS instruction perform a dummy read? (it should) ;;;
 
 	JSR DisableRendering
 
