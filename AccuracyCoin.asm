@@ -11673,7 +11673,6 @@ ImpliedDummyRead_NoBit5:
 	; NOP [Read Opcode] [Dummy Read $4015 (This should clear the Frame Counter interrupt.)]
 	; [Read opcode from $4015. Hopefully, a BRK.]
 
-
 ImpliedDummyRead_Bit5:
 	JSR DMASyncWithA5	; 50 cycles until DMA.
 	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag ; wait for the APU frame counter IRQ flag to be set. 55 cycles until DMA.
@@ -11689,11 +11688,10 @@ ImpliedDummyRead_Bit5:
 	; Keep in mind, the open bus value when reading controller 2 will be 16, which gets masked away, as only the upper 3 bits of controller 2 matter.
 	;	- Or if this is a top-loader console, bit 2 is also open bus, so the read from $4017 will return $04. Address $0421 is also $00.
 	;
-	; and hopefully the JSR takes you to $0021, a BRK to TEST_ImpliedDummyRead_BRKed2, which sets address $60 and jumps to TEST_ImpliedDummyRead_Post2.
 	JMP TEST_ImpliedDummyRead_Post
 
 
-ImpliedDummyRead_PullsAndBRK: ; PLP, PLA, BRK, RTI
+ImpliedDummyRead_PLP_PLA: ; PLP, PLA
 	JSR DMASyncWith48	; 50 cycles until DMA.
 	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag
 	JSR Clockslide_39; 99 cycles from clockslides. 19 cycles until DMA
@@ -11707,8 +11705,6 @@ ImpliedDummyRead_PullsAndBRK: ; PLP, PLA, BRK, RTI
 	; PHA [data bus = A (A = the opcode we want to test)] [also dummy read.]
 	; PLA [Read Opcode] [Dummy Read $4015 (This should clear the Frame Counter interrupt.)] [Dummy Read from stack (no way to test for this)] [Pull A from stack]
 	; [Read opcode from $4015. Hopefully, a BRK.]
-	;
-	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed5, which sets $60 and jumps to TEST_ImpliedDummyRead_Post5.
 
 ImpliedDummyRead_PHP: ; PHP
 	; PHP should push $3C to the stack, so an RTS instruction (failing the test) would "return" to address $063C:
@@ -11735,9 +11731,7 @@ ImpliedDummyRead_PHP: ; PHP
 	; LDA <$A5 [Read opcode] [Read operand] [read address $A5, Data bus = the opcode of the instruction we want to test.] (3)
 	; PHP [Read Opcode] [Dummy Read $4015 (This should clear the Frame Counter interrupt.)] [Push Processor ($3C) to stack]
 	; [Read opcode from $4015. Hopefully, a JSR.]
-	;
-	; and hopefully the BRK takes you to TEST_ImpliedDummyRead_BRKed3, which sets $60 and jumps to TEST_ImpliedDummyRead_PostPHP.
-
+	
 ImpliedDummyRead_PHA: ; PHA
 	JSR DMASyncWith68	; 50 cycles until DMA.
 	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag
@@ -11757,26 +11751,6 @@ ImpliedDummyRead_PHA: ; PHA
 	; LDA <$A5 [Read opcode] [Read operand] [read address $A5, Data bus = the opcode of the instruction we want to test.] (3)
 	; PHA [Read Opcode] [Dummy Read $4015 (This should clear the Frame Counter interrupt.)] [Push A ($48) to stack]
 	; [Read opcode from $4015. Hopefully, a BRK.]
-
-ImpliedDummyRead_RTS: ; RTS
-	JSR DMASyncWith68	; 50 cycles until DMA.
-	JSR Test_ImpliedDummyRead_WaitForFrameCounterFlag
-	JSR Clockslide_36; 99 cycles from clockslides. 19 cycles until DMA
-	LDA #HIGH(TEST_ImpliedDummyRead_Post-1) ; 17 cycles until DMA
-	PHA		 ; 15 cycles until DMA
-	LDA #LOW(TEST_ImpliedDummyRead_Post-1) ; 11 cycles until DMA
-	PHA		 ; 12 cycles until DMA
-	LDA <$A5 ; 6 cycles until DMA
-	PHA
-	; This one doesn't need to worry about get/put cycle polarity, since we're not double-reading $4015. We dummy read it, and the PC is moved *far away*.
-	JMP $4013; [Read opcode] [Read operand] [Read operand] 
-	; [DMC DMA, data bus = $68]
-	; PHA [data bus = A (A = the opcode we want to test)] [also dummy read.]
-	; RTS [Read Opcode] [Dummy Read $4015 (This should clear the Frame Counter interrupt.)] [The rest of RTS...]
-	; We don't read $4015 for the operand this time, so we're just going to LDA $4015 after returning to stable code to verify the dummy read happened.
-
-	
-	
 	
 TEST_ImpliedDummyRead_Check:
 	STA <$A5 ; Store the opcode you want to test.
@@ -11802,9 +11776,6 @@ TEST_ImpliedDummyRead_Check:
 	BNE TEST_ImpliedDummyRead_Check_Bit5
 
 	LDA <$A5 ; Okay, so bit 5 is not set. Is this a BRK instruction?
-	BEQ TEST_ImpliedDummyRead_Check_BRK_RTI
-	CMP #$40 ; RTI?
-	BEQ TEST_ImpliedDummyRead_Check_BRK_RTI
 	CMP #$08 ; PHP?
 	BEQ TEST_ImpliedDummyRead_Check_PHP
 	CMP #$48 ; PHA?
@@ -11821,37 +11792,30 @@ TEST_ImpliedDummyRead_Check_Bit5:
 
 	LDA <$A5 ; Okay, so bit 5 is set. Is this a PLP instruction?
 	CMP #$28 ; PLP?
-	BEQ TEST_ImpliedDummyRead_Check_Pull
+	BEQ TEST_ImpliedDummyRead_Check_PLP_PLA
 	CMP #$68 ; PLA?
-	BEQ TEST_ImpliedDummyRead_Check_Pull
-	CMP #$60 ; RTS?
-	BEQ TEST_ImpliedDummyRead_Check_RTS
+	BEQ TEST_ImpliedDummyRead_Check_PLP_PLA
 
 	JMP ImpliedDummyRead_Bit5 ; Okay cool, it's actually just a regular implied-addressed instruction with bit 5 set. Run the standard bit-5-set routine.
 
-TEST_ImpliedDummyRead_Check_Pull:
-TEST_ImpliedDummyRead_Check_BRK_RTI:
-	JMP ImpliedDummyRead_PullsAndBRK ; Run the version of the test that is specialized for the BRK and RTI instructions.
+TEST_ImpliedDummyRead_Check_PLP_PLA:
+	JMP ImpliedDummyRead_PLP_PLA ; Run the version of the test that is specialized for the BRK and RTI instructions.
 
-TEST_ImpliedDummyRead_Check_RTS:
-	JMP ImpliedDummyRead_RTS ; Run the version of the test that is specialized for the RTS instruction.
 
 	NOP ; Some loops might jump a byte early in the event of failure.
 TEST_ImpliedDummyRead_Post:
 
 	LDA <$A5 ; Now we evaluate the results of the test. Real quick, BRK, RTI, JSR, and RTS don't actually move the PC away before the double-read from $4015, so let's read from $4015 to check if the dummy read occurred.
-	BEQ TEST_ImpliedDummyRead_Eval_BRK_RTI_JSR_RTS
-	CMP #$20 ; JSR?
-	BEQ TEST_ImpliedDummyRead_Eval_BRK_RTI_JSR_RTS
+	BEQ TEST_ImpliedDummyRead_Eval_BRK_RTI_RTS
 	CMP #$40 ; RTI?
-	BEQ TEST_ImpliedDummyRead_Eval_BRK_RTI_JSR_RTS
+	BEQ TEST_ImpliedDummyRead_Eval_BRK_RTI_RTS
 	CMP #$60 ; RTS?
-	BEQ TEST_ImpliedDummyRead_Eval_BRK_RTI_JSR_RTS
+	BEQ TEST_ImpliedDummyRead_Eval_BRK_RTI_RTS
 	; Okay cool. If not one of those, the BRK routine (only runs if the dummy read occurred) will write $01 to address $60.
 	LDA <$60
 	RTS
 
-TEST_ImpliedDummyRead_Eval_BRK_RTI_JSR_RTS:
+TEST_ImpliedDummyRead_Eval_BRK_RTI_RTS:
 	LDA $4015  ; Check bit 6
 	AND #$40
 	EOR #$40 ; And flip this bit, so if it *was* a 1, then you fail.
