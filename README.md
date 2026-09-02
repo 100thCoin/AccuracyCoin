@@ -7,7 +7,7 @@ This ROM currently has 143 tests. These tests print "PASS" or "FAIL" on screen, 
 
 Here's an example of the menu in this ROM shown on an emulator failing a test, passing others, a few tests on screen haven't been run yet, and a test marked to be skipped. (The cursor is currently next to the "Dummy Read Cycles" test.)
 
-<img width="512" height="480" alt="AccuracyCoin_Example" src="https://github.com/user-attachments/assets/f0f82ee6-a73d-4b89-9532-5b5d4e0e9d14" />
+<img width="512" height="480" alt="AccuracyCoin_Example" src="https://github.com/user-attachments/assets/a8b9aecf-7d9c-49ad-9c1c-15f4fd60705a" />
 
 # Navigating the menus
 Use the D-Pad to move the cursor up or down.  
@@ -20,7 +20,7 @@ If the cursor is at the top of the page (highlighting the current page index), p
 
 Examples:
 
-<img width="546" height="240" alt="AccuracyCoin_ResultScreen" src="https://github.com/user-attachments/assets/6f725c67-7c05-4de6-8dc2-4a4d09e49c7b" />
+<img width="538" height="240" alt="AccuracyCoin_ResultScreen" src="https://github.com/user-attachments/assets/902c6cdb-7dfa-4625-b67b-6959c9b11634" />
 
 Any test with multiple acceptable passing behaviors will be drawn with a light blue number over it.
 
