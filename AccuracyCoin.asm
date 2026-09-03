@@ -318,6 +318,7 @@ result_ALERead = $491
 result_HybridAddresses = $492
 result_FrozenOAM2Inc = $493
 result_MisalignedOAMDMA = $494
+result_MisalignedOAM2Addr = $495
 
 result_DrawTest = $03FF	; page 3 omits the test from the all-test-result-table.
 
@@ -786,9 +787,10 @@ Suite_AdvancedBGEval:
 	
 Suite_AdvancedSpriteEval:
 	.byte "Advanced Sprite Evaluation", $FF
-	table "Sprites On Scanline 0",    $FF, result_Scanline0Sprites,      TEST_Scanline0Sprites
-	table "Stale Sprite Shift Regs",  $FF, result_StaleSpriteShiftRegs,  TEST_StaleSpriteShiftRegs
-	table "Frozen OAM2 Increment",    $FF, result_FrozenOAM2Inc,         TEST_FrozenOAM2Inc
+	table "Sprites On Scanline 0",   $FF, result_Scanline0Sprites,     TEST_Scanline0Sprites
+	table "Stale Sprite Shift Regs", $FF, result_StaleSpriteShiftRegs, TEST_StaleSpriteShiftRegs
+	table "Frozen OAM2 Increment",   $FF, result_FrozenOAM2Inc,        TEST_FrozenOAM2Inc
+	table "Misaligned OAM2 Address", $FF, result_MisalignedOAM2Addr,   TEST_MisalignedOAM2Addr
 	.byte $FF
 
 
@@ -11679,6 +11681,8 @@ TEST_ImpliedDummyRead_BackupRAM:
 TEST_IDR_BackupRAM_loop:
 	LDA <$00, X
 	STA $700, X
+	LDA #0
+	STA <$00, X
 	INX
 	BNE TEST_IDR_BackupRAM_loop
 	RTS
@@ -11741,7 +11745,7 @@ FAIL_ImpliedDummyRead1:
 ;;;;;;;;;;;;;;;;;
 TEST_ImpliedDummyReadPreReqContinue:
 	;;; Test 3 [Implied Dummy Reads]: Prerequisite check. Does a modified version of DMA + Open Bus pass? ;;;
-	LDA <result_DMCDMASync_PreTest	; If this emulator fails the pre-test for the DMA sync routine, then don't even bother trying.
+	LDA $700+result_DMCDMASync_PreTest	; If this emulator fails the pre-test for the DMA sync routine, then don't even bother trying.
 	CMP #1
 	BNE FAIL_ImpliedDummyRead1
 	; I specifically need to know if the DMA + Open bus test would pass if I also stall long enough for the Frame Counter Interrupt Flag. It should still be in sync, and all that.
@@ -13754,54 +13758,88 @@ TEST_FrozenOAM2Inc2_Loop:
 	
 FAIL_FrozenOAM2Inc2:
 	JMP TEST_Fail
-
-TEST_MisalignedOAMDMA_OAM:
-	.byte $07, $C0, $00, $80 
-
-TEST_MisalignedOAMDMA:
-	;;; Test 1 [Misaligned OAM DMA]: Verify sprite zero hits before running the actual test. ;;;
+	
+MisalignedOAM2_OAM:
+	.byte $00, $01, $02, $03
+	.byte $01, $21, $22, $23
+	.byte $02, $41, $42, $43
+	.byte $03, $61, $62, $63
+	.byte $04, $81, $82, $83
+	.byte $05, $A1, $A2, $A3
+	.byte $06, $C1, $C2, $C3
+	.byte $07, $E1, $E2, $E3
+	
+MisalignedOAM2RevE:
+	JMP Stress2004_RevE
+	
+FAIL_MisalignedOAM2Addr:
+	JMP TEST_Fail
+	
+TEST_MisalignedOAM2Addr:
+	;;; Test 1 [Misaligned OAM2 Address]: Verify sprite zero hits before running the actual test. ;;;
 	JSR VerifySpriteZeroHits ; Use this subroutine to verify if sprite zero hits are working.
-	BEQ FAIL_FrozenOAM2Inc; And if they aren't, fail the test.
+	BEQ FAIL_MisalignedOAM2Addr; And if they aren't, fail the test.
 	INC <ErrorCode
 	
-	;;; Test 2 [Misaligned OAM DMA]: If the primary OAM Address is non-zero when the OAM DMA occurs, then the data is offset. ;;;
-	; This is an easy one.
-	; Basically, if the OAM Address is non-zero when the OAM DMA occurs, then the DMA will begin at a non-zero address of OAM and loop around at some point.
-	; In this test, I set the OAM Address to $80, and the data at address $280 will end up in sprite zero.
+	;;; Test 2 [Misaligned OAM2 Address]: Verify OAMDATA is readable ;;;
+
+	JSR OAMDATA_Check
+	BEQ MisalignedOAM2RevE
+
+	;;; Test 3 [Misaligned OAM2 Address]: Reading from $2004 during dots 321 through 340 (under normal behavior) will read from index 0 of OAM2 ;;;
+
+	JSR ClearPage2 ; Overwrite page 2 with all FFs
+	LDA #$5A       ; Write $5A to the final Y position in primary OAM.
+	STA $2FC
+
+	JSR Sync_ToLine0Dot1
+	JSR Clockslide_100
+	NOP
+	NOP
+	LDA $2004 ; Read on dot 324. (The opcode is read on dot 313)
 	
-	JSR ClearPage2
-	LDX #3
-TEST_MisalignedOAMDMA_Loop:
-	LDA TEST_MisalignedOAMDMA_OAM, X
-	STA $280, X
+	CMP #$5A ; Check if it was index 0 of OAM2.
+	BNE FAIL_MisalignedOAM2Addr
+	INC <ErrorCode
+
+	;;; Test 4 [Misaligned OAM2 Address]: Verify accurate OAM2Address behavior ;;;
+	; Ideally I would test this by triggering a sprite zero hit, formed by enabling rendering on dot 256 or 257, with the OAM2 Address non-zero at the time...
+	; But alas, that has clock alignment specific instability.
+	; So instead, I'll fill OAM2, disable rendering between dots 320 and 340, re-enable rendering during the following sprite fetch, and then read from $2004 between dots 320 and 340.
+	; Typically, that range reads from index 0 of OAM2, but since we misaligned the OAM2 Address, this time it will not.
+	
+	; OAM2 should be [00, 01, 02, 03, 01, 21, 22, 23, 02, 41, 42, 43, 03, 61, 62, 63, 04, 81, 82, 83, 05, A1, A2, A3, 06, C1, C2, C3, 07, E1, E2, E3]
+	; We disable rendering on dot 268, when the OAM2 Address was $07. (pointing to the value of $23)
+	; Then we enable rendering on dot 286, where the OAM2 address is still $07.
+	; By the time we finish sprite fetch, due to the 18 missing dots, the OAM2 Address has only incremented to $18, where we can ten read the value of $06 from $2004.
+	
+	LDX #$1F
+TEST_MisalignedOAM2_Loop:
+	LDA MisalignedOAM2_OAM, X
+	STA $200, X
 	DEX
-	BPL TEST_MisalignedOAMDMA_Loop
+	BPL TEST_MisalignedOAM2_Loop
+
+	JSR Sync_ToLine0Dot1
 	
-	JSR PrintCHR
-	.word $2C30
-	.byte $C0, $FF
+	JSR ClockslideFromWord
+	.word 877
 	
-	JSR ResetScroll_2C00
-	JSR WaitForVBlank
-	LDA #$80 
-	STA $2003 ; OAM Address = $80
-	
-	LDA #2
-	STA $4014 ; OAM DMA, starting at address $200, but writing to address $80 of OAM, ending at address $7F.
-	
-	LDA #$FF  ;
-	STA $2003 ; 
-	STA $2004 ; Return tha OAM Address back to zero without OAM corruption.
-	
-	JSR Clockslide_29780
-	
-	LDA $2002
-	AND #$40
-	BEQ FAIL_FrozenOAM2Inc2
-	
+	LDA #0
+	LDX #$1E
+	STA $2001 ; disable on dot 268
+	NOP
+	STX $2001 ; enable on dot 286
+	JSR Clockslide_12
+	LDA $2004
+
+	CMP #$06
+	STA <$50
+	BNE FAIL_MisalignedOAM2Addr
+
 	LDA #1
 	RTS
-;;;;;;;
+;;;;;;;	
 	
 	
 	.bank 3
@@ -14039,6 +14077,20 @@ FAIL_OAM_Corruption_RevE:
 FAIL_OAM_Corruption:
 	JMP TEST_Fail
 
+OAMDATA_Check:
+	LDA #$5A
+	STA $2004 ; OAMADDR will be zero.
+	TXA
+	LDX #1
+	STA $2002
+	STA $2002, X ; safely write to $2003 without the risk of OAM corruption... a bit ironic considering the test we're running.
+	LDA #$A5
+	STA $2002
+	LDA $2004
+	CMP #$A5
+	RTS
+;;;;;;;
+
 TEST_OAM_Corruption:
 	; Brief synopsis:
 	; If rendering is disabled during a visible scanline, OAM is going to be corrupted on the next visible pixel.
@@ -14124,16 +14176,7 @@ TEST_OAM_Corruption:
 	CMP #1
 	BNE FAIL_OAM_Corruption
 	; also you can read from OAM. that's important.
-	LDA #$5A
-	STA $2004 ; OAMADDR will be zero.
-	TXA
-	LDX #1
-	STA $2002
-	STA $2002, X ; safely write to $2003 without the risk of OAM corruption... a bit ironic considering the test we're running.
-	LDA #$A5
-	STA $2002
-	LDA $2004
-	CMP #$A5
+	JSR OAMDATA_Check
 	BEQ FAIL_OAM_Corruption_RevE ; Revision E detected.
 	CMP #$5A
 	BNE FAIL_OAM_Corruption	
@@ -17818,7 +17861,7 @@ RunTest_AllTestSkipDraw1:
 	STA $4015                     ; Disable the DMC.
 	LDA <RunningAllTests          ; Check if this is in the all-test mode.
 	BNE RunTest_AllTestSkipDraw2  ; If so, skip updating the status.
-	LDA <Copy_A
+	JSR DisableNMI	              ; If a test enabled the NMI and forgot to disable it, let's do that real quick before waiting for vblank.
 	JSR WaitForVBlank             ; and wait for VBlank before updating the "...." text with the results.
 	LDX <menuCursorYPos           ; load X for the upcoming subroutines.
 	JSR DrawTEST                  ; draw "PASS" or "FAIL x"
@@ -18343,6 +18386,57 @@ Sync_ToSpriteFlagsClearingLoop:
 	PLA
 	BMI Sync_TSFC_Get
 Sync_TSFC_Get:	
+	RTS
+;;;;;;;
+
+FAIL_MisalignedOAMDMA:
+	JMP TEST_Fail
+
+TEST_MisalignedOAMDMA_OAM:
+	.byte $07, $C0, $00, $80 
+
+TEST_MisalignedOAMDMA:
+	;;; Test 1 [Misaligned OAM DMA]: Verify sprite zero hits before running the actual test. ;;;
+	JSR VerifySpriteZeroHits ; Use this subroutine to verify if sprite zero hits are working.
+	BEQ FAIL_MisalignedOAMDMA; And if they aren't, fail the test.
+	INC <ErrorCode
+	
+	;;; Test 2 [Misaligned OAM DMA]: If the primary OAM Address is non-zero when the OAM DMA occurs, then the data is offset. ;;;
+	; This is an easy one.
+	; Basically, if the OAM Address is non-zero when the OAM DMA occurs, then the DMA will begin at a non-zero address of OAM and loop around at some point.
+	; In this test, I set the OAM Address to $80, and the data at address $280 will end up in sprite zero.
+	
+	JSR ClearPage2
+	LDX #3
+TEST_MisalignedOAMDMA_Loop:
+	LDA TEST_MisalignedOAMDMA_OAM, X
+	STA $280, X
+	DEX
+	BPL TEST_MisalignedOAMDMA_Loop
+	
+	JSR PrintCHR
+	.word $2C30
+	.byte $C0, $FF
+	
+	JSR ResetScroll_2C00
+	JSR WaitForVBlank
+	LDA #$80 
+	STA $2003 ; OAM Address = $80
+	
+	LDA #2
+	STA $4014 ; OAM DMA, starting at address $200, but writing to address $80 of OAM, ending at address $7F.
+	
+	LDA #$FF  ;
+	STA $2003 ; 
+	STA $2004 ; Return tha OAM Address back to zero without OAM corruption.
+	
+	JSR Clockslide_29780
+	
+	LDA $2002
+	AND #$40
+	BEQ FAIL_MisalignedOAMDMA
+	
+	LDA #1
 	RTS
 ;;;;;;;
 

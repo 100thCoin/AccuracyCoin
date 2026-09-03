@@ -3,7 +3,7 @@ AccuracyCoin is a large collection of NES accuracy tests on a single NROM cartri
 
 This ROM was designed for an NTSC console with an RP2A03G CPU and RP2C02G PPU. Some tests might be automatically skipped on hardware with a different revision.
 
-This ROM currently has 143 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
+This ROM currently has 144 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
 Here's an example of the menu in this ROM shown on an emulator failing a test, passing others, a few tests on screen haven't been run yet, and a test marked to be skipped. (The cursor is currently next to the "Dummy Read Cycles" test.)
 
@@ -766,6 +766,11 @@ or
   2: If the "OAM2 Overflowed Flag" is raised, the OAM2 Address cannot be incremented. Precise toggles of rendering can keep this flag raised during Sprite Fetch.  
   3: If the OAM2 address overflows for any reason, including the end of sprite fetch where the address is incremented on dot 321, the "OAM2 Overflowed Flag" is raised.  
   4: If the OAM2 Overflowed flag is not set, then Sprite Fetch should work as normal.  
+  
+### Misaligned OAM2 Address
+  1: Sprite Zero Hits should be working.  
+  2: Reading from Address $2004 between dots 321 and 340 of a scanline should (under normal conditions) read from index 0 of OAM2.  
+  3: If rendering is disabled temporarily during sprite fetch and quickly re-enabled, then the OAM2 Address did not increment while rendering was disabled, so reading from address $2004 between dots 321 and 340 of this scanline will now read from a different OAM2 address.  
 
 # Success Codes
 Some tests have multiple acceptable behaviors that are tested for in this ROM. The behavior used will either be printed on screen after running the test, or you'll see a "success code" on the all-test table.  
