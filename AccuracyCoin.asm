@@ -10127,15 +10127,15 @@ TEST_FrameCounterIRQ:
 	; (get) [Read Opcode: $1F]
 	; (put) [Read Operand: $15]
 	; (get) [Read Operand: $40]
-	; (put) [Read $4015] (this is a get cycle, so clear bit 6 of 4015)
-	; (get) [Read $4015] (bit 6 was already cleared before the read.)
+	; (put) [Read $4015] (this is a put cycle, so afterwards, as the APU transitions into a get cycle, clear bit 6 of 4015)
+	; (get) [Read $4015] (bit 6 was just cleared before the read.)
 	;
 	; And here's what will happen in this test:
 	; (put) [Read Opcode: $1F]
 	; (get) [Read Operand: $15]
 	; (put) [Read Operand: $40]
-	; (get) [Read $4015] (this is a put cycle, so bit 6 of 4015 will not be cleared until after the next cycle.)
-	; (put) [Read $4015] (bit 6 was still set when this was read. *Now* we clear bit 6 of $4015.)
+	; (get) [Read $4015] (this is a get cycle. The APU will not clear bit 6 of 4015 until after the next cycle.)
+	; (put) [Read $4015] (bit 6 was still set when this was read. After this cycle, as the APU transitions into a get cycle, we clear bit 6 of $4015.)
 	;
 	; And of course, in the event of a regular non-double-read, $4015 will still only clear bit 6 on the next get cycle,
 	; so you probably want to clear bit 6 inside the APU cycle code of your emulator, and not in your "read $4015" code.
@@ -13812,6 +13812,12 @@ TEST_MisalignedOAM2Addr:
 	; We disable rendering on dot 268, when the OAM2 Address was $07. (pointing to the value of $23)
 	; Then we enable rendering on dot 286, where the OAM2 address is still $07.
 	; By the time we finish sprite fetch, due to the 18 missing dots, the OAM2 Address has only incremented to $18, where we can ten read the value of $06 from $2004.
+	
+	; NOTE: There are certainly ways you can be emulating the OAM2 Address incorrectly, yet still pass this test.
+	; As mentioned above, the ideal method for testing this (with a sprite zero hit) is unstable on certain cpu/ppu clock alignments.
+	; Hence the significantly more lenient test I present below.
+	; Since I'm unable to create a more strict version of this test, it is up to you to recognize if your emulator is actually implementing this correctly.
+	
 	
 	LDX #$1F
 TEST_MisalignedOAM2_Loop:
