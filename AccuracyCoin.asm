@@ -9637,9 +9637,9 @@ TEST_NmiAndBrk:
 	                                   ; Rendering is already disabled.
 	                                   ; The next NMI is in one frame. (and one ppu cycle... and then one and a half more cpu cycles.)
 	LDA $2002                          ; +4 cycles, prevent the NMI from happening
-	JSR EnableNMI                      ; +25 cycles.
 	JSR ClockslideFromWord             ; Wait until the BRK instruction would land just briefly before vblank.
 	.word 29729                        ;
+	JSR EnableNMI                      ; +25 cycles.
 	SEI                                ; Set up the flags for the test.
 	CLC                                ; Set up the flags for the test.
 	CLV                                ; Set up the flags for the test.
@@ -9771,9 +9771,9 @@ TEST_NmiAndIrq:
 	                                   ; Rendering is already disabled.
 	                                   ; The next NMI is in one frame. (and one ppu cycle... and then one and a half more cpu cycles.)
 	LDA $2002                          ; +4 cycles, prevent the NMI from happening
-	JSR EnableNMI                      ; +25 cycles.
 	JSR ClockslideFromWord             ; Wait until the IRQ instruction would land just briefly before vblank.
 	.word 29729                        ;
+	JSR EnableNMI                      ; +25 cycles.
 	CLC                                ; Set up the flags for the test.
 	CLV                                ; Set up the flags for the test.
 	LDA #0                             ; Set up the flags for the test.
