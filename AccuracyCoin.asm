@@ -13785,6 +13785,7 @@ TEST_MisalignedOAM2Addr:
 
 	JSR OAMDATA_Check
 	BEQ MisalignedOAM2RevE
+	INC <ErrorCode
 
 	;;; Test 3 [Misaligned OAM2 Address]: Reading from $2004 during dots 321 through 340 (under normal behavior) will read from index 0 of OAM2 ;;;
 
