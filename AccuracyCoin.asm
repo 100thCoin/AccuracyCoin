@@ -10213,7 +10213,7 @@ TEST_FrameCounterIRQ_Continue:
 	BEQ FAIL_FrameCounterIRQ2
 	INC <ErrorCode
 
-	;;; Test C [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (If the write occurs on a "put" CPU cycle, the IRQ is delayed by 1 CPU cycle) ;;;
+	;;; Test C [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (If the write occurs on a "get" CPU cycle, the IRQ is delayed by 1 CPU cycle) ;;;
 	JSR WaitForVBlank
 	LDA #02
 	STA $4014 ; sync CPU with "get" cycle

@@ -309,10 +309,10 @@ For more information, I recommend reading the fully commented assembly code for 
   7: The IRQ flag should not be cleared yet the APU transitions from a "get" cycle to a "put" cycle.  
   8: Changing the frame counter to 5-step mode after the flag was set should not clear the flag.  
   9: Disabling the IRQ flag should clear the IRQ flag.  
-  A: The IRQ flag was enabled too early. (writing to $4017 on an odd CPU cycle.)  
-  B: The IRQ flag was enabled too late. (writing to $4017 on an odd CPU cycle.)  
-  C: The IRQ flag was enabled too early. (writing to $4017 on an even CPU cycle.)  
-  D: The IRQ flag was enabled too late. (writing to $4017 on an even CPU cycle.)  
+  A: The IRQ flag was enabled too early. (writing to $4017 on a "put" cycle.)  
+  B: The IRQ flag was enabled too late. (writing to $4017 on a "put" cycle.)  
+  C: The IRQ flag was enabled too early. (writing to $4017 on a "get" cycle.)  
+  D: The IRQ flag was enabled too late. (writing to $4017 on a "get" cycle.)  
   E: Reading $4015 on the last cycle before the IRQ flag is set should not clear the IRQ flag. (it gets set on the following 2 CPU cycles)  
   F: Reading $4015 on the same cycle the IRQ flag is set should not clear the IRQ flag. (it gets set again on the following CPU cycle)  
   G: Reading $4015 1 cycle later than the previous test should not clear the IRQ flag. (it gets set again on this CPU cycle)  
