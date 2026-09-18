@@ -13727,6 +13727,7 @@ TEST_FrozenOAM2Inc2_Loop:
 	LDA $2002
 	AND #$40
 	BEQ FAIL_FrozenOAM2Inc2
+	INC <ErrorCode
 
 	;;; Test 4 [Frozen OAM2 Increment Flag]: This one is pretty much just a false-positive prevention. ;;;
 	; Just making sure you aren't freezing the OAM2 Increment at a time where you shouldn't be.
