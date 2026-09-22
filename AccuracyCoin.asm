@@ -18704,6 +18704,8 @@ dma_sync_first:
 	; the next DMA is at (432) cycles, so we have 406 cycles to go.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 sync_dmc_fail:
+	LDX <Copy_X
+	LDY <Copy_Y
 	RTS	; The DMA timing will be way off on this test, but it was unable to sync anyway, so... Better than infinite looping?
 
 VerifyReturnAddressesAreCorrect:
