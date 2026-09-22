@@ -231,7 +231,7 @@ result_UnOp_LAE_BB = $44B
 
 result_DMA_Plus_2007R = $44C
 result_ProgramCounter_Wraparound = $44D
-result_PPUOpenBus = $044E
+result_PPUIOOpenBus = $044E
 result_DMA_Plus_2007W = $44F
 
 result_VBlank_Beginning = $450
@@ -730,7 +730,7 @@ Suite_PPUBehavior:
 	.byte "PPU Behavior", $FF
 	table "CHR ROM is not writable", $FF, result_CHRROMIsNotWritable,   TEST_CHRROMIsNotWritable
 	table "PPU Register Mirroring",  $FF, result_PPURegMirror,          TEST_PPURegMirroring
-	table "PPU Register Open Bus",	 $FF, result_PPUOpenBus,            TEST_PPU_Open_Bus
+	table "PPU Register Open Bus",	 $FF, result_PPUIOOpenBus,          TEST_PPU_IO_Open_Bus
 	table "PPU Read Buffer",         $FF, result_PPUReadBuffer,         TEST_PPUReadBuffer
 	table "Palette RAM Quirks",      $FF, result_PaletteRAMQuirks,      TEST_PaletteRAMQuirks
 	.byte $FF
@@ -1643,10 +1643,10 @@ TEST_BranchDummyRead:
 	BNE FAIL_BranchDummyRead ; If the mirror doesn't match, abort!
 	INC <ErrorCode
 	
-	;;; Test 2 [Branch Dummy Reads]: (prerequisite) verify ppu open bus. ;;;
+	;;; Test 2 [Branch Dummy Reads]: (prerequisite) verify ppu IO open bus. ;;;
 	LDA #$90
-	STA $2002 ; Write to PPU data bus.
-	LDX $2000 ; Read from ppu data bus.
+	STA $2002 ; Write to PPU IO bus.
+	LDX $2000 ; Read from ppu IO bus.
 	CPX #$90
 	BNE FAIL_BranchDummyRead ; If the value read doesn't match the value written, abort!
 	LDA $2002 ; verify that bits 0 through 4 are open bus:
@@ -1664,7 +1664,7 @@ TEST_BranchDummyRead:
 
 	;;; Test 3 [Branch Dummy Reads]: (prerequisite) verify address $2004 behavior. ;;;
 	; Pre revision G PPUs behave differently, so we want this to work on either case.
-	; Let's just make sure we read either OAMDATA or PPU Open bus.
+	; Let's just make sure we read either OAMDATA or PPU IO Open bus.
 	LDA #$60
 	STA $200
 	
@@ -1745,7 +1745,7 @@ BranchDummyRead_RevE:
 	LDA #$90
 	STA $1FFF ; Set address $1FFF to be the opcode for BCC.
 	LDA #$F1
-	STA $2002 ; Set the PPU data bus to $0F. (The operand needed for the BCC.)
+	STA $2002 ; Set the PPU IO bus to $0F. (The operand needed for the BCC.)
 	CLC ; We're about to run a BCC instruction at $1FFF, so let's clear the carry flag.
 	JSR $1FFF ; Jump to $1FFF to run the test.
 	; $1FFF: (opcode: $90 = BCC)
@@ -3352,7 +3352,7 @@ TEST_OpenBus_PrepIRQLoop:
 	INC <ErrorCode 
 	
 	;;; Test 5 [Open Bus]: Dummy Reads update the data bus, test by reading $4000 ;;;
-	; This doubles as a test of dummy read cycles, and the PPU data bus. Here's what happens.
+	; This doubles as a test of dummy read cycles, and the PPU IO bus. Here's what happens.
 	; LDA $3FFF, X (X=$01)
 	; 1: fetch opcode 
 	; 2: fetch low byte
@@ -3360,7 +3360,7 @@ TEST_OpenBus_PrepIRQLoop:
 	; 4: READ $3F00, then fix the high byte
 	; 5: READ $4000.
 	;
-	; $3F00 is a mirror of $2000, which when read returns PPU Open Bus.
+	; $3F00 is a mirror of $2000, which returns the PPU IO Bus when read.
 	; So we need to set the PPU Bus to something first.
 	LDA #0
 	STA $2002
@@ -3399,9 +3399,9 @@ TEST_Fail_1p5:
 	AND #$E0
 	CMP #$40 ; When running LDA $4017, bit 6 is likely to be set.
 	BNE TEST_Fail_1p5
-	; This doubles as a test of dummy read cycles, and the PPU data bus.
+	; This doubles as a test of dummy read cycles, and the PPU IO bus.
 	LDA #$F0
-	STA $2002	; Set the PPU data bus to $F0
+	STA $2002	; Set the PPU IO bus to $F0
 	LDX #$17
 	LDA $3FFF, X ; dummy read $2006. (The data bus is now $F0) The offset moves the address bus to $4016, reading from controller 1 when the data bus was $F0.
 	AND #$E0
@@ -3671,14 +3671,14 @@ TEST_FailPPUOpenBus:
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
 
-TEST_PPU_Open_Bus:
-	;;; Test 1 [PPU Open Bus]: Verify PPU Open Bus exists. ;;;
+TEST_PPU_IO_Open_Bus:
+	;;; Test 1 [PPU IO Register Open Bus]: Verify PPU IO Open Bus exists. ;;;
 	; Don't worry, this this is remarkably simple.
-	; Here's how PPU Open bus works.
-	; The PPU data bus is updated whenever the CPU writes to any PPU Register.
-	
+	; Here's how PPU IO Open bus works.
+	; The PPU IO bus is updated whenever the CPU writes to any PPU Register.
+
 	LDA #2
-	STA $4014
+	STA $4015
 	
 	LDX #0
 	LDY #1
@@ -3690,8 +3690,8 @@ TEST_PPU_Open_Bus:
 	BNE TEST_FailPPUOpenBus
 	INC <ErrorCode 
 	
-	;;; Test 2 [PPU Open Bus]: All PPU Registers update PPU Open Bus. ;;;
-	; Writing to $2000 updates the PPU data bus
+	;;; Test 2 [PPU IO Register Open Bus]: All PPU Registers update PPU IO Open Bus. ;;;
+	; Writing to $2000 updates the PPU IO bus
 	LDA <PPUCTRL_COPY
 	STA $2000 ; this updates the PPU bus and changes nothing with the register... hopefully.
 	TXA
@@ -3699,7 +3699,7 @@ TEST_PPU_Open_Bus:
 	CMP <PPUCTRL_COPY
 	BNE TEST_FailPPUOpenBus
 	
-	; Writing to $2001 updates the PPU data bus
+	; Writing to $2001 updates the PPU IO bus
 	LDA <PPUMASK_COPY
 	STA $2001
 	TXA
@@ -3709,7 +3709,7 @@ TEST_PPU_Open_Bus:
 
 	; we've already tested writing to $2002
 	
-	; Writing to $2003 updates the PPU data bus
+	; Writing to $2003 updates the PPU IO bus
 	LDA #04
 	STA $2003
 	TXA
@@ -3717,7 +3717,7 @@ TEST_PPU_Open_Bus:
 	CMP #04
 	BNE TEST_FailPPUOpenBus
 	
-	; Writing to $2004 updates the PPU data bus
+	; Writing to $2004 updates the PPU IO bus
 	LDA #$FF
 	STA $2004
 	TXA
@@ -3725,7 +3725,7 @@ TEST_PPU_Open_Bus:
 	CMP #$FF
 	BNE TEST_FailPPUOpenBus
 	
-	; Writing to $2005 updates the PPU data bus
+	; Writing to $2005 updates the PPU IO bus
 	LDA $2002
 	LDA #$00
 	STA $2005
@@ -3734,7 +3734,7 @@ TEST_PPU_Open_Bus:
 	CMP #$00
 	BNE TEST_FailPPUOpenBus
 	
-	; Writing to $2006 updates the PPU data bus
+	; Writing to $2006 updates the PPU IO bus
 	LDA $2002
 	LDA #$20
 	STA $2006
@@ -3743,7 +3743,7 @@ TEST_PPU_Open_Bus:
 	CMP #$20
 	BNE TEST_FailPPUOpenBus
 	
-	; Writing to $2007 updates the PPU data bus
+	; Writing to $2007 updates the PPU IO bus
 	LDA #$24
 	STA $2007
 	TYA
@@ -3752,51 +3752,51 @@ TEST_PPU_Open_Bus:
 	BNE TEST_FailPPUOpenBus2
 	INC <ErrorCode 
 	
-	;;; Test 3 [PPU Open Bus]: Address $2002, bits 0 through 4 are open bus ;;;
+	;;; Test 3 [PPU IO Register Open Bus]: Address $2002, bits 0 through 4 are open bus ;;;
 	LDA $2002                ; reset the ppu's w latch. (not entirely needed, but good practice to do this before a write to $2006)
 	LDA #$15                 ; A = $15
-	STA $2006                ; The ppu data bus is now $15 (%0001 1001)
-	LDA $2002                ; reading from $2002 only affects the upper 3 bits of the ppu data bus, so you will see the previous contents of bits 0 through 4. (%xxx1 1001)
+	STA $2006                ; The ppu IO bus is now $15 (%0001 1001)
+	LDA $2002                ; reading from $2002 only affects the upper 3 bits of the ppu IO bus, so you will see the previous contents of bits 0 through 4. (%xxx1 1001)
 	AND #$1F                 ; Mask away the upper 3 bits. (%0001 1001)
-	CMP #$15                 ; Since reading from $2002 gives you the ppu's open bus data for bits 0 through 4, we should see that A = $15.
+	CMP #$15                 ; Since reading from $2002 gives you the ppu's IO open bus data for bits 0 through 4, we should see that A = $15.
 	BNE TEST_FailPPUOpenBus2 ; Otherwise, fail the test.
 	INC <ErrorCode 
 	JSR ResetScroll
 	
-	;;; Test 4 [PPU Open Bus]: The upper 3 bits of the PPU data bus is updated by reads of $2002. ;;;
+	;;; Test 4 [PPU IO Register Open Bus]: The upper 3 bits of the PPU IO bus is updated by reads of $2002. ;;;
 	JSR WaitForVBlank        ; this clears the vblank flag.
 	LDA #$FF                 ; A = $FF
-	STA $2002                ; The ppu data bus = $FF
-	LDA $2002                ; Reading $2002 only updates the upper 3 bits of the ppu open bus. (the upper 3 bits are all zero in this instance)
-	LDA $2000                ; Read a write-only register to get the ppu open bus value. (%0001 1111)
+	STA $2002                ; The ppu IO bus = $FF
+	LDA $2002                ; Reading $2002 only updates the upper 3 bits of the ppu IO open bus. (the upper 3 bits are all zero in this instance)
+	LDA $2000                ; Read a write-only register to get the ppu IO open bus value. (%0001 1111)
 	CMP #$1F                 ; Check if A = $1F.
 	BNE TEST_FailPPUOpenBus2 ; Otherwise, fail the test.
 
-	LDA <$50	; This value will be $00 if you are running [PPU Open Bus], but $01 if you are running [Dummy Write Cycles], which re-runs this test to verify the ppu bus works as a prerequisite.
-	            ; We don't need to check if the ppu open bus decays for that test, so we can skip that.
+	LDA <$50	; This value will be $00 if you are running [PPU IO Register Open Bus], but $01 if you are running [Dummy Write Cycles], which re-runs this test to verify the ppu bus works as a prerequisite.
+	            ; We don't need to check if the ppu IO open bus decays for that test, so we can skip that.
 	BNE TEST_PPU_Open_Bus_SkipDecayTest
 	INC <ErrorCode 
 
 	
-	;;; Test 5 [PPU Open Bus]: The PPU data bus decays. ;;;
+	;;; Test 5 [PPU IO Register Open Bus]: The PPU IO bus decays. ;;;
 	; Since having bits decay is analogue behavior, you're probably going to need to "fake" this.
-	; To make a long story short, if nothing updates the PPU Data bus, then the bits *eventually* decay to 0's.
+	; To make a long story short, if nothing updates the PPU IO bus, then the bits *eventually* decay to 0's.
 	; Emphasis on *eventually* because that's the inconsistent part on real hardware.
 	; There's no "logic" determining how long the bits should persist before decaying on real hardware, and this test is known to fail on hardware briefly after powering on the console.
 	; - The bits tend to decay faster the warmer the PPU is, though I'm not checking for that here.
 	; There's multiple ways to emulate this behavior, but I recommend making your implementation deterministic, rather than throwing random numbers around. (or at least make the RNG seeded?)
 	;
-	; I think the simplest approach is to give each bit of the ppu data bus an integer that ticks down every ppu cycle.
-	; Then whenever any bits of the ppu data bus are updated, you initialize the integer for that bit with *some constant* (or add randomness if you prefer.)
+	; I think the simplest approach is to give each bit of the ppu IO bus an integer that ticks down every ppu cycle.
+	; Then whenever any bits of the ppu IO bus are updated, you initialize the integer for that bit with *some constant* (or add randomness if you prefer.)
 	; - since this is analogue behavior, there is no "canonical" value for what you should initialize the integer with, though I recommend it takes somewhere between 5 and 30 frames to hit 0.
 	LDA #$FF
-	STA $2002                           ; Load the ppu data bus with $FF. (all bits set.)
+	STA $2002                           ; Load the ppu IO bus with $FF. (all bits set.)
 	LDX #120                            ; X = 120
 TEST_PPU_Open_Bus_120FrameStall:        ; wait approximately two seconds.
 	JSR Clockslide_29780	            ; stall for approximately 1 frame.
 	DEX                                 ; Decrement X
 	BNE TEST_PPU_Open_Bus_120FrameStall ; Loop until X = 0;
-	LDA $2000                           ; Read a write-only register to get the ppu open bus value. It should be all zeroes, as there was more than enough time for all the bits to decay.
+	LDA $2000                           ; Read a write-only register to get the ppu IO open bus value. It should be all zeroes, as there was more than enough time for all the bits to decay.
 	BNE TEST_FailPPUOpenBus2            ; If any bits are still set, fail the test.
 
 	;; END OF TEST ;;
@@ -3822,14 +3822,14 @@ TEST_DummyWritePrep_PPUADDR2DFA: ; This exists to save bytes
 	JSR SetPPUADDRFromWord
 	.byte $2D, $FA
 	LDA #$2D
-	STA $2002 ; Set the PPU Open bus value to 2D
+	STA $2002 ; Set the PPU IO bus value to 2D
 	RTS
 ;;;;;;;
 
 TEST_DummyWritePrep_2E: ; This exists to save bytes
 	JSR TEST_DummyWritePrep_PPUADDR2DFA ; just leech off this to save bytes.
 	LDA #$2E
-	STA $2002 ; Set the PPU Open bus value to 26
+	STA $2002 ; Set the PPU IO bus value to 26
 	RTS
 ;;;;;;;
 
@@ -3849,11 +3849,11 @@ TEST_DummyWrites:
 	;
 	; Focus on cycle 5. That's the dummy write.
 	
-	;;; Test 1 [Dummy Write Cycles]: Verify PPU Open Bus exists. ;;;
-	; This Dummy Write test relies on PPU Open Bus, so if it's not emulated we cannot check for dummy writes accurately.
+	;;; Test 1 [Dummy Write Cycles]: Verify PPU IO Open Bus exists. ;;;
+	; This Dummy Write test relies on PPU IO Open Bus, so if it's not emulated we cannot check for dummy writes accurately.
 	LDA #1
 	STA <$50				; The PPU_Open_Bus test uses address $50 to skip the decay test, since that's not needed here.
-	JSR TEST_PPU_Open_Bus	; It feels pretty silly running another test inside this test.
+	JSR TEST_PPU_IO_Open_Bus; It feels pretty silly running another test inside this test.
 	LDX #1					; But hey, it saves on bytes.
 	STX <ErrorCode		; reset the current sub test, as running TEST_PPU_Open_Bus changed it.
 	CMP #$01				
@@ -3861,15 +3861,15 @@ TEST_DummyWrites:
 	INC <ErrorCode 
 	
 	; Here's how the test works.
-	; Prep the PPU data bus with a specific value, usually $2D or $2E.
-	; RMW $2006. Read $2006 (PPU open bus), Dummy Write $2006 and modify value read, write $2006 again.
+	; Prep the PPU IO bus with a specific value, usually $2D or $2E.
+	; RMW $2006. Read $2006 (PPU IO open bus), Dummy Write $2006 and modify value read, write $2006 again.
 	; If we know where the writes will take the 'v' register, then we can simply read $2007 twice after this test to verify the dummy writes occurred.
 	
 	; for example: INC $2006
 	; 1: fetch opcode 
 	; 2: fetch low byte
 	; 3: fetch high byte
-	; 4: Read $2006. (address $2006 is write-only, so we read the PPU data bus: #$2D)
+	; 4: Read $2006. (address $2006 is write-only, so we read the PPU IO bus: #$2D)
 	; 5: Write #$2D to $2006, then do the operation on this value. (INC #$2D = #$2E)
 	; 6: Write #$2E to $2006. The VRAM address is now $2D26	
 	
@@ -6501,7 +6501,7 @@ TEST_NMI_Control:
 	JSR Clockslide_29780 ; Wait 1 frame.
 	; Instead of using JSR EnableNMI, I need to actually write it all out here.
 	LDA <PPUCTRL_COPY
-	STA $2002 ; prepare the PPU Open Bus
+	STA $2002 ; prepare the PPU IO Bus
 	INC $2000
 	LDX #$10
 	CPX #$11
@@ -7387,9 +7387,9 @@ TEST_MisalignedOAM_P4_Y_1_Loop:
 	BNE TEST_MisalignedOAM_P4_Y_1_Loop
 	JSR MisalignedOAM_Test		; Sync with (approximately) dot 0 of scanline 0.
 	LDA #1			; The data we want to process in OAM first is at address 1.
-	STA $2002		; Write this to $2002 to prime to PPU Data bus.
+	STA $2002		; Write this to $2002 to prime to PPU IO bus.
 	LDX #0			; We're going to write to $2003 with an offset, as a means to prevent the $2003 corruption.
-	STA $2003, X	; The dummy read prepared the CPU data bus with the value read from the PPU data bus. Now the early write to $2003 will be #01, the same as the intended write.
+	STA $2003, X	; The dummy read prepared the CPU data bus with the value read from the PPU IO bus. Now the early write to $2003 will be #01, the same as the intended write.
 
 	; Okay, so here's how these objects get processed.
 	; OAM $01: [$00, $E3, $00, $00]
@@ -7420,9 +7420,9 @@ TEST_MisalignedOAM_P5_Y_1_Loop:
 	BNE TEST_MisalignedOAM_P5_Y_1_Loop
 	JSR MisalignedOAM_Test		; Sync with (approximately) dot 0 of scanline 0.
 	LDA #1			; The data we want to process in OAM first is at address 1.
-	STA $2002		; Write this to $2002 to prime to PPU Data bus.
+	STA $2002		; Write this to $2002 to prime to PPU IO bus.
 	LDX #0			; We're going to write to $2003 with an offset, as a means to prevent the $2003 corruption.
-	STA $2003, X	; The dummy read prepared the CPU data bus with the value read from the PPU data bus. Now the early write to $2003 will be #01, the same as the intended write.
+	STA $2003, X	; The dummy read prepared the CPU data bus with the value read from the PPU IO bus. Now the early write to $2003 will be #01, the same as the intended write.
 
 	; Okay, so here's how these objects get processed.
 	; OAM $01: [$00, $E3, $00, $00]
@@ -7470,9 +7470,9 @@ TEST_MisalignedOAM_P4_1_Loop:
 	BNE TEST_MisalignedOAM_P4_1_Loop
 	JSR MisalignedOAM_Test		; Sync with (approximately) dot 0 of scanline 0.
 	LDA #1			; The data we want to process in OAM first is at address 1.
-	STA $2002		; Write this to $2002 to prime to PPU Data bus.
+	STA $2002		; Write this to $2002 to prime to PPU IO bus.
 	LDX #0			; We're going to write to $2003 with an offset, as a means to prevent the $2003 corruption.
-	STA $2003, X	; The dummy read prepared the CPU data bus with the value read from the PPU data bus. Now the early write to $2003 will be #01, the same as the intended write.
+	STA $2003, X	; The dummy read prepared the CPU data bus with the value read from the PPU IO bus. Now the early write to $2003 will be #01, the same as the intended write.
 	; Okay, so here's how these objects get processed.
 
 	; OAM $01: [$00, $E3, $00, $80]
@@ -7503,9 +7503,9 @@ TEST_MisalignedOAM_P4_1F_Loop:
 	BNE TEST_MisalignedOAM_P4_1F_Loop
 	JSR MisalignedOAM_Test		; Sync with (approximately) dot 0 of scanline 0.
 	LDA #1			; The data we want to process in OAM first is at address 1.
-	STA $2002		; Write this to $2002 to prime to PPU Data bus.
+	STA $2002		; Write this to $2002 to prime to PPU IO bus.
 	LDX #0			; We're going to write to $2003 with an offset, as a means to prevent the $2003 corruption.
-	STA $2003, X	; The dummy read prepared the CPU data bus with the value read from the PPU data bus. Now the early write to $2003 will be #01, the same as the intended write.
+	STA $2003, X	; The dummy read prepared the CPU data bus with the value read from the PPU IO bus. Now the early write to $2003 will be #01, the same as the intended write.
 	; Okay, so here's how these objects get processed.
 	; OAM $01: [$00, $E3, $00, $00]
 	; OAM $05: [$00, $E3, $00, $00]
@@ -7535,9 +7535,9 @@ TEST_MisalignedOAM_P4_2_Loop:
 	LDY #$1E
 	JSR MisalignedOAM_Test		; Sync with (approximately) dot 0 of scanline 0.
 	LDA #2			; The data we want to process in OAM first is at address 2.
-	STA $2002		; Write this to $2002 to prime to PPU Data bus.
+	STA $2002		; Write this to $2002 to prime to PPU IO bus.
 	LDX #0			; We're going to write to $2003 with an offset, as a means to prevent the $2003 corruption.
-	STA $2003, X	; The dummy read prepared the CPU data bus with the value read from the PPU data bus. Now the early write to $2003 will be #02, the same as the intended write.
+	STA $2003, X	; The dummy read prepared the CPU data bus with the value read from the PPU IO bus. Now the early write to $2003 will be #02, the same as the intended write.
 	; Okay, so here's how these objects get processed.
 	; OAM $02: [$00, $E3, $10, $00]
 	; OAM $06: [$00, $E3, $20, $00]
@@ -7565,9 +7565,9 @@ TEST_MisalignedOAM_P4_3_Loop:
 	LDY #$1E
 	JSR MisalignedOAM_Test		; Sync with (approximately) dot 0 of scanline 0.
 	LDA #3			; The data we want to process in OAM first is at address 3.
-	STA $2002		; Write this to $2002 to prime to PPU Data bus.
+	STA $2002		; Write this to $2002 to prime to PPU IO bus.
 	LDX #0			; We're going to write to $2003 with an offset, as a means to prevent the $2003 corruption.
-	STA $2003, X	; The dummy read prepared the CPU data bus with the value read from the PPU data bus. Now the early write to $2003 will be #03, the same as the intended write.
+	STA $2003, X	; The dummy read prepared the CPU data bus with the value read from the PPU IO bus. Now the early write to $2003 will be #03, the same as the intended write.
 	; Okay, so here's how these objects get processed.
 	; OAM $03: [$00, $10, $00, $00]
 	; OAM $07: [$00, $20, $00, $00]
@@ -8004,7 +8004,7 @@ FAIL_APURegActivation_Pre:
 	JMP TEST_Fail
 
 TEST_APURegActivation:
-	;;; Test 1 [APU Register Activation]: Pre-requisite test suite: Does DMA affect the data bus? Is DMC DMA timing accurate? Is open bus accurate enough for this test? How about PPU Open Bus? What about the PPU Read buffer? OAM DATA? ;;;
+	;;; Test 1 [APU Register Activation]: Pre-requisite test suite: Does DMA affect the data bus? Is DMC DMA timing accurate? Is open bus accurate enough for this test? How about PPU IO Bus? What about the PPU Read buffer? OAM DATA? ;;;
 	; For the purposes of debugging, you can press select to show the debug menu. Address $50 will be labeled 00 to 05 based on which pre-requisite it fails.
 
 	LDA <result_DMCDMASync_PreTest	; This is written before the main menu loads when resetting the ROM. If you aren't passing this test (and using save-states), you'll need to reboot the ROM to update this value.
@@ -8030,7 +8030,7 @@ TEST_APURegActivation:
 	LDA #0
 	LDA $3000 ; use a mirror to test for mirrors too.
 	CMP #$5A
-	BNE FAIL_APURegActivation_Pre ; Fail if PPU open bus doesn't exist.
+	BNE FAIL_APURegActivation_Pre ; Fail if PPU IO open bus doesn't exist.
 	INC <$50 ; for debugging.
 
 	JSR WriteToPPUADDRWithByte
@@ -8126,10 +8126,10 @@ APURegActivation_Continue:
 	;
 	; Here's the plan. (Special thanks to lidnariq and Fiskbit)
 	; Execute STA $4014 (A = $40) from address $3FFE. (The 6502 address bus will be $4001 when the OAM DMA occurs. Follow that up with a BRK from address $4001.)
-	; In order to make this work, we need the PPU data bus to be $8D, the PPU Buffer to be $14, and Open Bus to be $40
+	; In order to make this work, we need the PPU IO bus to be $8D, the PPU Buffer to be $14, and Open Bus to be $40
 	; So, the order of operations here is: 
 	; Prepare PPU buffer with $14. (some writes to $2006, a write to $2007, more writes to $2006, and a read from $2007)
-	; Prepare PPU data bus with $8D. Write $8D to $2002.
+	; Prepare PPU IO bus with $8D. Write $8D to $2002.
 	; Now, when we execute this:
 	; [$3FFE = $8D] [$3FFF = $14] [DMC DMA! Overwrite data bus with $40] [$4000 = $40] [OAM DMA!]
 	; Which will result in an OAM DMA where the 6502 Data bus is in-fact from the range $4000 to $401F, so the OAM DMA *will* read from all the registers.
@@ -8194,7 +8194,7 @@ APURegActivation_Continue:
 	.byte $2C, $00
 	LDA $2007 ; Prep the buffer with the value of $14 written to PPU $2400
 	JSR ResetScroll
-	; Step 5: Put $8D in the PPU data bus.
+	; Step 5: Put $8D in the PPU IO bus.
 	LDA #$8D
 	STA $2002
 	; Step 6: Try and prevent a crash with incorrect results of the test.
@@ -8357,7 +8357,7 @@ TEST_APURegActivation_Prep6Loop: ; And this loop makes address $280 through $2FF
 	.byte $2C, $00
 	LDA $2007 ; Prep the buffer with the value of $14 written to PPU $2400
 	JSR ResetScroll
-	; Put $8D in the PPU data bus.
+	; Put $8D in the PPU IO bus.
 	LDA #$8D
 	STA $2002	
 	; Schedule a DMA
@@ -9447,7 +9447,7 @@ FAIL_IFlagLatency2:
 	JMP FAIL_IFlagLatency
 
 TEST_IFlagLatency_Test_C:
-	;;; Test C [Interrupt Flag Latency]: A real quick ppu open bus pre-requisite check ;;;
+	;;; Test C [Interrupt Flag Latency]: A real quick ppu IO open bus pre-requisite check ;;;
 	; Test E is pretty wild, and involves jumping to a PPU register. To prevent a crash, I need to verify that jumping there is safe.
 	LDA #$44
 	STA $2002
@@ -9482,7 +9482,7 @@ TEST_IFlagLatency_Test_C:
 	; - poll for interrupts, (IRQ Level detector is low)
 	; 4.) Dummy read, update PCH.
 	
-	; This will also branch to $3FA5, reading from PPU Open bus to grab an RTS.
+	; This will also branch to $3FA5, reading from PPU IO Open bus to grab an RTS.
 
 	; Does an IRQ occur after the branch? Let's find out!
 
@@ -11075,7 +11075,7 @@ TEST_DeltaModulationChannelTestILoop:
 	STA $4013 ; 1 byte sample.
 	LDA #$10
 	STA $4015 ; Enable DMC
-	LDA $4015 ; Immediately read from $4015: (There's a 50% chance the DMA occurs when the address bus is pointing to $4015. That doesn't cahnge anything though.)
+	LDA $4015 ; Immediately read from $4015: (There's a 50% chance the DMA occurs when the address bus is pointing to $4015. That doesn't change anything though.)
 	AND #$90  ; The IRQ flag should be set, and the sample should have ended.
 	CMP #$80
 	BNE FAIL_DeltaModulationChannel3
@@ -11798,7 +11798,7 @@ TEST_ImpliedDummyReadPreReqContinue:
 	; Check the open bus bits of the controller port.
 	JSR WaitForVBlank
 	LDA #$F0
-	STA $2002	; Set the PPU data bus to $F0
+	STA $2002	; Set the PPU IO bus to $F0
 	LDX #$17
 	LDA $3FFF, X ; dummy read $2006. (The data bus is now $F0) The offset moves the address bus to $4016, reading from controller 1 when the data bus was $F0.
 	AND #$E0
