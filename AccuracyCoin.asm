@@ -18627,8 +18627,8 @@ DMASyncWithoutOpenBus:
 	; It doesn't rely on reading open bus, rather ii just simply relies on perfectly timed DMAs, and the 2 or 3 cpu cycle delay after writing to $4015.
 	; It's worth noting that function *is* consistent on hardware, and it does work. However, despite this, a lot of emulators have incorrect timing for reads from $4015, and won't actually be in sync after this runs.
 	; Hence the existence of the open bus DMA Sync routine, but wouldn't you know it- even fewer emulators implement the DMC DMA updating the data bus, so... not much I can do about that.
-	STX <Copy_X
-	STY <Copy_Y
+	STX <$0E ; I can't use Copy_X because it's used by ClockslideFromWord
+	STY <$0F ; I can't use Copy_Y because it's used by ClockslideFromWord
 	LDX #0
 	LDA #$FF
 	STA $4012 ; Sample address $FFC0.
@@ -18697,16 +18697,13 @@ dma_sync_first:
     STA $4015
 	LDA #$10
     STA $4015
-	LDX <Copy_X
-	LDY <Copy_Y
 	NOP
+sync_dmc_fail:
+	LDX <$0E
+	LDY <$0F
 	RTS				  ; 412 -> 406
 	; the next DMA is at (432) cycles, so we have 406 cycles to go.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-sync_dmc_fail:
-	LDX <Copy_X
-	LDY <Copy_Y
-	RTS	; The DMA timing will be way off on this test, but it was unable to sync anyway, so... Better than infinite looping?
 
 VerifyReturnAddressesAreCorrect:
 	TSX
