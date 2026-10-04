@@ -306,7 +306,7 @@ For more information, I recommend reading the fully commented assembly code for 
   4: The IRQ flag should not be set when the APU frame counter is in the 5-step mode, and the IRQ flag is disabled.  
   5: Reading the IRQ flag should clear the IRQ flag.  
   6: The IRQ flag should be cleared when the APU transitions from a "put" cycle to a "get" cycle.  
-  7: The IRQ flag should not be cleared yet the APU transitions from a "get" cycle to a "put" cycle.  
+  7: The IRQ flag should not be cleared yet when the APU transitions from a "get" cycle to a "put" cycle.  
   8: Changing the frame counter to 5-step mode after the flag was set should not clear the flag.  
   9: Disabling the IRQ flag should clear the IRQ flag.  
   A: The IRQ flag was enabled too early. (writing to $4017 on a "put" cycle.)  
@@ -563,11 +563,11 @@ or
   1: PPU registers should be mirrored through $3FFF.  
 
 ### PPU Register Open Bus
-  1: Reading from a write-only register PPU should return the most recently written value to the PPU data bus.  
-  2: All PPU Registers should update the PPU data bus when written.  
-  3: Bits 0 through 4 when reading from address $2002 should read the PPU data bus.  
-  4: Reads from $2002 should update the upper 3 bits of the ppu data bus.  
-  5: The PPU data bus value should decay before 1 second passes.  
+  1: Reading from a write-only register PPU should return the most recently written value to the PPU IO bus.  
+  2: All PPU Registers should update the PPU IO bus when written.  
+  3: Bits 0 through 4 when reading from address $2002 should read the PPU IO bus.  
+  4: Reads from $2002 should update the upper 3 bits of the PPU IO bus.  
+  5: The PPU IO bus value should decay before 1 second passes.  
 
 ### PPU Read Buffer
   1: Reading from the PPU register at $2007 is not working at all in this emulator.  

@@ -2822,11 +2822,11 @@ TEST_2007StressTest_Exit:
 	;│ t0.1 │ 0 │ 0 │ 01010 │ false │ false │ ; M2 is low.
 	;│ t1.0 │ 0 │ 0 │ 11010 │ false │ false │
 	;│ t1.1 │ 0 │ 0 │ 10010 │ false │ false │
-	;│ t2.0 │ 0 │ 0 │ 10110 │ true  │ false │
-	;│ t2.1 │ 0 │ 1 │ 10100 │ true  │ false │
+	;│ t2.0 │ 0 │ 0 │ 10110 │ true  │ false │ ; ALE is true
+	;│ t2.1 │ 0 │ 1 │ 10100 │ true  │ false │ ; ALE is (still) true
 	;│ t3.0 │ 0 │ 1 │ 00101 │ false │ false │
-	;│ t3.1 │ 0 │ 1 │ 01101 │ false │ true  │
-	;│ t4.0 │ 0 │ 1 │ 01001 │ false │ true  │
+	;│ t3.1 │ 0 │ 1 │ 01101 │ false │ true  │ ; Write is true
+	;│ t4.0 │ 0 │ 1 │ 01001 │ false │ true  │ ; Write is (still) true.
 	;│ t4.1 │ 0 │ 1 │ 01011 │ false │ false │
 	;│ t5.0 │ 0 │ 1 │ 01010 │ false │ false │
 	;│ ...  │ 0 │ 1 │ 01010 │ false │ false │
@@ -2978,30 +2978,6 @@ TEST_2007StressTest_TimingLoop:
 	.word 1779-12
 	RTS
 ;;;;;;;
-
-TEST_2007StressTest_Key: ; This is every other byte from the data. Honestly a real shame half the bytes are affected by analogue behavior.
-	.byte $02, $C0, $46, $46, $03, $C0, $06, $06
-	.byte $04, $C1, $6C, $6C, $05, $C1, $60, $60
-	.byte $06, $C1, $60, $60, $07, $C1, $06, $06
-	.byte $08, $C2, $66, $66, $09, $C2, $66, $66
-	.byte $0A, $C2, $24, $24, $0B, $C2, $66, $66
-	.byte $0C, $C3, $66, $66, $0D, $C3, $64, $64
-	.byte $0E, $C3, $60, $60, $0F, $C3, $60, $60
-	.byte $10, $C4, $66, $66, $11, $C4, $66, $66
-	.byte $12, $C4, $18, $18, $13, $C4, $0C, $0C
-	.byte $14, $C5, $6C, $6C, $15, $C5, $60, $60
-	.byte $16, $C5, $76, $76, $17, $C5, $72, $72
-	.byte $18, $C6, $66, $66, $19, $C6, $7C, $7C
-	.byte $1A, $C6, $3C, $3C, $1B, $C6, $7C, $7C
-	.byte $1C, $C7, $3C, $3C, $1D, $C7, $7E, $7E
-	.byte $1E, $C7, $66, $66, $1F, $C7, $66, $66
-	.byte $00, $C0, $3C, $3C, $01, $C0, $18, $18
-	.byte $02, $00, $FF, $FF, $00, $00, $FF, $FF
-	.byte $00, $00, $FF, $FF, $00, $00, $FF, $FF
-	.byte $00, $00, $FF, $FF, $00, $00, $FF, $FF
-	.byte $00, $00, $FF, $FF, $00, $00, $FF, $FF
-	.byte $00, $C0, $66, $66, $01, $C0, $38, $38
-	.byte $02, $02
 
 TEST_APURegActivation_Finale:
 	LDA #0
@@ -8203,11 +8179,11 @@ APURegActivation_Continue:
 	STA <$01 ; And since the BRK jumps to a function loading the value of A with $A9, we can check for this after the test.
 		
 	; Step 7: Schedule a DMA
-	LDA #$50
 	JSR DMASyncWith40
 	; We have 50 CPU cycles until the DMA occurs.
-	; JSR takes 6 cycles, we want the DMA to occur 3 cycles after that. We need to stall for 41 CPU cycles
-	JSR Clockslide_41	; This takes 41 CPU cycles
+	LDA #$50
+	; This LDA took 2 cycles, and JSR takes 6 cycles, so we want the DMA to occur 3 cycles after that. We need to stall for 39 CPU cycles
+	JSR Clockslide_39	; This takes 39 CPU cycles
 	JSR $3FFE	; Jump to $3FFE, as explained above.
 	; Making it back here is honestly an accomplishment. This should not crash, but I can't really prepare for incorrect emulation any more than I did in the above tests.
 	; If the wrong value remains on the data bus, then there's not much I can do about that. Hope you execute a BRK?
@@ -8361,11 +8337,11 @@ TEST_APURegActivation_Prep6Loop: ; And this loop makes address $280 through $2FF
 	LDA #$8D
 	STA $2002	
 	; Schedule a DMA
-	LDA #$02
 	JSR DMASyncWith40
 	; We have 50 CPU cycles until the DMA occurs.
-	; JSR takes 6 cycles, we want the DMA to occur 3 cycles after that. We need to stall for 41 CPU cycles
-	JSR Clockslide_41	; This takes 41 CPU cycles
+	LDA #$02
+	; That LDS took 2 cycles, and JSR takes 6 cycles, so we want the DMA to occur 3 cycles after that. We need to stall for 41 CPU cycles
+	JSR Clockslide_39	; This takes 41 CPU cycles
 	JSR $3FFE	; Jump to $3FFE, as explained above.
 	;;;;;; A real big loop to read compare the values in OAM with the desired results.
 	LDX #0
@@ -10009,7 +9985,7 @@ FAIL_APULengthTable:
 ;;;;;;;;;;;;;;;;;
 	
 TEST_APULengthTable:
-	;;; Test 1 [APU Length Table]: What value was the length counter when we write 'n' to address $4003? ;;;
+	;;; Test 1 [APU Length Table]: Does this emulator pass the APU Length Counter test? It's a pre-requisite. ;;;
 	
 	JSR TEST_APULengthCounter
 	LDX #1
@@ -10613,26 +10589,6 @@ TEST_FrameCounter4Step:
 	
 FAIL_FrameCounter4Step2:
 	JMP FAIL_AndDisableAudioChannels
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-TEST_FrameCounterSyncDMC:
-	SEI
-	LDA #$40        ; clear IRQ flag
-	STA $4017
-	LDA #$00        ; mode 0, frame IRQ enabled
-	STA $4017
-	JSR ClockslideFromWord
-	.word 29820 ; 7
-	LDA <$00
-	NOP
-	NOP
-	LDA $4015
-	AND #$40
-	BNE TEST_FrameCounter4Step_Sync
-TEST_FrameCounter4Step_Sync:
-	LDA #$40        ; clear IRQ flag
-	STA $4017
-	RTS
-;;;;;;;
 
 FAIL_FrameCounter5Step:
 	JMP FAIL_AndDisableAudioChannels
@@ -16026,9 +15982,8 @@ DPCM_Sample_05:
 		
 MarkTestToSkip:
 	STX <Copy_X
-	LDX <menuCursorYPos           ; X = which test from the current suite
-	TXA
-	ASL A				          ; Double X, since we're reading a 2-byte word from a list of 2-byte words.
+	LDA <menuCursorYPos           ; A = which test from the current suite
+	ASL A				          ; Double A, since we're reading a 2-byte word from a list of 2-byte words.
 	TAX
 	
 	LDA <suitePointerList+1,X
@@ -16092,8 +16047,21 @@ AddYToNameOffset0:
 AddYToNameOffset1:
 	RTS
 ;;;;;;;
-		
-	.org $EDC0	
+
+SetUpSpriteZero:
+	JSR CopyReturnAddressToByte0
+	LDY #0
+SetUpSpriteZero_Loop:
+	LDA [$0000], Y
+	STA $200, Y
+	INY
+	CPY #$4
+	BNE SetUpSpriteZero_Loop
+	JSR FixRTS
+	RTS
+;;;;;;;
+
+	.org $EDC0	; Superfluous .org, as there are zero bytes of padding here.
 DPCM_Sample_90:
 	.byte $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90, $90
 	.byte $90
@@ -16115,27 +16083,12 @@ DMASyncWithXX_Start: ; I moved this to a subroutine so I can save bytes.
 DMASyncWithXX_End: ; I moved this to a subroutine so I can save bytes.
 	LDA #$0F ; don't loop, continue at max speed. +2 (9)
 	STA $4010 
-	LDA <$00  
-	LDA Copy_A
-	JSR Clockslide_100 ; Note to self, do not try to optimize with ClockslideFromWord, as write cycles throw off the DMA timing.
-	JSR Clockslide_100 ; ^
-	JSR Clockslide_100 ; ^
-	JSR Clockslide_38  ; ^
-	NOP                ; ^
-	CMP <$C9           ; ^
+	JSR Clockslide_300 ; Note to self, do not try to optimize with ClockslideFromWord.
+	JSR Clockslide_40  ; ^
+	JSR Clockslide_19
 	RTS
 ;;;;;;;
 
-	.org $EE40	
-DPCM_Sample_68:
-	.byte $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68
-	.byte $68
-	
-	.org $EE80	
-DPCM_Sample_A5:
-	.byte $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5
-	.byte $A5
-	
 SetPPUSCROLLFromWord:	; pretty much the same as SetPPUADDRFromWord, but it writes to $2005.
 	STA <$FF
 	STY <$FE
@@ -16153,35 +16106,10 @@ SetPPUSCROLLFromWord:	; pretty much the same as SetPPUADDRFromWord, but it write
 	LDA <$FF
 	RTS
 ;;;;;;;
-	
-	.org $EEC0	
-DPCM_Sample_60:
-	.byte $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60
-	.byte $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60
-	.byte $60
-	
-SetUpSpriteZero:
-	JSR CopyReturnAddressToByte0
-	LDY #0
-SetUpSpriteZero_Loop:
-	LDA [$0000], Y
-	STA $200, Y
-	INY
-	CPY #$4
-	BNE SetUpSpriteZero_Loop
-	JSR FixRTS
-	RTS
-;;;;;;;
 
-	.org $EF00	
-DPCM_Sample_48:
-	.byte $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48
-	.byte $48
-	
 DMASyncWith40:
 	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
 	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
-	STA <Copy_A
 	LDA #$F8 ; Sample address $FE00.
 	JSR DMASyncWithXX_Start
 DMASync40_Loop:
@@ -16189,14 +16117,25 @@ DMASync40_Loop:
 	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
 	CMP #$40
 	BNE DMASync40_Loop ; If the DMA occurs, LDA $5000 will read $40 (Setting zero flag) ; +2 (7)
-	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
-	RTS 
-;;;;;;;
+	JMP DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
+
+LSM_CopySuitePointerToByte0: ; I moved this subroutine over here to make space. It's relatively far from where it gets used, but now there's zero bytes of padding here between this routine and the .org
+	LDA <suitePointer
+	STA <$00
+	LDA <suitePointer+1
+	STA <$01
+	RTS
+;;;;;;
+
+
+	.org $EE40 
+DPCM_Sample_68:
+	.byte $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68, $68
+	.byte $68
 
 DMASyncWith48:
 	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
 	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
-	STA <Copy_A	
 	LDA #$BC ; Sample address $EF00.
 	JSR DMASyncWithXX_Start
 DMASync48_Loop:
@@ -16204,14 +16143,12 @@ DMASync48_Loop:
 	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
 	CMP #$48
 	BNE DMASync48_Loop ; If the DMA occurs, LDA $4000 will read $48 (Setting zero flag) ; +2 (7)
-	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
-	RTS
+	JMP DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
 ;;;;;;;
 	
 DMASyncWith60:
 	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
 	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
-	STA <Copy_A
 	LDA #$BB ; Sample address $EEC0.
 	JSR DMASyncWithXX_Start
 DMASync60_Loop:
@@ -16219,14 +16156,12 @@ DMASync60_Loop:
 	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
 	CMP #$60
 	BNE DMASync60_Loop ; If the DMA occurs, LDA $4000 will read $60 (Setting zero flag) ; +2 (7)
-	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
-	RTS
+	JMP DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
 ;;;;;;;
 	
 DMASyncWithA5:
 	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
 	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
-	STA <Copy_A
 	LDA #$BA ; Sample address $EE80.
 	JSR DMASyncWithXX_Start
 DMASyncA5_Loop:
@@ -16234,14 +16169,17 @@ DMASyncA5_Loop:
 	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
 	CMP #$A5
 	BNE DMASyncA5_Loop ; If the DMA occurs, LDA $4000 will read $A5 (Setting zero flag) ; +2 (7)
-	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
-	RTS
+	JMP DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
 ;;;;;;;
-	
+
+	.org $EE80	
+DPCM_Sample_A5:
+	.byte $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5, $A5
+	.byte $A5
+
 DMASyncWith68:
 	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
 	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
-	STA <Copy_A
 	LDA #$B9 ; Sample address $EE40.
 	JSR DMASyncWithXX_Start
 DMASync68_Loop:
@@ -16249,14 +16187,12 @@ DMASync68_Loop:
 	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
 	CMP #$68
 	BNE DMASync68_Loop ; If the DMA occurs, LDA $4000 will read $68 (Setting zero flag) ; +2 (7)
-	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
-	RTS
+	JMP DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
 ;;;;;;;
 	
 DMASyncWith90:
 	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
 	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
-	STA <Copy_A
 	LDA #$B7 ; Sample address $EDC0.
 	JSR DMASyncWithXX_Start
 DMASync90_Loop:
@@ -16264,14 +16200,12 @@ DMASync90_Loop:
 	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
 	CMP #$90
 	BNE DMASync90_Loop ; If the DMA occurs, LDA $4000 will read $90 (Setting zero flag) ; +2 (7)
-	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
-	RTS
+	JMP DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
 ;;;;;;;
 	
 DMASyncWith05:
 	; This function very reliably exits with exactly 50 CPU cycles until the DMA occurs.
 	; However, it relies on open bus behavior, with the consequence of an infinite loop if not correctly emulated.
-	STA <Copy_A
 	LDA #$B5 ; Sample address $EDC0.
 	JSR DMASyncWithXX_Start
 DMASync05_Loop:
@@ -16279,9 +16213,46 @@ DMASync05_Loop:
 	;	[Read AD] [Read 00] [Read 40] [DMA PUT (1)] [DMA GET (2)] [DMA PUT (3)] [DMA GET (4)] [Read open bus (5)]
 	CMP #$05
 	BNE DMASync05_Loop ; If the DMA occurs, LDA $4000 will read $05 (Setting zero flag) ; +2 (7)
-	JSR DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
-	RTS
+	JMP DMASyncWithXX_End ; Set the sample to non-looping, restore A, and clockslide a bit.
 ;;;;;;;
+
+	.org $EEC0	
+DPCM_Sample_60:
+	.byte $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60
+	.byte $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60, $60
+	.byte $60
+
+	.org $EF00	
+DPCM_Sample_48:
+	.byte $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48, $48
+	.byte $48
+
+; I moved this answer key over here to save space.
+TEST_2007StressTest_Key: ; This is every other byte from the data. Honestly a real shame half the bytes are affected by analogue behavior.
+	.byte $02, $C0, $46, $46, $03, $C0, $06, $06
+	.byte $04, $C1, $6C, $6C, $05, $C1, $60, $60
+	.byte $06, $C1, $60, $60, $07, $C1, $06, $06
+	.byte $08, $C2, $66, $66, $09, $C2, $66, $66
+	.byte $0A, $C2, $24, $24, $0B, $C2, $66, $66
+	.byte $0C, $C3, $66, $66, $0D, $C3, $64, $64
+	.byte $0E, $C3, $60, $60, $0F, $C3, $60, $60
+	.byte $10, $C4, $66, $66, $11, $C4, $66, $66
+	.byte $12, $C4, $18, $18, $13, $C4, $0C, $0C
+	.byte $14, $C5, $6C, $6C, $15, $C5, $60, $60
+	.byte $16, $C5, $76, $76, $17, $C5, $72, $72
+	.byte $18, $C6, $66, $66, $19, $C6, $7C, $7C
+	.byte $1A, $C6, $3C, $3C, $1B, $C6, $7C, $7C
+	.byte $1C, $C7, $3C, $3C, $1D, $C7, $7E, $7E
+	.byte $1E, $C7, $66, $66, $1F, $C7, $66, $66
+	.byte $00, $C0, $3C, $3C, $01, $C0, $18, $18
+	.byte $02, $00, $FF, $FF, $00, $00, $FF, $FF
+	.byte $00, $00, $FF, $FF, $00, $00, $FF, $FF
+	.byte $00, $00, $FF, $FF, $00, $00, $FF, $FF
+	.byte $00, $00, $FF, $FF, $00, $00, $FF, $FF
+	.byte $00, $C0, $66, $66, $01, $C0, $38, $38
+	.byte $02, $02
+	
+; 5 bytes of padding.
 	
 	.org $EFC0
 TEST_DMC_ConflictsSample:
@@ -16953,14 +16924,6 @@ LSMNR_SkipInc2:
 LSMNR_SkipInc3:
 	JMP LSMNR_Loop2
 ;;;;;;;;;;;;;;;;;;;
-
-LSM_CopySuitePointerToByte0:
-	LDA <suitePointer
-	STA <$00
-	LDA <suitePointer+1
-	STA <$01
-	RTS
-;;;;;;
 
 LSM_ReadSuiteRow:
 	LDA [$0000], Y
