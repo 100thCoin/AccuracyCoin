@@ -7276,6 +7276,8 @@ MisalignedOAM_Test:
 ;;;;;;;
 
 FAIL_MisalignedOAM_Behavior:
+	PLA
+	PLA
 	JMP FAIL_MisalignedOAM
 	
 TEST_MisalignedOAM_Evaluate:
@@ -7364,8 +7366,8 @@ TEST_MisalignedOAM_P4_Y_1_Loop:
 	JSR MisalignedOAM_Test		; Sync with (approximately) dot 0 of scanline 0.
 	LDA #1			; The data we want to process in OAM first is at address 1.
 	STA $2002		; Write this to $2002 to prime to PPU IO bus.
-	LDX #0			; We're going to write to $2003 with an offset, as a means to prevent the $2003 corruption.
-	STA $2003, X	; The dummy read prepared the CPU data bus with the value read from the PPU IO bus. Now the early write to $2003 will be #01, the same as the intended write.
+	LDX #$10		; We're going to write to $2003 with an offset, as a means to prevent the $2003 corruption.
+	STA $20F3, X	; The dummy read prepared the CPU data bus with the value read from the PPU IO bus. Now the early write to $2003 will be #01, the same as the intended write.
 
 	; Okay, so here's how these objects get processed.
 	; OAM $01: [$00, $E3, $00, $00]
@@ -7397,8 +7399,8 @@ TEST_MisalignedOAM_P5_Y_1_Loop:
 	JSR MisalignedOAM_Test		; Sync with (approximately) dot 0 of scanline 0.
 	LDA #1			; The data we want to process in OAM first is at address 1.
 	STA $2002		; Write this to $2002 to prime to PPU IO bus.
-	LDX #0			; We're going to write to $2003 with an offset, as a means to prevent the $2003 corruption.
-	STA $2003, X	; The dummy read prepared the CPU data bus with the value read from the PPU IO bus. Now the early write to $2003 will be #01, the same as the intended write.
+	LDX #$10		; We're going to write to $2003 with an offset, as a means to prevent the $2003 corruption.
+	STA $20F3, X	; The dummy read prepared the CPU data bus with the value read from the PPU IO bus. Now the early write to $2003 will be #01, the same as the intended write.
 
 	; Okay, so here's how these objects get processed.
 	; OAM $01: [$00, $E3, $00, $00]
@@ -7447,8 +7449,8 @@ TEST_MisalignedOAM_P4_1_Loop:
 	JSR MisalignedOAM_Test		; Sync with (approximately) dot 0 of scanline 0.
 	LDA #1			; The data we want to process in OAM first is at address 1.
 	STA $2002		; Write this to $2002 to prime to PPU IO bus.
-	LDX #0			; We're going to write to $2003 with an offset, as a means to prevent the $2003 corruption.
-	STA $2003, X	; The dummy read prepared the CPU data bus with the value read from the PPU IO bus. Now the early write to $2003 will be #01, the same as the intended write.
+	LDX #$10		; We're going to write to $2003 with an offset, as a means to prevent the $2003 corruption.
+	STA $20F3, X	; The dummy read prepared the CPU data bus with the value read from the PPU IO bus. Now the early write to $2003 will be #01, the same as the intended write.
 	; Okay, so here's how these objects get processed.
 
 	; OAM $01: [$00, $E3, $00, $80]
@@ -7480,8 +7482,8 @@ TEST_MisalignedOAM_P4_1F_Loop:
 	JSR MisalignedOAM_Test		; Sync with (approximately) dot 0 of scanline 0.
 	LDA #1			; The data we want to process in OAM first is at address 1.
 	STA $2002		; Write this to $2002 to prime to PPU IO bus.
-	LDX #0			; We're going to write to $2003 with an offset, as a means to prevent the $2003 corruption.
-	STA $2003, X	; The dummy read prepared the CPU data bus with the value read from the PPU IO bus. Now the early write to $2003 will be #01, the same as the intended write.
+	LDX #$10		; We're going to write to $2003 with an offset, as a means to prevent the $2003 corruption.
+	STA $20F3, X	; The dummy read prepared the CPU data bus with the value read from the PPU IO bus. Now the early write to $2003 will be #01, the same as the intended write.
 	; Okay, so here's how these objects get processed.
 	; OAM $01: [$00, $E3, $00, $00]
 	; OAM $05: [$00, $E3, $00, $00]
@@ -7512,8 +7514,8 @@ TEST_MisalignedOAM_P4_2_Loop:
 	JSR MisalignedOAM_Test		; Sync with (approximately) dot 0 of scanline 0.
 	LDA #2			; The data we want to process in OAM first is at address 2.
 	STA $2002		; Write this to $2002 to prime to PPU IO bus.
-	LDX #0			; We're going to write to $2003 with an offset, as a means to prevent the $2003 corruption.
-	STA $2003, X	; The dummy read prepared the CPU data bus with the value read from the PPU IO bus. Now the early write to $2003 will be #02, the same as the intended write.
+	LDX #$10		; We're going to write to $2003 with an offset, as a means to prevent the $2003 corruption.
+	STA $20F3, X	; The dummy read prepared the CPU data bus with the value read from the PPU IO bus. Now the early write to $2003 will be #01, the same as the intended write.
 	; Okay, so here's how these objects get processed.
 	; OAM $02: [$00, $E3, $10, $00]
 	; OAM $06: [$00, $E3, $20, $00]
@@ -7542,8 +7544,8 @@ TEST_MisalignedOAM_P4_3_Loop:
 	JSR MisalignedOAM_Test		; Sync with (approximately) dot 0 of scanline 0.
 	LDA #3			; The data we want to process in OAM first is at address 3.
 	STA $2002		; Write this to $2002 to prime to PPU IO bus.
-	LDX #0			; We're going to write to $2003 with an offset, as a means to prevent the $2003 corruption.
-	STA $2003, X	; The dummy read prepared the CPU data bus with the value read from the PPU IO bus. Now the early write to $2003 will be #03, the same as the intended write.
+	LDX #$10		; We're going to write to $2003 with an offset, as a means to prevent the $2003 corruption.
+	STA $20F3, X	; The dummy read prepared the CPU data bus with the value read from the PPU IO bus. Now the early write to $2003 will be #01, the same as the intended write.
 	; Okay, so here's how these objects get processed.
 	; OAM $03: [$00, $10, $00, $00]
 	; OAM $07: [$00, $20, $00, $00]
@@ -13840,7 +13842,7 @@ TEST_ControllerClocking:
 	INC <ErrorCode
 	
 	;;; Test 2 [Controller Clocking]: Reading $4016 while the controllers are being strobed does not update the shift register inside the controller. ;;;
-	; The shift register is constantly being reloaded while it is strobed, so until clearing the strobe, the shift register always returns the A register.
+	; The shift register is constantly being reloaded while it is strobed, so until clearing the strobe, the shift register always returns the A button.
 	; This test will fail if ANY button other than A is being pressed. Do not press any other buttons during this test, thanks. :)
 
 	STA $4016 ; A=1, strobe the controller.
@@ -18680,6 +18682,26 @@ VerifyReturnAddressesAreCorrect:
 	RTS
 ;;;;;;;
 
+VblSync_Plus_A: ; In this context, the value of A will translate to 1 additional PPU cycle. (by stalling for 29781*A CPU cycles)
+	PHA
+	LDA <result_VblankSync_PreTest		; Check if this sync routine will loop infinitely.
+	BMI VblSync_ABORT	; If it will, just RTS without syncing. It was going to fail the test anyway with frame timing that incorrect.
+	JSR WaitForVBlank
+	JSR New_VBL_Sync	; Sync to VBlank dot 0
+	PLA
+VblSync_Plus_A_Loop:   
+	JSR ClockslideFromWord
+	.word 29774
+	CLC						; + 2
+	ADC #$FF 				; + 2
+	BCS VblSync_Plus_A_Loop ; + 3 if looping, 2 otherwise. (29781 CPU cycles if looping. Each frame is 29780.67 CPU cycles long, so this advances 1 PPU cycle)
+	JMP VblSync_Plus_A_End	; I ran out of space, so I moved it up there.
+	
+	VblSync_ABORT:	; This emulator failed the pre-test, implying that this will loop infinitely, so instead of doing that, just don't bother.
+	PLA
+	RTS
+;;;;;;;
+
 	.org $FF00
 Clockslide:
 	; JSR takes 6 cycles.
@@ -18866,28 +18888,9 @@ TEST_RMW2007_ClearNametable2Loop:
 ;;;;;;;
 
 	.org $FFC0
-	; 17 00s. This will be the DPCM "audio sample" played during the DMC DMA Sync loop. It should just be silence.
+	; 33 00s. This will be the DPCM "audio sample" played during the DMC DMA Sync loop. It should just be silence.
+	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-
-VblSync_Plus_A: ; In this context, the value of A will translate to 1 additional PPU cycle. (by stalling for 29781*A CPU cycles)
-	PHA
-	LDA <result_VblankSync_PreTest		; Check if this sync routine will loop infinitely.
-	BMI VblSync_ABORT	; If it will, just RTS without syncing. It was going to fail the test anyway with frame timing that incorrect.
-	JSR WaitForVBlank
-	JSR New_VBL_Sync	; Sync to VBlank dot 0
-	PLA
-VblSync_Plus_A_Loop:   
-	JSR ClockslideFromWord
-	.word 29774
-	CLC						; + 2
-	ADC #$FF 				; + 2
-	BCS VblSync_Plus_A_Loop ; + 3 if looping, 2 otherwise. (29781 CPU cycles if looping. Each frame is 29780.67 CPU cycles long, so this advances 1 PPU cycle)
-	JMP VblSync_Plus_A_End	; I ran out of space, so I moved it up there.
-	
-	VblSync_ABORT:	; This emulator failed the pre-test, implying that this will loop infinitely, so instead of doing that, just don't bother.
-	PLA
-	RTS
-;;;;;;;
 	
 	.org $FFF5
 TEST_AddrMode_Relative_FFF5:
