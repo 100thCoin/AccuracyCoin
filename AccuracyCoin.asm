@@ -49,10 +49,7 @@ menuCursorYPos = $16
 menuHeight = $17
 controller = $18
 controller_New = $19
-JSRFromRAM = $1A
-JSRFromRAM1 = $1B
-JSRFromRAM2 = $1C
-JSRFromRAM3 = $1D
+testAddressPointer = $1A
 
 TestResultPointer = $1E
 
@@ -94,6 +91,7 @@ Reserved_41 = $41 ; Used in the Implied Dummy Reads. It's probably best we never
 
 PostDMACyclesUntilTestInstruction = 13
 
+copy_SP2 = $4F
 
 Test_ZeroPageReserved = $50 ; through $5F
 Test_ZeroPageReserved2 = $60 ; through $6F (rarely used, but let's still avoid putting engine stuff here.)
@@ -487,10 +485,6 @@ VerifyJSRBehavior:
 	STA <$03
 	INC <Debug_EC ; 02 -> 03
 	JSR $0000 ; Verify return addresses pushed by JSR are correct.	
-	LDA #$20
-	STA <JSRFromRAM
-	LDA #$60
-	STA <JSRFromRAM3
 	RTS
 ;;;;;;;
 	
@@ -3210,6 +3204,8 @@ TEST_RamMirroring:
 ;;;;;;;
 
 TEST_Fail:
+	LDX <copy_SP2  ; Restore the copied stack pointer.
+	TXS            ; This prevents failed tests from RTS'ing to the wrong place if something goes horribly wrong.
 	LDA <ErrorCode
 	ASL A
 	ASL A
@@ -7276,8 +7272,6 @@ MisalignedOAM_Test:
 ;;;;;;;
 
 FAIL_MisalignedOAM_Behavior:
-	PLA
-	PLA
 	JMP FAIL_MisalignedOAM
 	
 TEST_MisalignedOAM_Evaluate:
@@ -17762,7 +17756,7 @@ DpadConflictMask: ; A LUT for masking the d-pad values.
 	.byte $00, $01, $02, $00, $04, $05, $06, $00, $08, $09, $0A, $08, $00, $01, $02, $00
 
 RunTest:
-	; This function sets things up, then jumps to "JSRFromRAM" where a JSR to the test occurs.
+	; This function sets things up, then runs the test.
 	; Basically, this makes a bunch of preparations for tests, like clearing page 5 of RAM, halting the NMI, etc.
 	STA <Copy_A2                  ; Store the A register
 	STY <Copy_Y2                  ; Store the Y register
@@ -17776,10 +17770,9 @@ RunTest_AllTestSkipNMI:
 	ASL A                         ; Double X, since we're reading a 2-byte word from a list of 2-byte words.
 	TAX
 	LDA <suiteExecPointerList,X   ; read the low byte of where the test occurs.
-	STA <JSRFromRAM+1             ; and store it in RAM next to a JSR opcode.
+	STA <testAddressPointer       ; and store it in RAM for an indirect JMP.
 	LDA <suiteExecPointerList+1,X ; read the high byte of where the test occurs.
-	STA <JSRFromRAM+2             ; and store it in RAM next to the low byte.
-	                              ; `JSR [Test], RTS` now exists in RAM at "JSRFromRAM"
+	STA <testAddressPointer+1     ; and store it in RAM next to the low byte.
 	LDA <suitePointerList,X	      ; read the low byte of where to store the test results.
 	STA <TestResultPointer        ; and store it in RAM
 	LDA <suitePointerList+1,X     ; read the high byte of where to store the test results.
@@ -17825,7 +17818,7 @@ RunTest_AllTestSkipDraw1:
 	LDA #0                        ; Initialize A to 0.
 	TAX                           ; Initialize X to 0.
 	TAY                           ; Initialize Y to 0.
-	JSR JSRFromRAM                ; !! This is where the test occurs. "JSRFromRAM" is at address $001A. !!
+	JSR PerformTest               ; !! This is where the test occurs. !!
                                   ; The A Register holds the results of the test.
 	LDY #0
 	STA [TestResultPointer],Y     ; store the test results in RAM.
@@ -17855,6 +17848,15 @@ RunTest_AllTestSkipDraw2:         ; If we're running all tests, we don't need th
 	LDA <Copy_A2                  ; Restore the A register
 	RTS
 ;;;;;;;
+
+;;; PerformTest ;;;
+; This is an indirect jump. The test will end with an RTS, effective acting as the RTS for this routine.
+PerformTest:                 ;
+	TSX                      ;
+	STX <copy_SP2            ; Make a copy of the stack pointer.
+	LDX #0                   ;
+	JMP [testAddressPointer] ; Move the PC to the location of the test.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ClearNametableFrom2240:	; Some "tests" just print a bunch of values on screen around VRAM address $2240.
 						; This function simply clears a good amount of VRAM from those tests.
