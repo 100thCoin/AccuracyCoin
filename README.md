@@ -3,7 +3,7 @@ AccuracyCoin is a large collection of NES accuracy tests on a single NROM cartri
 
 This ROM was designed for an NTSC console with an RP2A03G CPU and RP2C02G PPU. Some tests might be automatically skipped on hardware with a different revision.
 
-This ROM currently has 144 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
+This ROM currently has 146 tests. These tests print "PASS" or "FAIL" on screen, and in the event of a failure, this ROM also provides an error code. In addition to those tests, this ROM also has 5 tests labeled "DRAW", which don't actually test for anything; rather, they simply print information on screen.
 
 Here's an example of the menu in this ROM shown on an emulator failing a test, passing others, a few tests on screen haven't been run yet, and a test marked to be skipped. (The cursor is currently next to the "Dummy Read Cycles" test.)
 
@@ -476,6 +476,20 @@ For more information, I recommend reading the fully commented assembly code for 
   1: Reading from open bus should work correctly when crossing a page boundary. DMC DMA Timing should be correct.  
   2: The DMC DMA Bus Conflict with $4015 cannot affect the internal data bus.  
   2: Reads from $4015 only update the internal data bus and cannot affect the external data bus.  
+
+### DMA Landing on Write
+  1: Open bus should not always read 00.  
+  2: The DMC DMA should update the data bus, or your DMC DMA timing is incorrect.  
+  3: The DMC DMA cannot occur on a CPU Write cycle, and should instead be delayed until the next CPU Read cycle.  
+  4: If the DMC DMA begins on an APU Get cycle, the DMC DMA is 1 cycle shorter than usual.  
+  5: If the DMC DMA would land on two consecutive write cycles, it gets delayed by 2 cycles and then lasts the usual 4 CPU cycles.  
+  6: If the write to $4015 occurs on an APU Get cycle, the Load DMA should occur after 4 CPU cycles.  
+  7: If the write to $4015 occurs on an APU Put cycle, the Load DMA should occur after 3 CPU cycles.  
+  8: Load DMAs also should not be able to halt the CPU on write cycles.  
+  9: Load DMAs that get delayed by 1 cycle should halt the CPU for 4 cycles.  
+
+### DMC Reload Timing
+  1: Writing to $4010 as the DMC timer resets should cause the timer to reload using the new value.  
 
 ## Page 16: Power On State
 

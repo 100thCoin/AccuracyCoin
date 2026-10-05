@@ -91,8 +91,6 @@ Reserved_41 = $41 ; Used in the Implied Dummy Reads. It's probably best we never
 
 PostDMACyclesUntilTestInstruction = 13
 
-copy_SP2 = $4F
-
 Test_ZeroPageReserved = $50 ; through $5F
 Test_ZeroPageReserved2 = $60 ; through $6F (rarely used, but let's still avoid putting engine stuff here.)
 
@@ -318,6 +316,10 @@ result_FrozenOAM2Inc = $493
 result_MisalignedOAMDMA = $494
 result_MisalignedOAM2Addr = $495
 
+result_DMALandingOnWrite = $496
+result_DMCReloadTiming = $497
+
+
 result_DrawTest = $03FF	; page 3 omits the test from the all-test-result-table.
 
 ;$500 is dedicated to RAM needed for tests.
@@ -425,8 +427,7 @@ ReloadMainMenu: ; There's an option to run every test in the ROM, and it draws a
 	; This can help inform you of specifically where your emulator hangs.
 	INC <Debug_EC ; 00 -> 01
 	JSR ClearPage2 ; Page 2 is used for OAM.
-	LDA #02
-	STA $4014 ; Set up OAM
+	JSR OAMDMAWithPage2
 	
 	LDA #0
 	STA <dontSetPointer
@@ -702,11 +703,13 @@ Suite_APUTiming:
 
 Suite_CPUBehavior2:
 	.byte "CPU Behavior 2", $FF
-	table "Instruction Timing", 	 $FF, result_InstructionTiming, TEST_InstructionTiming
-	table "Implied Dummy Reads",	 $FF, result_ImpliedDummyRead,  TEST_ImpliedDummyRead
-	table "Branch Dummy Reads", 	 $FF, result_BranchDummyRead,   TEST_BranchDummyRead
-	table "JSR Edge Cases",          $FF, result_JSREdgeCases,      TEST_JSREdgeCases
-	table "Internal Data Bus",       $FF, result_InternalDataBus,   TEST_InternalDataBus
+	table "Instruction Timing",   $FF, result_InstructionTiming, TEST_InstructionTiming
+	table "Implied Dummy Reads",  $FF, result_ImpliedDummyRead,  TEST_ImpliedDummyRead
+	table "Branch Dummy Reads",   $FF, result_BranchDummyRead,   TEST_BranchDummyRead
+	table "JSR Edge Cases",       $FF, result_JSREdgeCases,      TEST_JSREdgeCases
+	table "Internal Data Bus",    $FF, result_InternalDataBus,   TEST_InternalDataBus
+	table "DMA Landing on Write", $FF, result_DMALandingOnWrite, TEST_DMALandingOnWrite
+	table "DMC Reload Timing",    $FF, result_DMCReloadTiming,   TEST_DMCReloadTiming
 	.byte $FF
 
 	;; Power On State ;;
@@ -1101,8 +1104,7 @@ AERROP_NoneSkipped:
 	LDA #$00
 	STA $2005
 	JSR WaitForVBlank
-	LDA #2
-	STA $4014
+	JSR OAMDMAWithPage2
 	JSR EnableRendering
 	JSR EnableNMI                 ; And enable the MNI.
 	RTS
@@ -1113,22 +1115,6 @@ AERROP_Attributes:
 	.byte $CC, $FF, $FF, $FF, $FF, $FF, $00, $00
 	.byte $0C, $0F, $0F, $0F, $0F, $0F
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-PressStartToContinue:
-	JSR ReadController1
-	LDA <controller_New
-	AND #$10
-	BEQ PressStartToContinue_End
-	JSR SetUpDefaultPalette
-	JSR DisableNMI
-	JSR DisableRendering
-	JSR ClearNametable
-	LDX #$EF ; Due to some tests modifying the stack pointer, it's convenient to put it at EF instead of FF.
-	TXS		 ; This prevents some tests where the resulting stack pointer is 00 from pushing data, and overwriting the bottom of the stack.
-	JMP ReloadMainMenu
-PressStartToContinue_End:
-	RTI
-;;;;;;;
 	
 PrintTestName:
 	TXA
@@ -1601,8 +1587,7 @@ TEST_Rendering2007Read:
 	JSR ResetScroll_2C00
 	
 	JSR WaitForVBlank
-	LDA #2
-	STA $4014
+	JSR OAMDMAWithPage2
 	
 	; We don't need the most precise timing for this.
 	; Simply read from $2007 at some point on a visible scanline.
@@ -1665,8 +1650,7 @@ TEST_BranchDummyRead:
 	JSR WaitForVBlank
 	JSR Clockslide_29780 ; Set the vblank flag. (This will hopefully persist until we JSR to $2000 in the next test.
 	
-	LDA #2
-	STA $4014 ; OAM DMA
+	JSR OAMDMAWithPage2 ; OAM DMA
 	STA $2002	
 	LDX $2004 ; OAM[0] = $60.
 	CMP #2
@@ -2973,41 +2957,6 @@ TEST_2007StressTest_TimingLoop:
 	RTS
 ;;;;;;;
 
-TEST_APURegActivation_Finale:
-	LDA #0
-	STA $4015
-	; The controller ports might not have been visible by the OAM DMA, but did the controller ports get clocked?
-	; This used to be an error code, but different consoles behave differently, so let's just print if it did or not.
-	LDA #0
-	STA <dontSetPointer ; prep this, since we're drawing stuff.
-	LDA $4016
-	LDA $4016	; it is assumed the B button is not pressed during the test.
-	LSR A
-	BCS TEST_APURegActivation_ConflictClocked	
-	; And the controller ports were NOT clocked here!
-	LDA <RunningAllTests
-	BNE TEST_APURegActivation_Res1
-	JSR PrintTextCentered
-	.word $2350
-	.byte "OAM DMA Bus Conflict no Clock", $FF
-	JSR ResetScroll
-TEST_APURegActivation_Res1:
-	LDA #5 ; Success Code 1
-	RTS
-	
-TEST_APURegActivation_ConflictClocked:
-	; Bingo! Look at that. The controller ports *were* clocked, but did not appear in OAM!
-	LDA <RunningAllTests
-	BNE TEST_APURegActivation_Res2
-	JSR PrintTextCentered
-	.word $2350
-	.byte "OAM DMA Bus Conflict Clocks", $FF
-	JSR ResetScroll
-TEST_APURegActivation_Res2:
-	LDA #9 ; Success Code 2
-	RTS
-;;;;;;;
-
 FAIL_InternalDataBus1:
 	JMP TEST_Fail
 
@@ -3024,8 +2973,7 @@ TEST_StaleSpriteShiftRegs:
 
 	JSR SetUpSpriteZero           ; Prepare sprite zero with the following values:
 	.byte $05, $C5, $03, $FE      ; 1x8 pixel stripe, but it's placed at X=$FE.	
-	LDA #2                        ; 
-	STA $4014                     ; OAM DMA with page 2.
+	JSR OAMDMAWithPage2           ; OAM DMA with page 2.
 	
 	JSR WriteToPPUADDRWithByte    ; Put a box at $2C1F for the attempted sprite zero hit (that will fail)
 	.byte $2C, $1F                ; Address $2C1F (upper right corner of the screen.)
@@ -3056,8 +3004,7 @@ TEST_StaleSpriteShiftRegs:
 
 	JSR SetUpSpriteZero           ; Prepare sprite zero with the following values:
 	.byte $04, $C5, $03, $30      ; 1x8 pixel stripe, but it's placed at X=$30.	
-	LDA #2                        ; 
-	STA $4014                     ; OAM DMA with page 2.
+	JSR OAMDMAWithPage2           ; OAM DMA with page 2.
 
 	JSR Sync_ToLine0Dot1          ; sync the CPU to dot 1 of scanline 0.
 	JSR ClockslideFromWord        ; stall 562 CPU cycles. (stall until scanline 4 dot 322)
@@ -3076,8 +3023,7 @@ TEST_StaleSpriteShiftRegs:
 	
 	JSR SetUpSpriteZero           ; Prepare sprite zero with the following values:
 	.byte $03, $C5, $03, $FF      ; 1x8 pixel stripe, but it's placed at X=$FF.	
-	LDA #2                        ; 
-	STA $4014                     ; OAM DMA with page 2.
+	JSR OAMDMAWithPage2           ; OAM DMA with page 2.
 	
 	JSR WaitForVBLSpriteZeroHit   ; Wait for vblank and load A with $2002.6
 	BNE FAIL_StaleSpriteShiftRegs ; Fail the test if a sprite zero hit occurred here.
@@ -3150,7 +3096,199 @@ FAIL_StaleSpriteShiftRegs:
 
 
 
+WaitForFrameCounterIRQFlag:
+	LDA #$00               ;
+	STA $4017              ; Reset the APU Frame Counter
+	JSR ClockslideFromWord ; Wait for a while.
+	.word 30000            ;
+	RTS                    ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+FAIL_DMALandingOnWrite1:             ;
+	JMP FAIL_AndDisableAudioChannels ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;;; DMA Landing on Write ;;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+TEST_DMALandingOnWrite:
+	;;; Test 1 [DMA Landing on Write]: Open bus should not always read 00 ;;;
+	LDA $4000                        ;
+	BEQ FAIL_DMALandingOnWrite1      ;
+	INC <ErrorCode                   ;
+
+	;;; Test 2 [DMA Landing on Write]: The DMC DMA can update the data bus when reading from open bus ;;;
+	JSR TEST_DMA_Plus_OpenBus        ;
+	LDX #2                           ; The DMA Plus Open Bus test increments the error code, so let's fix it real quick.
+	STX <ErrorCode                   ;
+	CMP #1                           ;
+	BNE FAIL_DMALandingOnWrite1      ;
+	INC <ErrorCode                   ;
+
+	;;; Test 3 [DMA Landing on Write]: The DMC DMA cannot happen on a write cycle ;;;
+	; This test will verify two things:
+	; 1. The DMC DMA cannot occur on a write cycle.
+	; 2. If the DMC DMA is delayed due to a write cycle, then the get/put alignment is different, skipping a cycle of the DMA.
+	JSR WaitForFrameCounterIRQFlag   ; Wait for the APU Frame Counter IRQ flag
+	JSR DMASync_50CyclesRemaining    ;
+	LDA #$4F                         ; Loop this sample
+	STA $4010                        ;
+	JSR Clockslide_38                ;
+	LDA #$10                         ; Keep the DMC enabled.
+	STA $4015                        ; [Opcode] [Operand] [Operand] {WRITE}
+	; Surprise! The DMC DMA is delayed by a cycle! And check this out...
+	; [Get (halt)] [Put] [Get]
+	; And the DMA ends after just 3 cycles!
+	; That means the next DMC DMA is in 429 cycles
+	; In the meantime, let's check if the DMC DMA read from $4015
+	LDA $4015                        ;
+	AND #$40                         ; Filter for the frame counter IRQ flag.
+	BEQ FAIL_DMALandingOnWrite1      ; Fail the test if the flag is cleared
+	INC <ErrorCode                   ;
+	
+	;;; Test 4 [DMA Landing on Write]: The DMC DMA is shorter if starting on a Get cycle ;;;
+	JSR ClockslideFromWord           ;
+	.word 412                        ;
+	LDA $4000                        ;
+	BNE FAIL_DMALandingOnWrite1      ;
+	INC <ErrorCode                   ;
+	
+	;;; Test 5 [DMA Landing on Write]: If the DMC DMA would land on two consecutive write cycles, it gets delayed by 2 cycles and then takes 4 whole cycles ;;;
+	JSR DMASync_50CyclesRemaining    ;
+	LDA #$4F                         ; Loop this sample
+	STA $4010                        ;
+	JSR Clockslide_39                ;
+	INC $5000                        ; [Opcode] [Operand] [Operand] [Read] {WRITE} {WRITE}
+	                                 ; [Put (halt)] [Get (halt)] [Put] [Get]
+	JSR ClockslideFromWord           ;
+	.word 425                        ;
+	LDA $4000                        ;
+	BNE FAIL_DMALandingOnWrite1      ;
+	INC <ErrorCode                   ;
+	
+	;;; Test 6 [DMA Landing on Write]: Load DMAs can have a 4 cycle delay ;;;
+	; NOTE: Some CPU's have been seen to take an extra APU cycle for the Load DMA to occur.
+	; As of writing this test, I am entirely out of space in the ROM, so I don't have room to verify if this is running on one of those CPU's.
+	; So this test is known to fail on those consoles, and as soon as I save some more bytes, I'll try and fix this issue with this test.
+	LDA #$0                          ;
+	STA $4015                        ;
+	JSR Clockslide_1000              ;
+	STA $4014                        ;
+	LDA <$00                         ; [get] [put] [get]
+	LDA #$10                         ; [put] [get]
+	STA $4015                        ; [put] [get] [put] [GET]
+	LDA $4000                        ; [put] [get] [put] [DMC DMA (get)]
+	BNE FAIL_DMALandingOnWrite1      ;
+	INC <ErrorCode                   ;
+
+	;;; Test 7 [DMA Landing on Write]: Load DMAs can have a 3 cycle delay ;;;
+	LDA #0                           ;
+	STA $4015                        ; disable DMC
+	; The idea:
+	; write to $4015 while the PC is at $3FFF
+	; Then read $A5 from $3FFF running LDA <$A5, reading the value $E8
+	; Then the load DMA should run overwriting the data bus with $00 instead of letting INX run.
+	; Then we check if X != 0
+	
+	JSR SetBRKRoutineFromWord        ;
+	.word TEST_DMALandingOnWrite_BRK ;
+	
+	JSR WaitForVBlank                ;
+	
+	LDA #$A5                         ;
+	JSR SetPPUReadBufferToA          ;
+	JSR ResetScroll                  ;
+	
+	LDA <$81                         ; Make a copy of these values on the zero page, since we need to use these addresses for the open bus tomfoolery.
+	STA <$00                         ;
+	LDA <$82                         ;
+	STA <$01                         ;
+	LDA <$A5                         ;
+	STA <$02                         ;
+	
+	LDA #$15                         ;
+	STA <$81                         ;
+	LDA #$40                         ;
+	STA <$82                         ;
+	LDA #$E8                         ;
+	STA <$A5                         ;
+	
+	STA $4014                        ; Use an OAM DMA to sync to a get cycle.
+	; Get cycle.
+	
+	LDA #$81                         ;
+	STA $2002                        ; Set the PPU io bus to #$81
+	
+	LDY #0                           ;
+	LDX #0                           ;
+	LDA #$10                         ;
+	JMP $3FFD                        ;
+	; STA ($81), Y (Write $10 to $4015)
+	; LDA <$A5 (Data bus = $E8)
+
+TEST_DMALandingOnWrite_BRK:
+
+	PLA
+	PLA
+	PLA
+
+	LDA <$00                         ; Fix the zero page RAM we modified.
+	STA <$81                         ;
+	LDA <$01                         ;
+	STA <$82                         ;
+	LDA <$02                         ;
+	STA <$A5                         ;
+
+	CPX #$00                         ;
+	BNE FAIL_DMALandingOnWrite       ;
+	INC <ErrorCode                   ;
+	
+	;;; Test 8 [DMA Landing on Write]: Load DMAs also cannot land on write cycles ;;;
+	LDA #0                           ;
+	STA $4015                        ; disable DMC
+	JSR WaitForFrameCounterIRQFlag   ;
+	LDA #$10                         ;
+	STA $4014                        ; Trigger an OAM DMA to align with a Get cycle next.
+	LDA $00                          ; delay 3 cycles to sync with put cycle.
+	STA $4015                        ; [Opcode (put)] [Operand (get)] [Operand (put)] [Write (get)]
+	STA $4015                        ; [Opcode (put)] [Operand (get)] [Operand (put)] {Write (get)} This delays the DMA by a cycle, and does NOT read from $4015
+	LDA $4015                        ;
+	AND #$40                         ; Filter for the Frame Counter IRQ Flag
+	BEQ FAIL_DMALandingOnWrite       ;
+	INC <ErrorCode                   ;
+
+	;;; Test 9 [DMA Landing on Write]: Load DMAs that get delayed by 1 cycle take 4 cycles ;;;
+	JSR DMASync_50CyclesRemaining    ;
+	JSR Clockslide_50                ;
+	; 4 cycle DMA
+	; [Put cycle]
+	; Next DMA in 428 cycles.
+	LDA #$0                          ; +2 cycles
+	STA $4015                        ; +4 cycles
+	JSR ClockslideFromWord           ; Stall
+	.word 422
+	JSR ClockslideFromWord           ; Stall
+	.word 432
+	; A DMA does not happen here, but the timer is reset here. 432 cycles to go.
+	LDA #$4F                         ; +2 cycles
+	STA $4010                        ; +4 cycles
+	LDA #$10                         ; +2 cycles
+	STA $4015                        ; +4 cycles
+	STA $5000                        ; +4 cycles
+	                                 ; +4 cycle long DMA
+	                                 ; Next DMA in 413 cycles
+	JSR ClockslideFromWord           ; Stall for 409 cycles
+	.word 409                        ; ^
+	LDA $4000                        ; read from open bus immediately after the DMA.
+	BNE FAIL_DMALandingOnWrite       ;	
+	
+	;; End Of Test ;;                ;
+	LDA #1                           ;
+	RTS                              ;	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+FAIL_DMALandingOnWrite:              ;
+	JMP FAIL_AndDisableAudioChannels ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 	.bank 1
@@ -3204,8 +3342,6 @@ TEST_RamMirroring:
 ;;;;;;;
 
 TEST_Fail:
-	LDX <copy_SP2  ; Restore the copied stack pointer.
-	TXS            ; This prevents failed tests from RTS'ing to the wrong place if something goes horribly wrong.
 	LDA <ErrorCode
 	ASL A
 	ASL A
@@ -3649,8 +3785,7 @@ TEST_PPU_IO_Open_Bus:
 	; Here's how PPU IO Open bus works.
 	; The PPU IO bus is updated whenever the CPU writes to any PPU Register.
 
-	LDA #2
-	STA $4015
+	JSR OAMDMAWithPage2
 	
 	LDX #0
 	LDY #1
@@ -3781,14 +3916,6 @@ TEST_PPU_Open_Bus_SkipDecayTest:
 TEST_FailPPUOpenBus2:
 	JSR ResetScroll
 	JMP TEST_Fail
-
-TEST_DummyWritePrep_SetUpV:
-	LDA #$25
-	STA $2006
-	LDA #$FA
-	STA $2006
-	RTS
-;;;;;;;
 
 TEST_DummyWritePrep_PPUADDR2DFA: ; This exists to save bytes
 	JSR SetPPUADDRFromWord
@@ -6108,8 +6235,6 @@ TEST_DMA_Plus_OpenBus:
 	BNE FAIL_DMA_Plus_OpenBus
 	
 	;; END OF TEST ;;
-	LDA #0
-	STA $4015
 	LDA #1
 	RTS
 ;;;;;;;
@@ -7005,8 +7130,7 @@ TEST_ArbitrarySpriteZero:
 	;;; Test 1 [Arbitrary Sprite Zero]: Sprite 0 should trigger a sprite zero hit. No other sprite should. ;;;
 	JSR PREP_SpriteZeroHit
 	JSR EnableRendering_S ; start rendering sprites!
-	LDA #02
-	STA $4014 ; OAM DMA
+	JSR OAMDMAWithPage2 ; OAM DMA
 	JSR Clockslide_3000 ; Wait long enough for VBlank to be over, and the sprite zero hit to occur. (we're not going for precise timing on this test. Just to see if it happens.)
 	LDA $2002	; Bit 6 should be set, since the sprite zero hit should have occurred.
 	AND #$40
@@ -7018,8 +7142,7 @@ TEST_ArbitrarySpriteZeroLoop:
 	JSR InitializeSpriteX
 	;    YPos, CHR, Att, XPos
 	.byte $00, $FC, $00, $08
-	LDA #02
-	STA $4014 ; OAM DMA
+	JSR OAMDMAWithPage2 ; OAM DMA
 	JSR Clockslide_3000 ; Wait long enough for VBlank to be over, and the sprite zero hit to occur. (we're not going for precise timing on this test. Just to see if it happens.)
 	LDA $2002	; Bit 6 should be set, since the sprite zero hit should have occurred.
 	AND #$40
@@ -7187,8 +7310,7 @@ TEST_SprOverflow_Behavior:
 	;;; Test 2 [Sprite Overflow Behavior]: The Sprite Overflow Flag is NOT the same thing as the CPU's V flag. ;;;
 	; The first emulator I ever made was making this mistake, ha! I doubt anybody is making this mistake, but I'll test for it anyway.
 	JSR WaitForVBlank
-	LDA #02
-	STA $4014 ; Set up OAM so objects 0 through 8 exist on scanline 1.
+	JSR OAMDMAWithPage2 ; Set up OAM so objects 0 through 8 exist on scanline 1.
 	CLV	; Clear CPU V flag
 	JSR Clockslide_3000 ; wait long enough for these to render.
 	BVS FAIL_SprOverflow ; The CPU V flag should not have been set by the PPU.
@@ -7202,8 +7324,7 @@ TEST_SprOverflow_Behavior:
 	LDA #$FF
 	STA $200	; move sprite zero to Y=$FF (does not get rendered ever)
 	JSR WaitForVBlank
-	LDA #02
-	STA $4014 ; Set up OAM so objects 0 through 7 exist on scanline 1.
+	JSR OAMDMAWithPage2 ; Set up OAM so objects 0 through 7 exist on scanline 1.
 	JSR Clockslide_3000 ; wait long enough for these to render.
 	LDA $2002
 	AND #$20 ; Bit 5 holds the sprite overflow flag. (in this case, not set because only 8 sprites existed on the busiest scanline)
@@ -7241,30 +7362,18 @@ SprOverflow_Prep1:
 	CPX #4*9
 	BNE SprOverflow_PrepLoop
 	JSR WaitForVBlank
-	LDA #02
-	STA $4014 ; Set up OAM so objects 0 through 8 exist on scanline 1.
+	JSR OAMDMAWithPage2 ; Set up OAM so objects 0 through 8 exist on scanline 1.
 	RTS
-	
-VerifySprOverflowFlag:
-	JSR sprOverflow_Setup
-	JSR EnableRendering	; Enable both the background and sprites.
-	JSR Clockslide_3000 ; wait long enough for these to render.
-	LDA $2002
-	AND #$20 ; Bit 5 holds the sprite overflow flag
-	RTS
-;;;;;;;
 	
 MisalignedOAM_Test:
 	JSR WaitForVBlank
-	LDA #02
-	STA $4014
+	JSR OAMDMAWithPage2
 	JSR DisableRendering
 	LDA #0
 	JSR VblSync_Plus_A
 	; Sync to dot 0 of VBlank
 
-	LDA #02
-	STA $4014
+	JSR OAMDMAWithPage2
 	JSR EnableRendering
 	JSR ClockslideFromWord
 	.word 1816
@@ -7272,6 +7381,8 @@ MisalignedOAM_Test:
 ;;;;;;;
 
 FAIL_MisalignedOAM_Behavior:
+	PLA
+	PLA
 	JMP FAIL_MisalignedOAM
 	
 TEST_MisalignedOAM_Evaluate:
@@ -7743,8 +7854,7 @@ FAIL_Address2004_PreRevG:
 
 FAIL_Address2004_Behavior:
 	JSR WaitForVBlank
-	LDA #2
-	STA $4014
+	JSR OAMDMAWithPage2
 	JMP FAIL_Address2004
 
 TEST_Address2004_Behavior:
@@ -7756,8 +7866,7 @@ TEST_Address2004_Behavior:
 	.word $2001
 	.byte $FC, $FF	
 	JSR ResetScrollAndWaitForVBlank
-	LDA #2
-	STA $4014 ; run the OAM DMA, overwriting the whole thing with $FF
+	JSR OAMDMAWithPage2 ; run the OAM DMA, overwriting the whole thing with $FF
 	LDA #0
 	LDY #$FC
 	STA $2004	; write $00 to OAM $00
@@ -7780,8 +7889,7 @@ TEST_Address2004_Behavior:
 	LDA #$A5			; and OAM address $01 will have the value $A5.
 	STA $201			;
 	JSR WaitForVBlank
-	LDA #2
-	STA $4014 ; run the OAM DMA with page 2.
+	JSR OAMDMAWithPage2 ; run the OAM DMA with page 2.
 	STA $2002 ; Prep buffer to check for Pre-Revision-G behavior.
 	LDA $2004
 	CMP #2
@@ -7799,8 +7907,7 @@ TEST_Address2004_Behavior:
 	; So, address $02, $06, $0A, $0E, $12, $16... and so on.
 	JSR ClearPage2
 	JSR WaitForVBlank
-	LDA #2
-	STA $4014 ; run the OAM DMA with page 2.
+	JSR OAMDMAWithPage2 ; run the OAM DMA with page 2.
 	; OAM should be all $FFs, except the attribute addresses, which should be $E3.
 	STA $2004 ; INC OAM address to $01
 	STA $2004 ; INC OAM address to $02
@@ -7956,8 +8063,6 @@ TEST_Address2004_Behavior_loop:			; Set up page 2 so every value is essentially 
 	;; END OF TEST ;;
 	JSR ClearOverscanNametable
 	JSR WaitForVBlank
-	LDA #2
-	STA $4014
 	JSR DisableRendering_S
 	LDA #$41 ; Success code "G", referring to revision G PPU (or later) behavior.
 	RTS
@@ -8260,8 +8365,6 @@ TEST_APURegActivation_SkipResetY:
 FAIL_APURegActivation:
 	LDA #$40
 	STA $4017
-	LDA #0
-	STA $4015
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
 
@@ -8429,16 +8532,12 @@ TEST_APURegActivation_YSkip3:
 FAIL_APURegActivation2:
 	LDA #$40
 	STA $4017
-	LDA #0
-	STA $4015
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
 
 FAIL_DMA_Timing:
 	LDA #$40
 	STA $4017
-	LDA #0
-	STA $4015
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
 
@@ -8539,6 +8638,81 @@ TEST_DMA_Plus_4016R_SkipText2:
 	FAIL_DMA_Plus_4016R:
 	JMP TEST_Fail
 
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;
+	;;; DMC Reload Timing ;;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;
+TEST_DMCReloadTiming:
+	;;; Test 1 [DMC Reload Timing]: Do precisely timed writes to $4010 update the reload-value of the DMC timer correctly? ;;;
+	; Basically we have a loop here that reads from open but at two precise moments.
+	; - read 1 would overlap with a DMC DMA if the write to $4010 does not update the reload-value.
+	; - read 2 would overlap with a DMC DMA if the write to $4010 does update the reload-value.
+
+TEST_DMCReloadTimingLoop:            ;
+	JSR DMASync_50CyclesRemaining    ;
+	; Using the fastest DMC Sample rate.
+	; This means every reload should load the timer with 27 APU cycles remaining (54 CPU cycles).
+	LDA #$4F                         ;
+	STA $4010                        ; Loop + fastest rate.
+	JSR Clockslide_44                ;
+	; DMC DMA goes here.
+	JSR ClockslideFromWord           ; in 378 CPU cycles, the timer will be reset for the final time.
+	.word 320                        ; 378 - 320 = 58 cycles remaining
+	TXA                              ; -2 = 56 cycles
+	JSR Clockslide37_Plus_A          ; - (37 + A) = 19 - A cycles.
+	LDA #$40                         ; 17 - A cycles.
+	NOP                              ;
+	NOP                              ;
+	NOP                              ; 9 - A cycles.
+	                                 ;
+	STA $4010                        ; = 5 - A cycles.
+	TXA                              ;
+	TAY                              ;
+	DEY                              ;
+	.byte $30, $00                   ; 3 cycles if Y is negative, 2 if positive.
+	DEY                              ;
+	.byte $30, $00                   ; 3 cycles if Y is negative, 2 if positive.
+	DEY                              ;
+	.byte $30, $00                   ; 3 cycles if Y is negative, 2 if positive.
+	DEY                              ;
+	.byte $30, $00                   ; 3 cycles if Y is negative, 2 if positive.
+	DEY                              ;
+	.byte $30, $00                   ; 3 cycles if Y is negative, 2 if positive.
+	DEY                              ;
+	.byte $30, $00                   ; 3 cycles if Y is negative, 2 if positive.
+	                                 ; in total, 32 cycles, and we balance out the +A from earlier.
+	TXA                              ;
+	ASL A                            ;
+	TAY                              ;
+	JSR Clockslide_14                ;
+	LDA $4000                        ; DMC DMA happens during this read if early
+	STA $500, Y                      ;  - In other words, you would see $00 from this read if the DMA occurred, and $40 if the DMA did not occur.
+	JSR ClockslideFromWord           ;
+	.word 365                        ;
+	LDA $4000                        ; DMC DMA happens during this read if late
+	STA $501, Y                      ;  - In other words, you would see $00 from this read if the DMA occurred, and $40 if the DMA did not occur.
+	                                 ;
+	INX                              ;
+	CPX #6                           ;
+	BNE TEST_DMCReloadTimingLoop     ;
+	                                 ;
+	LDX #0                           ;
+TEST_DMCReloadTiming_KeyLoop:        ; I had to move the answer key somewhere else in the ROM to fit it in. (I'm running out of bytes.)
+	LDA $500, X                      ; The pattern should be "Early, Early, Early, Early, Late, Late"
+	CMP TEST_DMCReloadTiming_Key, X  ; Which looks like "40 00" "40 00" "40 00" "40 00" "00 40" "00 40"
+	BNE FAIL_DMCReloadTiming         ; Which suggests that writing to $4010 on the same APU cycle that the timer reloads does in-fact use the new value.
+	INX                              ;
+	CPX #12                          ;
+	BNE TEST_DMCReloadTiming_KeyLoop ;
+	                                 ;
+	;; End of Test ;;                ;
+	LDA #1                           ;
+	RTS                              ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	
+FAIL_DMCReloadTiming:
+	JMP TEST_Fail
+	
 ;;;;;;;
 	.bank 2	; If I don't do this, the ROM won't compile.
 	.org $C000
@@ -8585,8 +8759,7 @@ TEST_ControllerStrobing:
 	; - if that 1-cycle strobe happens on a get cycle, the controllers actually aren't strobed at all! (See the next error code)
 	; - But if the strobe occurs on a put cycle, the controllers DO get strobed.
 	JSR WaitForVBlank
-	LDA #2
-	STA $4014 ; sync CPU with "get" cycle.
+	JSR OAMDMAWithPage2 ; sync CPU with "get" cycle.
 	DEC $4016 ; (get) (put) (get) (put) (get) [PUT] [GET] : this should strobe the controller.
 	JSR ReadControllerInto50_and_A
 	AND #$7F
@@ -8596,8 +8769,7 @@ TEST_ControllerStrobing:
 	;;; Test 4 [Controller Strobing]: Do controller strobes only happen when the CPU transitions from a get cycle to a put cycle? (continued) ;;;
 	; This results in a 1-cycle strobe of the controller ports, however they actually aren't strobed at all!
 	JSR WaitForVBlank
-	LDA #2
-	STA $4014 ; sync CPU with "get" cycle.
+	JSR OAMDMAWithPage2 ; sync CPU with "get" cycle.
 	LDA <$00  ; (get) (put) (get) 3 CPU cycles.
 	DEC $4016 ; (put) (get) (put) (get) (put) [GET] [PUT] this should not strobe the controller.
 	JSR ReadControllerInto50_and_A
@@ -9523,8 +9695,6 @@ TEST_IFlagLatency_Test_C:
 
 FAIL_IFlagLatency:
 	SEI
-	LDA #0
-	STA $4015
 	JMP TEST_Fail
 ;;;;;;;;;;;;;;;;;
 
@@ -9604,7 +9774,7 @@ TEST_NmiAndBrk:
 	; In an older form of this test, I re-synced to VBlank for every loop, and that resulted in this test taking around 11.5 seconds.
 	; I would like this updated version of this test to *not* take that long, so we're only going to sync to VBlank once and then count cycles to make the NMI land at the right time each loop.
 	LDX #0                             ; Set X to zero for this upcoming loop.
-	LDA #0                             ;
+	TXA                                ;
 	JSR VblSync_Plus_A                 ; Sync the next instruction to scanline 241, dot 0. (This takes upwards of a third of a second.)
 	                                   ; Rendering is already disabled.
 	                                   ; The next NMI is in one frame. (and one ppu cycle... and then one and a half more cpu cycles.)
@@ -9640,7 +9810,7 @@ TEST_NmiAndBrk_ConfirmBRK:             ;
 	BNE FAIL_NmiAndBrk                 ;
 	                                   ; If you count all the CPU cycles of the instructions in this loop, then we have exactly 29510 CPU cycles to get rid of in order to make this loop happen 1 ppu cycle later each iteration relative to vblank.
 	JSR ClockslideFromWord             ;
-	.word 29501                        ;	
+	.word 29502                        ;	
 	JSR EnableNMI                      ; 30 CPU cycles.
 	LDA #0                             ; +2
 	STA <$51                           ; +3
@@ -9773,7 +9943,7 @@ TEST_NmiAndIrq_ConfirmIRQ:             ;
 	BEQ TEST_NmiAndIrq_PostLoop        ; else, +2	
 	                                   ; If you count all the CPU cycles of the instructions in this loop, then we have exactly 29510 CPU cycles to get rid of in order to make this loop happen 1 ppu cycle later each iteration relative to vblank.
 	JSR ClockslideFromWord             ;
-	.word 29490                        ;	
+	.word 29489                        ;	
 	JSR EnableNMI                      ; 30 CPU cycles.
 	LDA #0                             ; +2
 	STA <$51                           ; +3
@@ -9853,8 +10023,8 @@ TEST_APU_Prep:
 
 FAIL_APULengthCounter:
 FAIL_AndDisableAudioChannels:
-	LDA #$00
-    STA $4015	; disable all audio channels.
+	; So uh- all tests now disable audio channels after the test ends, so this isn't really needed any more.
+	; I have removed the STA $4015 business, but everything that already jumps here will still do that.
 	JMP TEST_Fail
 
 TEST_APULengthCounter:
@@ -10079,8 +10249,7 @@ TEST_FrameCounterIRQ:
 	LDA #$00	
 	STA $4017	; 4-step mode, enable IRQ
 	JSR Clockslide_30000 ; wait long enough that the IRQ flag would be set.
-	LDA #02
-	STA $4014 ; align with "get" cycle.
+	JSR OAMDMAWithPage2 ; align with "get" cycle.
 	LDA #0 ; (get), (put)
 	LDX #0 ; (get), (put)
 	; TODO: Shouldn't I make sure the SLO instruction works before running this?
@@ -10116,8 +10285,7 @@ TEST_FrameCounterIRQ:
 	LDA #$00	
 	STA $4017	; 4-step mode, enable IRQ
 	JSR Clockslide_30000 ; wait long enough that the IRQ flag would be set.
-	LDA #02
-	STA $4014 ; align with "get" cycle.
+	JSR OAMDMAWithPage2 ; align with "get" cycle.
 	LDA <$00  ; (get), (put), (get)
 	LDA #0    ; (put), (get)
 	LDX #0    ; (put), (get)
@@ -10148,8 +10316,7 @@ TEST_FrameCounterIRQ:
 	
 	;;; Test A [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (see if it's set too early) ;;;
 	JSR WaitForVBlank
-	LDA #02
-	STA $4014 ; sync CPU with "get" cycle
+	JSR OAMDMAWithPage2 ; sync CPU with "get" cycle
 	LDA #$40  ; (get), (put)
 	STA $4017 ; (get), (put), (get), (put) : 4-step mode, clear IRQ flag 
 	LDA #$00  ; (get), (put)
@@ -10171,8 +10338,7 @@ FAIL_FrameCounterIRQ2:
 TEST_FrameCounterIRQ_Continue:
 	;;; Test B [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (see if it's set on the right CPU cycle) ;;;
 	JSR WaitForVBlank
-	LDA #02
-	STA $4014 ; sync CPU with "get" cycle
+	JSR OAMDMAWithPage2 ; sync CPU with "get" cycle
 	LDA #$40  ; (get), (put)
 	STA $4017 ; (get), (put), (get), (put) : 4-step mode, clear IRQ flag 
 	LDA #$00  ; (get), (put)
@@ -10187,8 +10353,7 @@ TEST_FrameCounterIRQ_Continue:
 
 	;;; Test C [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (If the write occurs on a "get" CPU cycle, the IRQ is delayed by 1 CPU cycle) ;;;
 	JSR WaitForVBlank
-	LDA #02
-	STA $4014 ; sync CPU with "get" cycle
+	JSR OAMDMAWithPage2 ; sync CPU with "get" cycle
 	LDA <$00  ; (get), (put), (get)
 	LDA #$40  ; (put), (get)
 	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag
@@ -10204,8 +10369,7 @@ TEST_FrameCounterIRQ_Continue:
 
 	;;; Test D [APU Frame Counter IRQ]: Test the timing of the IRQ flag. (see if it's set on the correct cycle) ;;;
 	JSR WaitForVBlank
-	LDA #02
-	STA $4014 ; sync with "get" CPU cycle
+	JSR OAMDMAWithPage2 ; sync with "get" CPU cycle
 	LDA <$00  ; (get), (put), (get)
 	LDA #$40  ; (put), (get)
 	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag
@@ -10221,8 +10385,7 @@ TEST_FrameCounterIRQ_Continue:
 
 	;;; Test E [APU Frame Counter IRQ]: Reading $4015 on the same cycle the IRQ flag is set, will not clear the IRQ flag (it gets set again on the following 2 CPU cycles) ;;;
 	JSR WaitForVBlank
-	LDA #02
-	STA $4014 ; sync with "get" CPU cycle
+	JSR OAMDMAWithPage2 ; sync with "get" CPU cycle
 	LDA <$00  ; (get), (put), (get)
 	LDA #$40  ; (put), (get)
 	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag
@@ -10237,8 +10400,7 @@ TEST_FrameCounterIRQ_Continue:
 	
 	;;; Test F [APU Frame Counter IRQ]: Reading $4015 on the cycle after the IRQ flag is set, will not clear the IRQ flag (it gets set again on the following CPU cycle) ;;;
 	JSR WaitForVBlank
-	LDA #02
-	STA $4014 ; sync with "get" CPU cycle
+	JSR OAMDMAWithPage2 ; sync with "get" CPU cycle
 	LDA <$00  ; (get), (put), (get)
 	LDA #$40  ; (put), (get)
 	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag
@@ -10253,8 +10415,7 @@ TEST_FrameCounterIRQ_Continue:
 	
 	;;; Test G [APU Frame Counter IRQ]: Reading $4015 2 cycles after the IRQ flag is set, will not clear the IRQ flag (it gets set again on this CPU cycle) ;;;
 	JSR WaitForVBlank
-	LDA #02
-	STA $4014 ; sync with "get" CPU cycle
+	JSR OAMDMAWithPage2 ; sync with "get" CPU cycle
 	LDA <$00  ; (get), (put), (get)
 	LDA #$40  ; (put), (get)
 	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag
@@ -10269,8 +10430,7 @@ TEST_FrameCounterIRQ_Continue:
 	
 	;;; Test H [APU Frame Counter IRQ]: Reading $4015 3 cycles after the IRQ flag is set, will clear the IRQ flag (it does not get set again on this CPU cycle) ;;;
 	JSR WaitForVBlank
-	LDA #02
-	STA $4014 ; sync with "get" CPU cycle
+	JSR OAMDMAWithPage2 ; sync with "get" CPU cycle
 	LDA <$00  ; (get), (put), (get)
 	LDA #$40  ; (put), (get)
 	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag
@@ -10299,8 +10459,7 @@ TEST_FrameCounterIRQ_Continue2:
 	;
 	; The following 4 tests will check 29827, 29828, 29829, and 29830 cycles after resetting the frame counter, and the test after that will verify that the IRQ level detector is not pulled low. (An IRQ did not happen)
 	JSR WaitForVBlank
-	LDA #02
-	STA $4014 ; sync with "get" CPU cycle
+	JSR OAMDMAWithPage2 ; sync with "get" CPU cycle
 	LDA <$00  ; (get), (put), (get)
 	LDA #$40  ; (put), (get)
 	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
@@ -10315,8 +10474,7 @@ TEST_FrameCounterIRQ_Continue2:
 
 	;;; Test J [APU Frame Counter IRQ]: Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It happens on this cycle) ;;;
 	JSR WaitForVBlank
-	LDA #02
-	STA $4014 ; sync with "get" CPU cycle
+	JSR OAMDMAWithPage2 ; sync with "get" CPU cycle
 	LDA <$00  ; (get), (put), (get)
 	LDA #$40  ; (put), (get)
 	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
@@ -10331,8 +10489,7 @@ TEST_FrameCounterIRQ_Continue2:
 
 	;;; Test K [APU Frame Counter IRQ]: Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It happens on this cycle too) ;;;
 	JSR WaitForVBlank
-	LDA #02
-	STA $4014 ; sync with "get" CPU cycle
+	JSR OAMDMAWithPage2 ; sync with "get" CPU cycle
 	LDA <$00  ; (get), (put), (get)
 	LDA #$40  ; (put), (get)
 	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
@@ -10347,8 +10504,7 @@ TEST_FrameCounterIRQ_Continue2:
 
 	;;; Test L [APU Frame Counter IRQ]:  Despite the "Suppress Frame Counter Interrupts" flag being set, the frame counter interrupt flag *will be set* for 2 CPU cycles. (It does not happen on this cycle) ;;;
 	JSR WaitForVBlank
-	LDA #02
-	STA $4014 ; sync with "get" CPU cycle
+	JSR OAMDMAWithPage2 ; sync with "get" CPU cycle
 	LDA <$00  ; (get), (put), (get)
 	LDA #$40  ; (put), (get)
 	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
@@ -10366,8 +10522,7 @@ TEST_FrameCounterIRQ_Continue2:
 	; This test is only reliable if the Interrupt Flag Latency test passes.
 	JSR WaitForVBlank
 	LDX #$5A
-	LDA #02
-	STA $4014 ; sync with "get" CPU cycle
+	JSR OAMDMAWithPage2 ; sync with "get" CPU cycle
 	LDA <$00  ; (get), (put), (get)
 	LDA #$40  ; (put), (get)
 	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
@@ -10384,8 +10539,7 @@ TEST_FrameCounterIRQ_Continue2:
 
 	;;; Test N [APU Frame Counter IRQ]: If the CPU's I flag is clear, when exactly does the IRQ occur? ;;;
 	JSR WaitForVBlank
-	LDA #02
-	STA $4014 ; sync with "get" CPU cycle
+	JSR OAMDMAWithPage2 ; sync with "get" CPU cycle
 	LDA <$00  ; (get), (put), (get)
 	LDA #$00  ; (put), (get)
 	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
@@ -10410,8 +10564,7 @@ FAIL_FrameCounterIRQ4:
 TEST_FrameCounterIRQ_Continue3:
 	;;; Test O [APU Frame Counter IRQ]: If the CPU's I flag is clear, when exactly does the IRQ occur? ;;;
 	JSR WaitForVBlank
-	LDA #02
-	STA $4014 ; sync with "get" CPU cycle
+	JSR OAMDMAWithPage2 ; sync with "get" CPU cycle
 	LDA <$00  ; (get), (put), (get)
 	LDA #$00  ; (put), (get)
 	STA $4017 ; (put), (get), (put), (get) : 4-step mode, clear IRQ flag (The CPU was on a "get" cycle when writing that, so the frame counter is reset in 4 CPU cycles.)
@@ -10442,8 +10595,7 @@ FAIL_FrameCounter4Step:
 TEST_FrameCounter4Step:
 	JSR TEST_APU_Prep
 	;;; Test 1 [APU Frame Counter 4-Step Mode]: Verify the timing of the first clock (read 1 cycle early. It's still going) ;;;
-	LDA #2
-	STA $4014
+	JSR OAMDMAWithPage2
 	; CPU is synced with "get" CPU cycle
 	LDA #0    ; (get), (put)
 	STA $4017 ; (get), (put), (get), (put) : Reset the frame counter.
@@ -10466,8 +10618,7 @@ TEST_FrameCounter4Step:
 	INC <ErrorCode
 	
 	;;; Test 2 [APU Frame Counter 4-Step Mode]: Verify the timing of the first clock  (Read the cycle it stops);;;
-	LDA #2
-	STA $4014
+	JSR OAMDMAWithPage2
 	;CPU is synced with "get" CPU cycle
 	LDA #0    ; (get), (put)
 	STA $4017 ; (get), (put), (get), (put) : Reset the frame counter.
@@ -10491,8 +10642,7 @@ TEST_FrameCounter4Step:
 	INC <ErrorCode
 	
 	;;; Test 3 [APU Frame Counter 4-Step Mode]: Verify the timing of the second clock while not inhibiting Frame Counter IRQs (read 1 cycle early. It's still going) ;;;
-	LDA #2
-	STA $4014
+	JSR OAMDMAWithPage2
 	;CPU is synced with "get" CPU cycle
 	LDA #$18  ; (get), (put)
 	STA $4003 ; (get), (put), (get), (put) : Set the length to 2. We don't need to manually clock this one, as we're checking the timing of the 2nd clock.
@@ -10510,8 +10660,7 @@ TEST_FrameCounter4Step:
 	INC <ErrorCode
 	
 	;;; Test 4 [APU Frame Counter 4-Step Mode]: Verify the timing of the second clock while not inhibiting Frame Counter IRQs (Read the cycle it stops) ;;;
-	LDA #2
-	STA $4014
+	JSR OAMDMAWithPage2
 	;CPU is synced with "get" CPU cycle
 	LDA #$18  ; (get), (put)
 	STA $4003 ; (get), (put), (get), (put) : Set the length to 2. We don't need to manually clock this one, as we're checking the timing of the 2nd clock.
@@ -10530,8 +10679,7 @@ TEST_FrameCounter4Step:
 	INC <ErrorCode
 	
 	;;; Test 5 [APU Frame Counter 4-Step Mode]: Verify the timing of the third clock (read 1 cycle early. It's still going) ;;;
-	LDA #2
-	STA $4014
+	JSR OAMDMAWithPage2
 	;CPU is synced with "get" CPU cycle
 	LDA #0    ; (get), (put)
 	STA $4017 ; (get), (put), (get), (put) : Reset the frame counter.
@@ -10554,8 +10702,7 @@ TEST_FrameCounter4Step:
 	INC <ErrorCode	
 	
 	;;; Test 6 [APU Frame Counter 4-Step Mode]: Verify the timing of the third clock  (Read the cycle it stops) ;;;
-	LDA #2
-	STA $4014
+	JSR OAMDMAWithPage2
 	;CPU is synced with "get" CPU cycle
 	LDA #0    ; (get), (put)
 	STA $4017 ; (get), (put), (get), (put) : Reset the frame counter.
@@ -10593,8 +10740,7 @@ FAIL_FrameCounter5Step:
 TEST_FrameCounter5Step:
 	JSR TEST_APU_Prep
 	;;; Test 1 [APU Frame Counter 5-Step Mode]: Verify the timing of the first clock (read 1 cycle early. It's still going) ;;;
-	LDA #2
-	STA $4014
+	JSR OAMDMAWithPage2
 	;CPU is synced with "get" CPU cycle
 	LDA #0    ; (get), (put)
 	STA $4017 ; (get), (put), (get), (put) : Reset the frame counter.
@@ -10615,8 +10761,7 @@ TEST_FrameCounter5Step:
 	INC <ErrorCode
 	
 	;;; Test 2 [APU Frame Counter 5-Step Mode]: Verify the timing of the first clock  (Read the cycle it stops);;;
-	LDA #2
-	STA $4014
+	JSR OAMDMAWithPage2
 	;CPU is synced with "get" CPU cycle
 	LDA #0    ; (get), (put)
 	STA $4017 ; (get), (put), (get), (put) : Reset the frame counter.
@@ -10637,8 +10782,7 @@ TEST_FrameCounter5Step:
 	INC <ErrorCode
 	
 	;;; Test 3 [APU Frame Counter 5-Step Mode]: Verify the timing of the second clock (read 1 cycle early. It's still going) ;;;
-	LDA #2
-	STA $4014
+	JSR OAMDMAWithPage2
 	;CPU is synced with "get" CPU cycle
 	LDA #0    ; (get), (put)
 	STA $4017 ; (get), (put), (get), (put) : Reset the frame counter.
@@ -10659,8 +10803,7 @@ TEST_FrameCounter5Step:
 	INC <ErrorCode
 	
 	;;; Test 4 [APU Frame Counter 5-Step Mode]: Verify the timing of the second clock  (Read the cycle it stops);;;
-	LDA #2
-	STA $4014
+	JSR OAMDMAWithPage2
 	;CPU is synced with "get" CPU cycle
 	LDA #0    ; (get), (put)
 	STA $4017 ; (get), (put), (get), (put) : Reset the frame counter.
@@ -10681,8 +10824,7 @@ TEST_FrameCounter5Step:
 	INC <ErrorCode
 	
 	;;; Test 5 [APU Frame Counter 5-Step Mode]: Verify the timing of the third clock (read 1 cycle early. It's still going) ;;;
-	LDA #2
-	STA $4014
+	JSR OAMDMAWithPage2
 	;CPU is synced with "get" CPU cycle
 	LDA #0    ; (get), (put)
 	STA $4017 ; (get), (put), (get), (put) : Reset the frame counter.
@@ -10703,8 +10845,7 @@ TEST_FrameCounter5Step:
 	INC <ErrorCode
 	
 	;;; Test 6 [APU Frame Counter 5-Step Mode]: Verify the timing of the third clock  (Read the cycle it stops);;;
-	LDA #2
-	STA $4014
+	JSR OAMDMAWithPage2
 	;CPU is synced with "get" CPU cycle
 	LDA #0    ; (get), (put)
 	STA $4017 ; (get), (put), (get), (put) : Reset the frame counter.
@@ -11680,8 +11821,7 @@ TEST_ImpliedDummyRead:
 	LDA #$00	
 	STA $4017	; 4-step mode, enable IRQ
 	JSR Clockslide_30000 ; wait long enough that the IRQ flag would be set.
-	LDA #02
-	STA $4014 ; align with "get" cycle.
+	JSR OAMDMAWithPage2 ; align with "get" cycle.
 	LDA #0    ; (get), (put)
 	LDX #0    ; (get), (put)
 	.byte $1F	; (get) : SLO Absolute, X
@@ -12722,8 +12862,6 @@ TEST_DMCDMAPlusOAMDMA_Loop3:
 	BNE TEST_DMCDMAPlusOAMDMA_Loop3
 	
 	;; END OF TEST ;;
-	LDA #0
-	STA $4015 ; stop the DMC from playing.
 	LDA #1
 	RTS
 ;;;;;;;
@@ -12736,8 +12874,6 @@ TEST_DMCDMAPlusOAMDMA_AnswerKey:
 	.byte $02, $01, $02, $01, $02, $00, $01, $02, $03, $03, $04, $03, $04, $03, $04, $03
 
 FAIL_ExplicitDMAAbort:
-	LDA #0
-	STA $4015	; stop the DMC from playing.
 	JMP TEST_Fail
 
 
@@ -12798,8 +12934,6 @@ TEST_ExplicitDMAAbort_Loop2:
 	BNE TEST_ExplicitDMAAbort_Loop2
 
 	;; END OF TEST ;;
-	LDA #0
-	STA $4015 ; disable DMC
 	LDA #1
 	RTS
 ;;;;;;;
@@ -12808,8 +12942,6 @@ TEST_ExplicitDMAAbort_AnswerKey:
 	.byte $04, $04, $04, $04, $04, $04, $03, $04, $01, $01, $00, $00, $00, $00, $00, $00
 
 FAIL_ImplicitDMAAbort:
-	LDA #0
-	STA $4015	; stop the DMC from playing.
 	JMP TEST_Fail
 
 TEST_ImplicitDMAAbort:
@@ -13801,6 +13933,56 @@ TEST_MisalignedOAM2_Loop:
 	RTS
 ;;;;;;;	
 	
+TEST_APURegActivation_Finale:
+	LDA #0
+	STA $4015
+	; The controller ports might not have been visible by the OAM DMA, but did the controller ports get clocked?
+	; This used to be an error code, but different consoles behave differently, so let's just print if it did or not.
+	LDA #0
+	STA <dontSetPointer ; prep this, since we're drawing stuff.
+	LDA $4016
+	LDA $4016	; it is assumed the B button is not pressed during the test.
+	LSR A
+	BCS TEST_APURegActivation_ConflictClocked	
+	; And the controller ports were NOT clocked here!
+	LDA <RunningAllTests
+	BNE TEST_APURegActivation_Res1
+	JSR PrintTextCentered
+	.word $2350
+	.byte "OAM DMA Bus Conflict no Clock", $FF
+	JSR ResetScroll
+TEST_APURegActivation_Res1:
+	LDA #5 ; Success Code 1
+	RTS
+	
+TEST_APURegActivation_ConflictClocked:
+	; Bingo! Look at that. The controller ports *were* clocked, but did not appear in OAM!
+	LDA <RunningAllTests
+	BNE TEST_APURegActivation_Res2
+	JSR PrintTextCentered
+	.word $2350
+	.byte "OAM DMA Bus Conflict Clocks", $FF
+	JSR ResetScroll
+TEST_APURegActivation_Res2:
+	LDA #9 ; Success Code 2
+	RTS
+;;;;;;;
+	
+PressStartToContinue:
+	JSR ReadController1
+	LDA <controller_New
+	AND #$10
+	BEQ PressStartToContinue_End
+	JSR SetUpDefaultPalette
+	JSR DisableNMI
+	JSR DisableRendering
+	JSR ClearNametable
+	LDX #$EF ; Due to some tests modifying the stack pointer, it's convenient to put it at EF instead of FF.
+	TXS		 ; This prevents some tests where the resulting stack pointer is 00 from pushing data, and overwriting the bottom of the stack.
+	JMP ReloadMainMenu
+PressStartToContinue_End:
+	RTI
+;;;;;;;
 	
 	.bank 3
 	.org $E000
@@ -15328,8 +15510,7 @@ TEST_tRegisterQuirks:
 DoSpriteZeroHitTest:
 	JSR WaitForVBlank	
 	JSR EnableRendering
-	LDA #2
-	STA $4014
+	JSR OAMDMAWithPage2
 	JSR WaitForVBlank	
 	JSR DisableRendering_S
 	LDA $2002 ; Read from PPUSTATUS
@@ -15373,8 +15554,7 @@ TEST_StaleBGShiftRegisters:
 	
 	JSR SetUpSpriteZero
 	.byte $06, $C6, $03, $00 ; This is a specific character that will miss this particular sprite zero hit.
-	LDA #2
-	STA $4014
+	JSR OAMDMAWithPage2
 	JSR Test_StaleShiftRegisters_Run
 	BNE FAIL_StaleShiftRegisters
 	INC <ErrorCode
@@ -15393,8 +15573,7 @@ TEST_StaleBGShiftRegisters:
 	
 	JSR SetUpSpriteZero
 	.byte $06, $C8, $03, $00 ; X = 0. Sprite zero will be drawn immediately after rendering is enabled.
-	LDA #2
-	STA $4014
+	JSR OAMDMAWithPage2
 	JSR Test_StaleShiftRegisters_Run
 	BEQ FAIL_StaleShiftRegisters
 	INC <ErrorCode
@@ -15402,8 +15581,7 @@ TEST_StaleBGShiftRegisters:
 	;;; Test 4 [Stale BG Shift Registers]: This is just testing a quirk of the sprite shifters, and how if rendering wasn't enabled when dot 339 occurs, all sprites are treated as X = 0 ;;;
 	JSR SetUpSpriteZero
 	.byte $06, $C8, $03, $80 ; X = 80. Sprite zero will be still drawn immediately after rendering is enabled. (Dot 339 occurred while rendering was still disabled)
-	LDA #2
-	STA $4014
+	JSR OAMDMAWithPage2
 	JSR Test_StaleShiftRegisters_Run
 	BEQ FAIL_StaleShiftRegisters
 
@@ -15547,8 +15725,7 @@ TEST_Scanline0Sprites_ClearPg2: ; clear page 2 (used for OAM DMA) with all zeroe
 		
 	JSR WaitForVBlank ; Wait for vblank
 	JSR EnableRendering
-	LDA #2
-	STA $4014
+	JSR OAMDMAWithPage2
 	JSR WaitForVBLSpriteZeroHit; Wait for vblank and load A with $2002.6
 	BNE FAIL_Scanline0Sprites1 ; If the sprite zero hit *DID* occur, the test has failed, since a Y coordinate of 0 should draw the sprite on scanline 1.
 	INC <ErrorCode
@@ -15966,6 +16143,18 @@ TEST_BGSerialIn_Exit:
 FAIL_BGSerialIn2:
 	JMP FAIL_BGSerialIn
 ;;;;;;;;;;;;;;;;;
+
+VerifySprOverflowFlag:
+	JSR sprOverflow_Setup
+	JSR EnableRendering	; Enable both the background and sprites.
+	JSR Clockslide_3000 ; wait long enough for these to render.
+	LDA $2002
+	AND #$20 ; Bit 5 holds the sprite overflow flag
+	RTS
+;;;;;;;
+
+TEST_DMCReloadTiming_Key:
+	.byte $40, $00, $40, $00, $40, $00, $40, $00, $00, $40, $00, $40
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                ENGINE                   ;;
@@ -17852,8 +18041,6 @@ RunTest_AllTestSkipDraw2:         ; If we're running all tests, we don't need th
 ;;; PerformTest ;;;
 ; This is an indirect jump. The test will end with an RTS, effective acting as the RTS for this routine.
 PerformTest:                 ;
-	TSX                      ;
-	STX <copy_SP2            ; Make a copy of the stack pointer.
 	LDX #0                   ;
 	JMP [testAddressPointer] ; Move the PC to the location of the test.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -18199,8 +18386,7 @@ VerifySpriteZeroHits:          ; Verify that sprite zero hits work in this emula
 	JSR PrintCHR               ; Update nametable
 	.word $2C00                ; And 8x8 box with a single pixel hole in it. (we're intentionally missing this sprite zero hit.)
 	.byte $E1, $FF             ; This will trigger the sprite zero hit.
-	LDA #2                     ; Page 2 for the OAM DMA
-	STA $4014                  ; Trigger the OAM DMA
+	JSR OAMDMAWithPage2        ; OAM DMA with page 2
 	JSR WaitForVBlank          ; Wait for vblank
 	JSR EnableRendering        ; Draw both the background and sprites.	
 	JSR WaitForVBLSpriteZeroHit; Wait for vblank and load A with $2002.6
@@ -18208,8 +18394,7 @@ VerifySpriteZeroHits:          ; Verify that sprite zero hits work in this emula
 	JSR PrintCHR               ; Update nametable
 	.word $2C00                ; Single dot to overlap the sprite. (we're intentionally hitting this one)
 	.byte $E2, $FF             ; This will trigger the sprite zero hit.	
-	LDA #2                     ; Page 2 for the OAM DMA
-	STA $4014                  ; Trigger the OAM DMA
+	JSR OAMDMAWithPage2        ; OAM DMA with page 2
 	JSR WaitForVBlank          ; Wait for vblank
 	JSR EnableRendering        ; Draw both the background and sprites.	
 	JSR WaitForVBLSpriteZeroHit; Wait for vblank and load A with $2002.6
@@ -18398,8 +18583,7 @@ TEST_MisalignedOAMDMA_Loop:
 	LDA #$80 
 	STA $2003 ; OAM Address = $80
 	
-	LDA #2
-	STA $4014 ; OAM DMA, starting at address $200, but writing to address $80 of OAM, ending at address $7F.
+	JSR OAMDMAWithPage2 ; OAM DMA, starting at address $200, but writing to address $80 of OAM, ending at address $7F.
 	
 	LDA #$FF  ;
 	STA $2003 ; 
@@ -18414,6 +18598,28 @@ TEST_MisalignedOAMDMA_Loop:
 	LDA #1
 	RTS
 ;;;;;;;
+
+;;; SetBRKRoutineFromWord ;;;
+; Updates the operands of the JMP instruction at address $600 to be the provided .word
+; This subroutine protects the A and Y registers.
+SetBRKRoutineFromWord:           ;
+	STA <Copy_A                  ; Make a copy of the A register.
+	STY <Copy_Y                  ; Make a copy of the Y register.
+	JSR CopyReturnAddressToByte0 ; Copy the return address into a pointer at address $0000.
+	LDY #0                       ;
+	LDA [$0000],Y                ; Read the low byte.
+	STA $601                     ; Write the low byte to $601.
+	INY                          ;
+	LDA [$0000],Y                ; Read the high byte.
+	STA $602                     ; Write the high byte to $602.
+	INY                          ;
+	JSR FixRTS                   ; Fix the return address so we skip the .word
+	LDA #$4C                     ;
+	STA $600                     ; Put a JMP opcode at address $600.
+	LDY <Copy_Y                  ; Restore Y.
+	LDA <Copy_A                  ; Restore A.
+	RTS                          ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 	.org $FD00
 ;;;;;;;;;;;;;;;;;;;;; The clockslide here must be page-aligned.
@@ -18893,6 +19099,12 @@ TEST_RMW2007_ClearNametable2Loop:
 	; 33 00s. This will be the DPCM "audio sample" played during the DMC DMA Sync loop. It should just be silence.
 	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+	
+	OAMDMAWithPage2:
+	LDA #2
+	STA $4014
+	RTS
+;;;;;;;
 	
 	.org $FFF5
 TEST_AddrMode_Relative_FFF5:
