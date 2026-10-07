@@ -1315,7 +1315,7 @@ TEST_SHA_Behavior4:
 	LDA #High(DMASync_50MinusACyclesRemaining)
 	STA $0582	
 	LDA #$7
-	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 6 is probably the only one that will show up.
+	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 7 is probably the only one that will show up.
 	PLA
 	
 	JSR TEST_RunTest_AddrInitAXYFS
@@ -5485,7 +5485,7 @@ TEST_SHA_Behavior1:
 	LDA #High(DMASync_50MinusACyclesRemaining)
 	STA $0582	
 	LDA #$7
-	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 6 is probably the only one that will show up.
+	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 7 is probably the only one that will show up.
 	PLA
 	
 	JSR TEST_RunTest_AddrInitAXYF
@@ -5597,7 +5597,7 @@ TEST_SHA_Behavior2:
 	LDA #High(DMASync_50MinusACyclesRemaining)
 	STA $0582	
 	LDA #$7
-	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 6 is probably the only one that will show up.
+	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 7 is probably the only one that will show up.
 	PLA
 	
 	JSR TEST_RunTest_AddrInitAXYF
@@ -5881,7 +5881,7 @@ TEST_SHY_9C:
 	LDA #High(DMASync_50MinusACyclesRemaining)
 	STA $0582	
 	LDA #$7
-	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 6 is probably the only one that will show up.
+	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 7 is probably the only one that will show up.
 	PLA
 	
 	; SHY just becomes STY if a DMA occurs on the right cpu cycle.
@@ -5937,7 +5937,7 @@ TEST_SHX_9E:
 	LDA #High(DMASync_50MinusACyclesRemaining)
 	STA $0582	
 	LDA #$7
-	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 6 is probably the only one that will show up.
+	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 7 is probably the only one that will show up.
 	PLA
 	
 	; SHX just becomes STX if a DMA occurs on the right cpu cycle.
@@ -13430,7 +13430,7 @@ TEST_SHA_Behavior3:
 	LDA #High(DMASync_50MinusACyclesRemaining)
 	STA $0582	
 	LDA #$7
-	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 6 is probably the only one that will show up.
+	STA <initialSubTest	; The following test will give error codes, 7, 8, 9, A, B, and C. Error code 7 is probably the only one that will show up.
 	PLA
 	
 	JSR TEST_RunSHASHS_AddrInitAXYFS
@@ -16127,7 +16127,7 @@ TEST_BGSerialIn_Loop:
 TEST_BGSerialIn_WasteACycle:
 	DEY                                                          ; +2 = 106
 	BEQ TEST_BGSerialIn_Exit ; Exit the loop if Y = 0.           ; +2 = 108
-	LDA <$00                                                     ; +3 = 111
+	NOP                                                          ; +3 = 111 (Oof, the branch here now crosses a page boundary?! This NOP is +2 cycles, but the branch took one more than expected.)
 	JMP TEST_BGSerialIn_Loop                                     ; +3 = 114
 TEST_BGSerialIn_Exit:
 	LDA $2002                ; Anyway, I could've just done that once instead of across the entire screen, but it was suggested to make it more visible.
@@ -17064,9 +17064,6 @@ LSMNR_Loop1:
 	CMP #$FF
 	BNE LSMNR_Loop1
 	JSR LSM_AddYToSuitePointer
-	BCC LSMNR_SkipInc
-	INC <suitePointer+1
-LSMNR_SkipInc:
 	; Now that we're past the name of the suite, we need to loop over every entry for a page.
 	; the format is: Name, $FF, ResultPointer, TestPointer
 	; If the first byte of Name is $FF, then we loaded everything in a page.
@@ -17093,9 +17090,6 @@ LSMNR_Loop3:
 	CMP #$FF
 	BNE LSMNR_Loop3
 	JSR LSM_AddYToSuitePointer
-	BCC LSMNR_SkipInc2
-	INC <suitePointer+1
-LSMNR_SkipInc2:
 	JSR LSM_CopySuitePointerToByte0
 	LDY #0
 	LDX <Copy_X
@@ -17104,9 +17098,6 @@ LSMNR_SkipInc2:
 	STX <Copy_X
 	; Y = 4.
 	JSR LSM_AddYToSuitePointer
-	BCC LSMNR_SkipInc3
-	INC <suitePointer+1
-LSMNR_SkipInc3:
 	JMP LSMNR_Loop2
 ;;;;;;;;;;;;;;;;;;;
 
@@ -17134,6 +17125,9 @@ LSM_AddYToSuitePointer:
 	CLC
 	ADC <suitePointer
 	STA <suitePointer
+	BCC LSM_AddYSkipInc
+	INC <suitePointer+1
+LSM_AddYSkipInc:
 	RTS
 ;;;;;;;
 
@@ -17159,9 +17153,6 @@ LoadSuiteMenu: ; Print a list of tests to run. If these tests have been ran befo
 LSM_Loop:
 	; add Y to suitePointer
 	JSR LSM_AddYToSuitePointer
-	BCC LSM_SkipInc
-	INC <suitePointer+1
-LSM_SkipInc:
 	LDA <$04
 	CLC
 	ADC #$40
