@@ -526,6 +526,30 @@ table .macro
 	.word \3
 	.word \4
 	.endm
+	
+	; This is just an absurd byte-saving measure where I substitute the word "absolute" for a single character in the ROM.
+tblf1 .macro
+	.byte \1
+	.byte \2
+	.byte \3
+	.word \4
+	.word \5
+	.endm
+	
+	; This is just an absurd byte-saving measure where I substitute the word "absolute" for a single character in the ROM, but then I need to add a ",X" afterwards.
+tblf2 .macro
+	.byte \1
+	.byte \2
+	.byte \3
+	.byte \4
+	.word \5
+	.word \6
+	.endm
+
+str_Indirect = $F0
+str_ZeroPage = $F1
+str_Absolute = $F2
+str_Immediate = $F3
 
 TestPages:	; I just made this label for ease of searching.
 
@@ -556,112 +580,112 @@ Suite_CPUInstructions:
 	;; Unofficial Instructions: SLO ;;
 Suite_UnofficialOps_SLO:
 	.byte "Unofficial Instructions: SLO", $FF
-	table "$03   SLO indirect,X", $FF, result_UnOp_SLO_03, TEST_SLO_03
-	table "$07   SLO zeropage",   $FF, result_UnOp_SLO_07, TEST_SLO_07
-	table "$0F   SLO absolute",   $FF, result_UnOp_SLO_0F, TEST_SLO_0F
-	table "$13   SLO indirect,Y", $FF, result_UnOp_SLO_13, TEST_SLO_13
-	table "$17   SLO zeropage,X", $FF, result_UnOp_SLO_17, TEST_SLO_17
-	table "$1B   SLO absolute,Y", $FF, result_UnOp_SLO_1B, TEST_SLO_1B
-	table "$1F   SLO absolute,X", $FF, result_UnOp_SLO_1F, TEST_SLO_1F
+	tblf2 "$03   SLO", str_Indirect, ",X", $FF, result_UnOp_SLO_03, TEST_SLO_03
+	tblf1 "$07   SLO", str_ZeroPage,       $FF, result_UnOp_SLO_07, TEST_SLO_07
+	tblf1 "$0F   SLO", str_Absolute,       $FF, result_UnOp_SLO_0F, TEST_SLO_0F
+	tblf2 "$13   SLO", str_Indirect, ",Y", $FF, result_UnOp_SLO_13, TEST_SLO_13
+	tblf2 "$17   SLO", str_ZeroPage, ",X", $FF, result_UnOp_SLO_17, TEST_SLO_17
+	tblf2 "$1B   SLO", str_Absolute, ",Y", $FF, result_UnOp_SLO_1B, TEST_SLO_1B
+	tblf2 "$1F   SLO", str_Absolute, ",X", $FF, result_UnOp_SLO_1F, TEST_SLO_1F
 	.byte $FF
 	
 	;; Unofficial Instructions: RLA ;;
 Suite_UnofficialOps_RLA:
 	.byte "Unofficial Instructions: RLA", $FF
-	table "$23   RLA indirect,X", $FF, result_UnOp_RLA_23, TEST_RLA_23
-	table "$27   RLA zeropage",   $FF, result_UnOp_RLA_27, TEST_RLA_27
-	table "$2F   RLA absolute",   $FF, result_UnOp_RLA_2F, TEST_RLA_2F
-	table "$33   RLA indirect,Y", $FF, result_UnOp_RLA_33, TEST_RLA_33
-	table "$37   RLA zeropage,X", $FF, result_UnOp_RLA_37, TEST_RLA_37
-	table "$3B   RLA absolute,Y", $FF, result_UnOp_RLA_3B, TEST_RLA_3B
-	table "$3F   RLA absolute,X", $FF, result_UnOp_RLA_3F, TEST_RLA_3F
+	tblf2 "$23   RLA", str_Indirect, ",X", $FF, result_UnOp_RLA_23, TEST_RLA_23
+	tblf1 "$27   RLA", str_ZeroPage,       $FF, result_UnOp_RLA_27, TEST_RLA_27
+	tblf1 "$2F   RLA", str_Absolute,       $FF, result_UnOp_RLA_2F, TEST_RLA_2F
+	tblf2 "$33   RLA", str_Indirect, ",Y", $FF, result_UnOp_RLA_33, TEST_RLA_33
+	tblf2 "$37   RLA", str_ZeroPage, ",X", $FF, result_UnOp_RLA_37, TEST_RLA_37
+	tblf2 "$3B   RLA", str_Absolute, ",Y", $FF, result_UnOp_RLA_3B, TEST_RLA_3B
+	tblf2 "$3F   RLA", str_Absolute, ",X", $FF, result_UnOp_RLA_3F, TEST_RLA_3F
 	.byte $FF
 	
 	;; Unofficial Instructions: SRE ;;
 Suite_UnofficialOps_SRE:
 	.byte "Unofficial Instructions: SRE", $FF
-	table "$43   SRE indirect,X", $FF, result_UnOp_SRE_43, TEST_SRE_43
-	table "$47   SRE zeropage",   $FF, result_UnOp_SRE_47, TEST_SRE_47
-	table "$4F   SRE absolute",   $FF, result_UnOp_SRE_4F, TEST_SRE_4F
-	table "$53   SRE indirect,Y", $FF, result_UnOp_SRE_53, TEST_SRE_53
-	table "$57   SRE zeropage,X", $FF, result_UnOp_SRE_57, TEST_SRE_57
-	table "$5B   SRE absolute,Y", $FF, result_UnOp_SRE_5B, TEST_SRE_5B
-	table "$5F   SRE absolute,X", $FF, result_UnOp_SRE_5F, TEST_SRE_5F
+	tblf2 "$43   SRE", str_Indirect, ",X", $FF, result_UnOp_SRE_43, TEST_SRE_43
+	tblf1 "$47   SRE", str_ZeroPage,       $FF, result_UnOp_SRE_47, TEST_SRE_47
+	tblf1 "$4F   SRE", str_Absolute,       $FF, result_UnOp_SRE_4F, TEST_SRE_4F
+	tblf2 "$53   SRE", str_Indirect, ",Y", $FF, result_UnOp_SRE_53, TEST_SRE_53
+	tblf2 "$57   SRE", str_ZeroPage, ",X", $FF, result_UnOp_SRE_57, TEST_SRE_57
+	tblf2 "$5B   SRE", str_Absolute, ",Y", $FF, result_UnOp_SRE_5B, TEST_SRE_5B
+	tblf2 "$5F   SRE", str_Absolute, ",X", $FF, result_UnOp_SRE_5F, TEST_SRE_5F
 	.byte $FF
 	
 	;; Unofficial Instructions: RRA ;;
 Suite_UnofficialOps_RRA:
 	.byte "Unofficial Instructions: RRA", $FF
-	table "$63   RRA indirect,X", $FF, result_UnOp_RRA_63, TEST_RRA_63
-	table "$67   RRA zeropage",   $FF, result_UnOp_RRA_67, TEST_RRA_67
-	table "$6F   RRA absolute",   $FF, result_UnOp_RRA_6F, TEST_RRA_6F
-	table "$73   RRA indirect,Y", $FF, result_UnOp_RRA_73, TEST_RRA_73
-	table "$77   RRA zeropage,X", $FF, result_UnOp_RRA_77, TEST_RRA_77
-	table "$7B   RRA absolute,Y", $FF, result_UnOp_RRA_7B, TEST_RRA_7B
-	table "$7F   RRA absolute,X", $FF, result_UnOp_RRA_7F, TEST_RRA_7F
+	tblf2 "$63   RRA", str_Indirect, ",X", $FF, result_UnOp_RRA_63, TEST_RRA_63
+	tblf1 "$67   RRA", str_ZeroPage,       $FF, result_UnOp_RRA_67, TEST_RRA_67
+	tblf1 "$6F   RRA", str_Absolute,       $FF, result_UnOp_RRA_6F, TEST_RRA_6F
+	tblf2 "$73   RRA", str_Indirect, ",Y", $FF, result_UnOp_RRA_73, TEST_RRA_73
+	tblf2 "$77   RRA", str_ZeroPage, ",X", $FF, result_UnOp_RRA_77, TEST_RRA_77
+	tblf2 "$7B   RRA", str_Absolute, ",Y", $FF, result_UnOp_RRA_7B, TEST_RRA_7B
+	tblf2 "$7F   RRA", str_Absolute, ",X", $FF, result_UnOp_RRA_7F, TEST_RRA_7F
 	.byte $FF
 	
 	;; Unofficial Instructions: .AX ;;
 Suite_UnofficialOps__AX:
 	.byte "Unofficial Instructions: *AX", $FF
-	table "$83   SAX indirect,X", $FF, result_UnOp_SAX_83, TEST_SAX_83
-	table "$87   SAX zeropage",   $FF, result_UnOp_SAX_87, TEST_SAX_87
-	table "$8F   SAX absolute",   $FF, result_UnOp_SAX_8F, TEST_SAX_8F
-	table "$97   SAX zeropage,Y", $FF, result_UnOp_SAX_97, TEST_SAX_97
-	table "$A3   LAX indirect,X", $FF, result_UnOp_LAX_A3, TEST_LAX_A3
-	table "$A7   LAX zeropage",   $FF, result_UnOp_LAX_A7, TEST_LAX_A7
-	table "$AF   LAX absolute",   $FF, result_UnOp_LAX_AF, TEST_LAX_AF
-	table "$B3   LAX indirect,Y", $FF, result_UnOp_LAX_B3, TEST_LAX_B3
-	table "$B7   LAX zeropage,Y", $FF, result_UnOp_LAX_B7, TEST_LAX_B7
-	table "$BF   LAX absolute,Y", $FF, result_UnOp_LAX_BF, TEST_LAX_BF
+	tblf2 "$83   SAX", str_Indirect, ",X", $FF, result_UnOp_SAX_83, TEST_SAX_83
+	tblf1 "$87   SAX", str_ZeroPage,       $FF, result_UnOp_SAX_87, TEST_SAX_87
+	tblf1 "$8F   SAX", str_Absolute,       $FF, result_UnOp_SAX_8F, TEST_SAX_8F
+	tblf2 "$97   SAX", str_ZeroPage, ",Y", $FF, result_UnOp_SAX_97, TEST_SAX_97
+	tblf2 "$A3   LAX", str_Indirect, ",X", $FF, result_UnOp_LAX_A3, TEST_LAX_A3
+	tblf1 "$A7   LAX", str_ZeroPage,       $FF, result_UnOp_LAX_A7, TEST_LAX_A7
+	tblf1 "$AF   LAX", str_Absolute,       $FF, result_UnOp_LAX_AF, TEST_LAX_AF
+	tblf2 "$B3   LAX", str_Indirect, ",Y", $FF, result_UnOp_LAX_B3, TEST_LAX_B3
+	tblf2 "$B7   LAX", str_ZeroPage, ",Y", $FF, result_UnOp_LAX_B7, TEST_LAX_B7
+	tblf2 "$BF   LAX", str_Absolute, ",Y", $FF, result_UnOp_LAX_BF, TEST_LAX_BF
 	.byte $FF
 	
 	;; Unofficial Instructions: DCP ;;
 Suite_UnofficialOps_DCP:
 	.byte "Unofficial Instructions: DCP", $FF
-	table "$C3   DCP indirect,X", $FF, result_UnOp_DCP_C3, TEST_DCP_C3
-	table "$C7   DCP zeropage",   $FF, result_UnOp_DCP_C7, TEST_DCP_C7
-	table "$CF   DCP absolute",   $FF, result_UnOp_DCP_CF, TEST_DCP_CF
-	table "$D3   DCP indirect,Y", $FF, result_UnOp_DCP_D3, TEST_DCP_D3
-	table "$D7   DCP zeropage,X", $FF, result_UnOp_DCP_D7, TEST_DCP_D7
-	table "$DB   DCP absolute,Y", $FF, result_UnOp_DCP_DB, TEST_DCP_DB
-	table "$DF   DCP absolute,X", $FF, result_UnOp_DCP_DF, TEST_DCP_DF
+	tblf2 "$C3   DCP", str_Indirect, ",X", $FF, result_UnOp_DCP_C3, TEST_DCP_C3
+	tblf1 "$C7   DCP", str_ZeroPage,       $FF, result_UnOp_DCP_C7, TEST_DCP_C7
+	tblf1 "$CF   DCP", str_Absolute,       $FF, result_UnOp_DCP_CF, TEST_DCP_CF
+	tblf2 "$D3   DCP", str_Indirect, ",Y", $FF, result_UnOp_DCP_D3, TEST_DCP_D3
+	tblf2 "$D7   DCP", str_ZeroPage, ",X", $FF, result_UnOp_DCP_D7, TEST_DCP_D7
+	tblf2 "$DB   DCP", str_Absolute, ",Y", $FF, result_UnOp_DCP_DB, TEST_DCP_DB
+	tblf2 "$DF   DCP", str_Absolute, ",X", $FF, result_UnOp_DCP_DF, TEST_DCP_DF
 	.byte $FF
 	
 	;; Unofficial Instructions: ISC ;;
 Suite_UnofficialOps_ISC:
 	.byte "Unofficial Instructions: ISC", $FF
-	table "$E3   ISC indirect,X", $FF, result_UnOp_ISC_E3, TEST_ISC_E3
-	table "$E7   ISC zeropage",   $FF, result_UnOp_ISC_E7, TEST_ISC_E7
-	table "$EF   ISC absolute",   $FF, result_UnOp_ISC_EF, TEST_ISC_EF
-	table "$F3   ISC indirect,Y", $FF, result_UnOp_ISC_F3, TEST_ISC_F3
-	table "$F7   ISC zeropage,X", $FF, result_UnOp_ISC_F7, TEST_ISC_F7
-	table "$FB   ISC absolute,Y", $FF, result_UnOp_ISC_FB, TEST_ISC_FB
-	table "$FF   ISC absolute,X", $FF, result_UnOp_ISC_FF, TEST_ISC_FF
+	tblf2 "$E3   ISC", str_Indirect, ",X", $FF, result_UnOp_ISC_E3, TEST_ISC_E3
+	tblf1 "$E7   ISC", str_ZeroPage,       $FF, result_UnOp_ISC_E7, TEST_ISC_E7
+	tblf1 "$EF   ISC", str_Absolute,       $FF, result_UnOp_ISC_EF, TEST_ISC_EF
+	tblf2 "$F3   ISC", str_Indirect, ",Y", $FF, result_UnOp_ISC_F3, TEST_ISC_F3
+	tblf2 "$F7   ISC", str_ZeroPage, ",X", $FF, result_UnOp_ISC_F7, TEST_ISC_F7
+	tblf2 "$FB   ISC", str_Absolute, ",Y", $FF, result_UnOp_ISC_FB, TEST_ISC_FB
+	tblf2 "$FF   ISC", str_Absolute, ",X", $FF, result_UnOp_ISC_FF, TEST_ISC_FF
 	.byte $FF
 	
 	;; Unofficial Instructions: SH_ ;;
 Suite_UnofficialOps_SH_:
 	.byte "Unofficial Instructions: SH*", $FF
-	table "$93   SHA indirect,Y", $FF, result_UnOp_SHA_93, TEST_SHA_93
-	table "$9F   SHA absolute,Y", $FF, result_UnOp_SHA_9F, TEST_SHA_9F
-	table "$9B   SHS absolute,Y", $FF, result_UnOp_SHS_9B, TEST_SHS_9B
-	table "$9C   SHY absolute,X", $FF, result_UnOp_SHY_9C, TEST_SHY_9C
-	table "$9E   SHX absolute,Y", $FF, result_UnOp_SHX_9E, TEST_SHX_9E
-	table "$BB   LAE absolute,Y", $FF, result_UnOp_LAE_BB, TEST_LAE_BB
+	tblf2 "$93   SHA", str_Indirect, ",Y", $FF, result_UnOp_SHA_93, TEST_SHA_93
+	tblf2 "$9F   SHA", str_Absolute, ",Y", $FF, result_UnOp_SHA_9F, TEST_SHA_9F
+	tblf2 "$9B   SHS", str_Absolute, ",Y", $FF, result_UnOp_SHS_9B, TEST_SHS_9B
+	tblf2 "$9C   SHY", str_Absolute, ",X", $FF, result_UnOp_SHY_9C, TEST_SHY_9C
+	tblf2 "$9E   SHX", str_Absolute, ",Y", $FF, result_UnOp_SHX_9E, TEST_SHX_9E
+	tblf2 "$BB   LAE", str_Absolute, ",Y", $FF, result_UnOp_LAE_BB, TEST_LAE_BB
 	.byte $FF
 	
 	;; Unofficial Instructions: The Immediate group ;;
 Suite_UnofficialOps_Immediates:
 	.byte "Unofficial Immediates", $FF
-	table "$0B   ANC Immediate", $FF, result_UnOp_ANC_0B, TEST_ANC_0B
-	table "$2B   ANC Immediate", $FF, result_UnOp_ANC_2B, TEST_ANC_2B
-	table "$4B   ASR Immediate", $FF, result_UnOp_ASR_4B, TEST_ASR_4B
-	table "$6B   ARR Immediate", $FF, result_UnOp_ARR_6B, TEST_ARR_6B
-	table "$8B   ANE Immediate", $FF, result_UnOp_ANE_8B, TEST_ANE_8B
-	table "$AB   LXA Immediate", $FF, result_UnOp_LXA_AB, TEST_LXA_AB
-	table "$CB   AXS Immediate", $FF, result_UnOp_AXS_CB, TEST_AXS_CB
-	table "$EB   SBC Immediate", $FF, result_UnOp_SBC_EB, TEST_SBC_EB
+	tblf1 "$0B   ANC", str_Immediate, $FF, result_UnOp_ANC_0B, TEST_ANC_0B
+	tblf1 "$2B   ANC", str_Immediate, $FF, result_UnOp_ANC_2B, TEST_ANC_2B
+	tblf1 "$4B   ASR", str_Immediate, $FF, result_UnOp_ASR_4B, TEST_ASR_4B
+	tblf1 "$6B   ARR", str_Immediate, $FF, result_UnOp_ARR_6B, TEST_ARR_6B
+	tblf1 "$8B   ANE", str_Immediate, $FF, result_UnOp_ANE_8B, TEST_ANE_8B
+	tblf1 "$AB   LXA", str_Immediate, $FF, result_UnOp_LXA_AB, TEST_LXA_AB
+	tblf1 "$CB   AXS", str_Immediate, $FF, result_UnOp_AXS_CB, TEST_AXS_CB
+	tblf1 "$EB   SBC", str_Immediate, $FF, result_UnOp_SBC_EB, TEST_SBC_EB
 	.byte $FF
 	
 	;; CPU Interrupts ;;
@@ -16446,8 +16470,154 @@ TEST_DMC_ConflictsSample:
 	.byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
 	.byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
 	; yes, the sample does technically include the first byte at $F000, but the test that uses this sample doesn't care.
-; Just a ton of helper functions letting me save some bytes in the tests, and also key functions for loading and navigating the main menu.
 	.org $F000
+
+	; It is important that this function doesn't move around and cause branches to start crossing page boundaries.
+Sync_ToPreRenderDot324:
+	; Syncing the CPU to dot 1 of Line 0 is not very easy, since there's the even/odd frame skipping dot 0 issue.
+	SEI
+	LDA #$00
+	STA $4017 ; enable the frame counter IRQ. (Used to determine get/put cycle later)
+	JSR WaitForVBlank
+	JSR New_VBL_Sync
+	; (this function syncs to cycle 0 of scanline 241)
+	; However, we do not know if this is an even or an odd frame.
+	; If this is an even frame and rendering is enabled, dot 0 is skipped, which means the next VBlank would be 1 dot earlier.
+	; VBlank flag is set on cycle 1 of scanline 241.
+	; Each scanline has 341 cycles, and there are 262 scanlines. 341*262 = 89342
+	; Which means there is either 29780.33 or 29780.66 CPU cycles until next VBlank.
+	; So to verify if this is an even or odd frame, we [enable rendering, wait 1 frame, disable rendering, wait 1 frame] 3 times.
+	; At which point, the VBlank flag will be set exactly 1 CPU cycle later on odd frames than on an even frame.
+	; This tells us what the alignment is, at which point we can stall for precise amounts of CPU cycles to line things up depending on if this is even or odd.
+	JSR EnableRendering
+	JSR Clockslide_29780
+	JSR DisableRendering
+	JSR Clockslide_29780
+	
+	JSR EnableRendering
+	JSR Clockslide_29780
+	JSR DisableRendering
+	JSR Clockslide_29780
+
+	JSR EnableRendering
+	JSR Clockslide_29780
+	JSR DisableRendering
+	JSR Clockslide_29780
+	; Okay, after all that has occurred, we are either on:
+	; Scanline 241, cycle 205 (ODD FRAME)
+	; Scanline 241, cycle 208 (EVEN FRAME)
+	;
+	; Keep rendering disabled.
+	; Wait until a few cycles before VBlank, then read from $2002.
+	; There's either:
+	; (89342 - (341+205)) = 88796 PPU Cycles, or 29598.66 CPU cycles (ODD FRAME)
+	; (89342 - (341+208)) = 88793 PPU Cycles, or 29597.66 CPU cycles (EVEN FRAME)
+	; So let's stall for 29595 Cycles and go from there.
+	JSR ClockslideFromWord
+	.word 29595
+	; 2.66 or 3.66 cycles to go.
+	LDA $2002
+	PHA
+	JSR ClockslideFromWord
+	.word 1791
+
+	PLA
+	BPL Sync_ToLine0Dot1_Odd
+Sync_ToLine0Dot1_Even:
+	; 13.33 CPU cycles
+	LDA <$00
+	; Current objective: Determine if we are on a "get" or "put" cycle.
+	LDA #0
+	LDX #0
+	.byte $1F
+	.word $4015 ; SLO $4015, X
+	; if this next cycle is a "put", A = $00. If this next cycle is a "get" A = $80.
+	; if the write to $4014 is on a "put" cycle, then there's a 1 cycle delay.
+	PHA
+	LDA #2
+	STA $4014
+	PLA
+	BMI Sync_ToLine0Dot1_Get
+Sync_ToLine0Dot1_Get:
+	JSR EnableRendering
+	RTS
+Sync_ToLine0Dot1_Odd:
+	; 11.33 CPU cycles
+	NOP
+	NOP
+	JSR ClockslideFromWord
+	.word 59560
+	; Current objective: Determine if we are on a "get" or "put" cycle.
+	LDA #0
+	LDX #0
+	.byte $1F
+	.word $4015 ; SLO $4015, X
+	; if this next cycle is a "put", A = $00. If this next cycle is a "get" A = $80.
+	; if the write to $4014 is on a "put" cycle, then there's a 1 cycle delay.
+	PHA
+	LDA #2
+	STA $4014
+	PLA
+	BMI Sync_ToLine0Dot1_Get2
+Sync_ToLine0Dot1_Get2:
+	JSR EnableRendering
+	RTS
+;;;;;;;
+
+Sync_ToLine0Dot1:
+	JSR Sync_ToPreRenderDot324
+	RTS
+;;;;;;;
+
+Sync_ToSpriteFlagsClearing:
+	; see TEST_2002FlagTiming
+	SEI
+	LDA #$00
+	STA $4017 ; enable the frame counter IRQ. (Used to determine get/put cycle later)
+	; We actually want to sync to the moment the sprite flags are cleared, rather than vblank beginning.
+	; This will be a lot easier if we use the sprite overflow flag, rather than sprite zero hit.
+	; Right now, page 7 should be all zeroes, which is convenient, because if used a OAM data that would set the sprite overflow flag.
+	JSR WaitForVBlank ; rough VBL sync. We are somewhere between dot 25, and dot 47. Assume 47 since that's the extreme that's ahead.
+	LDA #7
+	STA $4014
+	JSR DisableRendering
+	; Assume we're on scanline 245, dot 336.
+	; Aim for the end of the CPU read occurring on scanline 0 dot 1.
+	
+	JSR ClockslideFromWord
+	.word 1914
+	LDA <$00
+	LDX #0
+Sync_ToSpriteFlagsClearingLoop:
+	LDA #$08
+	NOP
+	STA $2001 ; rendering enabled on dot 321 of scanline 0. (this first time this is ran, at least.)
+	JSR ReadFrom2002WithExactTiming
+	TYA
+	AND #$20
+	STA <$50 ; stalling for 3 cycles without changing flags.
+	NOP
+	NOP
+	NOP
+	NOP
+	BNE Sync_ToSpriteFlagsClearingLoop
+	
+	LDA #0
+	LDX #0
+	.byte $1F
+	.word $4015 ; SLO $4015, X
+	; if this next cycle is a "put", A = $00. If this next cycle is a "get" A = $80.
+	; if the write to $4014 is on a "put" cycle, then there's a 1 cycle delay.
+	PHA
+	LDA #2
+	STA $4014
+	PLA
+	BMI Sync_TSFC_Get
+Sync_TSFC_Get:	
+	RTS
+;;;;;;;
+
+; Just a ton of helper functions letting me save some bytes in the tests, and also key functions for loading and navigating the main menu.
 
 EnableRendering:; Enables rending both sprites and background. Does not affect the other mask flags.
 	PHA
@@ -16595,16 +16765,11 @@ ClearRAMExceptPage3: ; Clears RAM from $0000 to $07FF, except leaving $0300 thro
 	LDX #0
 ClearRamLoop:
 	STA <$00,X
-	STA $200,X
+	;STA $200,X Briefly after ClearRAMExceptPage3 runs, I run a routine overwriting page 2 with all FF's.
 	STA $400,X
-	STA $500,X
-	STA $600,X
-	STA $700,X
 	INX
-	BNE ClearRamLoop	
-	RTS
-;;;;;;;
-
+	BNE ClearRamLoop
+	; flow into the code that clears the rest on RAM.
 ClearPage5: ; Page 5 is reserved for RAM used by tests. It's a good idea to clear this before any tests.
 	LDA #0
 	LDX #0
@@ -16628,26 +16793,11 @@ ClearPage5ZPLoop:
 ClearPage2: ; Page 2 is reserved for OAM. Let's clear it with FFs.
 	STX <Copy_X	; Keep a copy of X
 	LDA #$FF
-	LDX #$F
-ClearPage2Loop:
+	LDX #0
+ClearPage2Loop: ; There is no need to unroll/optimize this loop. The bytes saved is worth more than the cpu cycles saved.
 	STA $200,X
-	STA $210,X
-	STA $220,X
-	STA $230,X
-	STA $240,X
-	STA $250,X
-	STA $260,X
-	STA $270,X
-	STA $280,X
-	STA $290,X
-	STA $2A0,X
-	STA $2B0,X
-	STA $2C0,X
-	STA $2D0,X
-	STA $2E0,X
-	STA $2F0,X
-	DEX
-	BPL ClearPage2Loop
+	INX
+	BNE ClearPage2Loop
 	LDX <Copy_X ; restore X
 	RTS
 ;;;;;;;
@@ -16679,8 +16829,13 @@ PT_dontSetPointer:
 	STA $2006
 PTloop:
 	LDA [$0000],Y
+	BPL PTloop_Cont
 	CMP #$FF
 	BEQ PTpostLoop
+	JSR PrintTextSpecialString
+	JMP PTloop
+	
+PTloop_Cont:
 	TAX
 	LDA AsciiToCHR-32, X ; convert from ascii to my 0123456789ABCDEFGHI... format
 	LDX <HighlightTextPrinted
@@ -16701,6 +16856,53 @@ PTskipFixRTS:
 	LDA <Copy_A ; Restore A
 	RTS
 ;;;;;;;
+
+
+PrintTextSpecialString:
+	; If the character we're reading is from a special list, we need to substitute it.
+	; This was a byte-saving measure so I didn't have the string "absolute" or "zeropage" in the ROM dozens of times.
+	AND #$3
+	; Multiply this number by 9.
+	TAX
+	BEQ PTSS_MultEnd
+	LDA #0
+	CLC
+PTSS_Mult:
+	ADC #9
+	DEX
+	BNE PTSS_Mult
+
+PTSS_MultEnd:
+	STY <$40
+	LDX #9
+	STX <$41 ; It's okay to use this, since it will be set to 0 by the time this routine is through.
+	TAY                    ;
+	CPY #27                ; Check if we are printing "immediate"
+	BNE PT_SpecialCharLoop ; If not, skip ahead.
+	INC <$41               ; This string has 9 characters.
+PT_SpecialCharLoop:
+	LDA PrintTextSpecialStrings, Y
+	TAX
+	LDA AsciiToCHR-32, X ; convert from ascii to my 0123456789ABCDEFGHI... format
+	LDX <HighlightTextPrinted
+	BEQ PT_SkipHighlight1
+	ORA #$80
+PT_SkipHighlight1:
+	STA $2007
+	INY
+	DEC <$41
+	BNE PT_SpecialCharLoop
+	LDY <$40
+	INY
+	RTS
+;;;;;;;
+
+PrintTextSpecialStrings:
+	.byte " indirect"
+	.byte " zeropage"
+	.byte " absolute"
+	.byte " immediate"
+
 
 PrintTextCentered:
 	; Following a JSR here should be .word $HiLo (the target PPU Address)
@@ -16725,16 +16927,25 @@ PrintTextCentered:
 	; Get length of the string.
 PTC_dontSetPointer:
 	LDY #0
+	STY <$40
 PTCGetLength:
 	INY
 	LDA [$0000],Y
+	BPL PTCGetLength
 	CMP #$FF
-	BNE PTCGetLength	
+	BEQ PTCGetLength_Exit
+	LDA #$9
+	STA <$40
+	JMP PTCGetLength
+		
+PTCGetLength_Exit:
 	LDA <$04 ; take pointer low byte
 	AND #$E0  ; remove low 5 bits
 	ORA #$10  ; add bit 5
 	STA <$04
 	TYA
+	CLC
+	ADC <$40 ; If we encountered a special string, we need to add 9 to the length.
 	LSR A ; divide length by 2
 	EOR #$FF ; make negative
 	CLC
@@ -16749,8 +16960,13 @@ PTCGetLength:
 	LDY #0
 PTCloop:
 	LDA [$0000],Y
+	BPL PTCloop_Cont
 	CMP #$FF
 	BEQ PTCpostLoop
+	JSR PrintTextSpecialString
+	JMP PTCloop
+	
+PTCloop_Cont:
 	TAX
 	LDA AsciiToCHR-32, X ; convert from ASCII to my 0123456789ABCDEFGHI... format
 	LDX <HighlightTextPrinted
@@ -16772,14 +16988,10 @@ PTCskipFixRTS:
 	RTS
 ;;;;;;;
 
-
 Print32Bytes:
 	; Following a JSR here should be .word $HiLo (the target PPU Address)
 	; And following that word should be a second .word, acting as the "target address"
 	; print the 32 bytes found at the target address at the target PPU address.
-	STA <Copy_A
-	STY <Copy_Y
-	STX <Copy_X
 	JSR CopyReturnAddressToByte0
 	LDA $2002
 	LDY #$01
@@ -16834,16 +17046,10 @@ P32SkipADDR:
 	; post loop
 	LDY #02
 	JSR FixRTS
-	LDX <Copy_X
-	LDY <Copy_Y
-	LDA <Copy_A
 	RTS
 ;;;;;;;
 
 PrintCHR:	; Pretty much the same thing as "PrintText" but don't convert from ASCII.
-	STA <Copy_A
-	STY <Copy_Y
-	STX <Copy_X
 	LDA <dontSetPointer
 	BNE PChr_dontSetPointer
 	JSR CopyReturnAddressToByte0
@@ -16873,10 +17079,7 @@ PChrpostLoop:
 	LDA <dontSetPointer
 	BNE PChrskipFixRTS
 	JSR FixRTS
-	LDY <Copy_Y
 PChrskipFixRTS:
-	LDX <Copy_X
-	LDA <Copy_A
 	RTS
 ;;;;;;;
 
@@ -16957,37 +17160,27 @@ ReadPalLoop:
 
 DefaultPalette:	; The default palette for the main menu.
 	.byte $2D,$2D,$30,$30,$0F,$00,$30,$21,$0F,$26,$26,$26,$0F,$2D,$2D,$0F
-	.byte $2D,$30,$30,$30,$0F,$30,$30,$30,$0F,$30,$30,$30,$0F,$26,$26,$26	
+	.byte $2D,$30,$30,$30,$0F,$30,$30,$30,$0F,$30,$30,$30,$0F,$26,$26,$26
+AllTestMenuPalette:	; The color palette used in the results screen of the all-test-menu.
+	.byte $2D,$30,$30,$30,$0F,$21,$21,$21,$0F,$26,$26,$26,$0F,$26,$06,$21
+	.byte $2D,$30,$30,$30,$0F,$31,$31,$31,$0F,$30,$30,$30,$0F,$30,$30,$30	
+SetUpAllTestMenuPalette:
+	LDY #$20
+	.byte $9D ; CMP Absolute (skip the upocoming LDY)
 SetUpDefaultPalette: ; This function overwrites palette RAM with the values in the above table.
+	LDY #0
 	LDA #$3F
 	STA $2006
 	LDA #$00
 	STA $2006
-	LDY #0
+	LDX #0
 SetUpPaletteLoop:
 	LDA DefaultPalette,Y
 	STA $2007
 	INY
-	CPY #32
+	INX
+	CPX #32
 	BNE SetUpPaletteLoop
-	RTS
-;;;;;;;
-
-AllTestMenuPalette:	; The color palette used in the results screen of the all-test-menu.
-	.byte $2D,$30,$30,$30,$0F,$21,$21,$21,$0F,$26,$26,$26,$0F,$26,$06,$21
-	.byte $2D,$30,$30,$30,$0F,$31,$31,$31,$0F,$30,$30,$30,$0F,$30,$30,$30	
-SetUpAllTestMenuPalette: ; This function overwrites palette RAM with the values in the above table.
-	LDA #$3F
-	STA $2006
-	LDA #$00
-	STA $2006
-	LDY #0
-SetUpAllTestMenuPaletteLoop:
-	LDA AllTestMenuPalette,Y
-	STA $2007
-	INY
-	CPY #32
-	BNE SetUpAllTestMenuPaletteLoop
 	RTS
 ;;;;;;;
 	
@@ -17224,35 +17417,20 @@ DrawTEST_Print:
 	TAX
 	TAY
 	LDA TestPassFailBlend,Y
-	TAY
-	LDA AsciiToCHR-32,Y
-	STA $2007
-	TXA
-	TAY
+	JSR DrawTEST_PrintStep
 	LDA TestPassFailBlend+6,Y
-	TAY
-	LDA AsciiToCHR-32,Y
-	STA $2007
-	TXA
-	TAY
+	JSR DrawTEST_PrintStep
 	LDA TestPassFailBlend+12,Y
-	TAY
-	LDA AsciiToCHR-32,Y
-	STA $2007
-	TXA
-	TAY
+	JSR DrawTEST_PrintStep
 	LDA TestPassFailBlend+18,Y
-	TAY
-	LDA AsciiToCHR-32,Y
-	STA $2007
-	TXA
+	JSR DrawTEST_PrintStep
 	AND #$3
 	CMP #2 ; check if we failed.
 	BNE DrawTESTEraseErrorCode
 	; we failed, so print an error code.
 	LDA #$24
 	STA $2007
-	lda <ErrorCode
+	LDA <ErrorCode
 	AND #$FC
 	LSR A
 	LSR A
@@ -17265,6 +17443,15 @@ DrawTESTEraseErrorCode:
 	LDA #$24
 	STA $2007
 	BNE DrawTESTEnd
+;;;;;;;
+
+DrawTEST_PrintStep:
+	TAY
+	LDA AsciiToCHR-32,Y
+	STA $2007
+	TXA
+	TAY
+	RTS
 ;;;;;;;
 
 
@@ -18351,15 +18538,6 @@ Clockslide64_Minus_A:;+6
 	JMP [$0000]	; +50 - A
 ;;;;;;;;;;;;;;;;;
 
-VblSync_Plus_A_End: ; Moved here for space. This is the end of the VblSync_Plus_A subroutine.
-	JSR ClockslideFromWord
-	.word 59545
-	JSR ClockslideFromWord
-	.word 29781
-	BIT $2002
-	RTS
-;;;;;;;
-
 WaitForVBLSpriteZeroHit:
 	JSR WaitForVBlank          ; Wait for vblank
 	LDA $2002                  ; Read PPUSTATUS
@@ -18396,150 +18574,6 @@ VerifySpriteZeroHits_F:
 	RTS
 ;;;;;;;
 
-Sync_ToPreRenderDot324:
-	; Syncing the CPU to dot 1 of Line 0 is not very easy, since there's the even/odd frame skipping dot 0 issue.
-	SEI
-	LDA #$00
-	STA $4017 ; enable the frame counter IRQ. (Used to determine get/put cycle later)
-	JSR WaitForVBlank
-	JSR New_VBL_Sync
-	; (this function syncs to cycle 0 of scanline 241)
-	; However, we do not know if this is an even or an odd frame.
-	; If this is an even frame and rendering is enabled, dot 0 is skipped, which means the next VBlank would be 1 dot earlier.
-	; VBlank flag is set on cycle 1 of scanline 241.
-	; Each scanline has 341 cycles, and there are 262 scanlines. 341*262 = 89342
-	; Which means there is either 29780.33 or 29780.66 CPU cycles until next VBlank.
-	; So to verify if this is an even or odd frame, we [enable rendering, wait 1 frame, disable rendering, wait 1 frame] 3 times.
-	; At which point, the VBlank flag will be set exactly 1 CPU cycle later on odd frames than on an even frame.
-	; This tells us what the alignment is, at which point we can stall for precise amounts of CPU cycles to line things up depending on if this is even or odd.
-	JSR EnableRendering
-	JSR Clockslide_29780
-	JSR DisableRendering
-	JSR Clockslide_29780
-	
-	JSR EnableRendering
-	JSR Clockslide_29780
-	JSR DisableRendering
-	JSR Clockslide_29780
-
-	JSR EnableRendering
-	JSR Clockslide_29780
-	JSR DisableRendering
-	JSR Clockslide_29780
-	; Okay, after all that has occurred, we are either on:
-	; Scanline 241, cycle 205 (ODD FRAME)
-	; Scanline 241, cycle 208 (EVEN FRAME)
-	;
-	; Keep rendering disabled.
-	; Wait until a few cycles before VBlank, then read from $2002.
-	; There's either:
-	; (89342 - (341+205)) = 88796 PPU Cycles, or 29598.66 CPU cycles (ODD FRAME)
-	; (89342 - (341+208)) = 88793 PPU Cycles, or 29597.66 CPU cycles (EVEN FRAME)
-	; So let's stall for 29595 Cycles and go from there.
-	JSR ClockslideFromWord
-	.word 29595
-	; 2.66 or 3.66 cycles to go.
-	LDA $2002
-	PHA
-	JSR ClockslideFromWord
-	.word 1791
-
-	PLA
-	BPL Sync_ToLine0Dot1_Odd
-Sync_ToLine0Dot1_Even:
-	; 13.33 CPU cycles
-	LDA <$00
-	; Current objective: Determine if we are on a "get" or "put" cycle.
-	LDA #0
-	LDX #0
-	.byte $1F
-	.word $4015 ; SLO $4015, X
-	; if this next cycle is a "put", A = $00. If this next cycle is a "get" A = $80.
-	; if the write to $4014 is on a "put" cycle, then there's a 1 cycle delay.
-	PHA
-	LDA #2
-	STA $4014
-	PLA
-	BMI Sync_ToLine0Dot1_Get
-Sync_ToLine0Dot1_Get:
-	JSR EnableRendering
-	RTS
-Sync_ToLine0Dot1_Odd:
-	; 11.33 CPU cycles
-	NOP
-	NOP
-	JSR ClockslideFromWord
-	.word 59560
-	; Current objective: Determine if we are on a "get" or "put" cycle.
-	LDA #0
-	LDX #0
-	.byte $1F
-	.word $4015 ; SLO $4015, X
-	; if this next cycle is a "put", A = $00. If this next cycle is a "get" A = $80.
-	; if the write to $4014 is on a "put" cycle, then there's a 1 cycle delay.
-	PHA
-	LDA #2
-	STA $4014
-	PLA
-	BMI Sync_ToLine0Dot1_Get2
-Sync_ToLine0Dot1_Get2:
-	JSR EnableRendering
-	RTS
-;;;;;;;
-
-Sync_ToLine0Dot1:
-	JSR Sync_ToPreRenderDot324
-	RTS
-;;;;;;;
-
-Sync_ToSpriteFlagsClearing:
-	; see TEST_2002FlagTiming
-	SEI
-	LDA #$00
-	STA $4017 ; enable the frame counter IRQ. (Used to determine get/put cycle later)
-	; We actually want to sync to the moment the sprite flags are cleared, rather than vblank beginning.
-	; This will be a lot easier if we use the sprite overflow flag, rather than sprite zero hit.
-	; Right now, page 7 should be all zeroes, which is convenient, because if used a OAM data that would set the sprite overflow flag.
-	JSR WaitForVBlank ; rough VBL sync. We are somewhere between dot 25, and dot 47. Assume 47 since that's the extreme that's ahead.
-	LDA #7
-	STA $4014
-	JSR DisableRendering
-	; Assume we're on scanline 245, dot 336.
-	; Aim for the end of the CPU read occurring on scanline 0 dot 1.
-	
-	JSR ClockslideFromWord
-	.word 1914
-	LDA <$00
-	LDX #0
-Sync_ToSpriteFlagsClearingLoop:
-	LDA #$08
-	NOP
-	STA $2001 ; rendering enabled on dot 321 of scanline 0. (this first time this is ran, at least.)
-	JSR ReadFrom2002WithExactTiming
-	TYA
-	AND #$20
-	STA <$50 ; stalling for 3 cycles without changing flags.
-	NOP
-	NOP
-	NOP
-	NOP
-	BNE Sync_ToSpriteFlagsClearingLoop
-	
-	LDA #0
-	LDX #0
-	.byte $1F
-	.word $4015 ; SLO $4015, X
-	; if this next cycle is a "put", A = $00. If this next cycle is a "get" A = $80.
-	; if the write to $4014 is on a "put" cycle, then there's a 1 cycle delay.
-	PHA
-	LDA #2
-	STA $4014
-	PLA
-	BMI Sync_TSFC_Get
-Sync_TSFC_Get:	
-	RTS
-;;;;;;;
-
 FAIL_MisalignedOAMDMA:
 	JMP TEST_Fail
 
@@ -18556,7 +18590,11 @@ TEST_MisalignedOAMDMA:
 	; This is an easy one.
 	; Basically, if the OAM Address is non-zero when the OAM DMA occurs, then the DMA will begin at a non-zero address of OAM and loop around at some point.
 	; In this test, I set the OAM Address to $80, and the data at address $280 will end up in sprite zero.
-	
+
+	JSR PrintCHR
+	.word $2C30
+	.byte $C0, $FF
+
 	JSR ClearPage2
 	LDX #3
 TEST_MisalignedOAMDMA_Loop:
@@ -18564,10 +18602,6 @@ TEST_MisalignedOAMDMA_Loop:
 	STA $280, X
 	DEX
 	BPL TEST_MisalignedOAMDMA_Loop
-	
-	JSR PrintCHR
-	.word $2C30
-	.byte $C0, $FF
 	
 	JSR ResetScroll_2C00
 	JSR WaitForVBlank
@@ -18578,7 +18612,7 @@ TEST_MisalignedOAMDMA_Loop:
 	
 	LDA #$FF  ;
 	STA $2003 ; 
-	STA $2004 ; Return tha OAM Address back to zero without OAM corruption.
+	STA $2004 ; Return the OAM Address back to zero without OAM corruption.
 	
 	JSR Clockslide_29780
 	
@@ -18894,7 +18928,12 @@ VblSync_Plus_A_Loop:
 	CLC						; + 2
 	ADC #$FF 				; + 2
 	BCS VblSync_Plus_A_Loop ; + 3 if looping, 2 otherwise. (29781 CPU cycles if looping. Each frame is 29780.67 CPU cycles long, so this advances 1 PPU cycle)
-	JMP VblSync_Plus_A_End	; I ran out of space, so I moved it up there.
+	JSR ClockslideFromWord
+	.word 59548
+	JSR ClockslideFromWord
+	.word 29781
+	BIT $2002
+	RTS
 	
 	VblSync_ABORT:	; This emulator failed the pre-test, implying that this will loop infinitely, so instead of doing that, just don't bother.
 	PLA
