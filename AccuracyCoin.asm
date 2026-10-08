@@ -550,6 +550,7 @@ str_Indirect = $F0
 str_ZeroPage = $F1
 str_Absolute = $F2
 str_Immediate = $F3
+str_UnofficialInstructions = $F4
 
 TestPages:	; I just made this label for ease of searching.
 
@@ -579,7 +580,8 @@ Suite_CPUInstructions:
 	
 	;; Unofficial Instructions: SLO ;;
 Suite_UnofficialOps_SLO:
-	.byte "Unofficial Instructions: SLO", $FF
+	.byte str_UnofficialInstructions
+	.byte "SLO", $FF
 	tblf2 "$03   SLO", str_Indirect, ",X", $FF, result_UnOp_SLO_03, TEST_SLO_03
 	tblf1 "$07   SLO", str_ZeroPage,       $FF, result_UnOp_SLO_07, TEST_SLO_07
 	tblf1 "$0F   SLO", str_Absolute,       $FF, result_UnOp_SLO_0F, TEST_SLO_0F
@@ -591,7 +593,8 @@ Suite_UnofficialOps_SLO:
 	
 	;; Unofficial Instructions: RLA ;;
 Suite_UnofficialOps_RLA:
-	.byte "Unofficial Instructions: RLA", $FF
+	.byte str_UnofficialInstructions
+	.byte "RLA", $FF
 	tblf2 "$23   RLA", str_Indirect, ",X", $FF, result_UnOp_RLA_23, TEST_RLA_23
 	tblf1 "$27   RLA", str_ZeroPage,       $FF, result_UnOp_RLA_27, TEST_RLA_27
 	tblf1 "$2F   RLA", str_Absolute,       $FF, result_UnOp_RLA_2F, TEST_RLA_2F
@@ -603,7 +606,8 @@ Suite_UnofficialOps_RLA:
 	
 	;; Unofficial Instructions: SRE ;;
 Suite_UnofficialOps_SRE:
-	.byte "Unofficial Instructions: SRE", $FF
+	.byte str_UnofficialInstructions
+	.byte "SRE", $FF
 	tblf2 "$43   SRE", str_Indirect, ",X", $FF, result_UnOp_SRE_43, TEST_SRE_43
 	tblf1 "$47   SRE", str_ZeroPage,       $FF, result_UnOp_SRE_47, TEST_SRE_47
 	tblf1 "$4F   SRE", str_Absolute,       $FF, result_UnOp_SRE_4F, TEST_SRE_4F
@@ -615,7 +619,8 @@ Suite_UnofficialOps_SRE:
 	
 	;; Unofficial Instructions: RRA ;;
 Suite_UnofficialOps_RRA:
-	.byte "Unofficial Instructions: RRA", $FF
+	.byte str_UnofficialInstructions
+	.byte "RRA", $FF
 	tblf2 "$63   RRA", str_Indirect, ",X", $FF, result_UnOp_RRA_63, TEST_RRA_63
 	tblf1 "$67   RRA", str_ZeroPage,       $FF, result_UnOp_RRA_67, TEST_RRA_67
 	tblf1 "$6F   RRA", str_Absolute,       $FF, result_UnOp_RRA_6F, TEST_RRA_6F
@@ -627,7 +632,8 @@ Suite_UnofficialOps_RRA:
 	
 	;; Unofficial Instructions: .AX ;;
 Suite_UnofficialOps__AX:
-	.byte "Unofficial Instructions: *AX", $FF
+	.byte str_UnofficialInstructions
+	.byte "*AX", $FF
 	tblf2 "$83   SAX", str_Indirect, ",X", $FF, result_UnOp_SAX_83, TEST_SAX_83
 	tblf1 "$87   SAX", str_ZeroPage,       $FF, result_UnOp_SAX_87, TEST_SAX_87
 	tblf1 "$8F   SAX", str_Absolute,       $FF, result_UnOp_SAX_8F, TEST_SAX_8F
@@ -642,7 +648,8 @@ Suite_UnofficialOps__AX:
 	
 	;; Unofficial Instructions: DCP ;;
 Suite_UnofficialOps_DCP:
-	.byte "Unofficial Instructions: DCP", $FF
+	.byte str_UnofficialInstructions
+	.byte "DCP", $FF
 	tblf2 "$C3   DCP", str_Indirect, ",X", $FF, result_UnOp_DCP_C3, TEST_DCP_C3
 	tblf1 "$C7   DCP", str_ZeroPage,       $FF, result_UnOp_DCP_C7, TEST_DCP_C7
 	tblf1 "$CF   DCP", str_Absolute,       $FF, result_UnOp_DCP_CF, TEST_DCP_CF
@@ -654,7 +661,8 @@ Suite_UnofficialOps_DCP:
 	
 	;; Unofficial Instructions: ISC ;;
 Suite_UnofficialOps_ISC:
-	.byte "Unofficial Instructions: ISC", $FF
+	.byte str_UnofficialInstructions
+	.byte "ISC", $FF
 	tblf2 "$E3   ISC", str_Indirect, ",X", $FF, result_UnOp_ISC_E3, TEST_ISC_E3
 	tblf1 "$E7   ISC", str_ZeroPage,       $FF, result_UnOp_ISC_E7, TEST_ISC_E7
 	tblf1 "$EF   ISC", str_Absolute,       $FF, result_UnOp_ISC_EF, TEST_ISC_EF
@@ -666,7 +674,8 @@ Suite_UnofficialOps_ISC:
 	
 	;; Unofficial Instructions: SH_ ;;
 Suite_UnofficialOps_SH_:
-	.byte "Unofficial Instructions: SH*", $FF
+	.byte str_UnofficialInstructions
+	.byte "SH*", $FF
 	tblf2 "$93   SHA", str_Indirect, ",Y", $FF, result_UnOp_SHA_93, TEST_SHA_93
 	tblf2 "$9F   SHA", str_Absolute, ",Y", $FF, result_UnOp_SHA_9F, TEST_SHA_9F
 	tblf2 "$9B   SHS", str_Absolute, ",Y", $FF, result_UnOp_SHS_9B, TEST_SHS_9B
@@ -4181,9 +4190,8 @@ TEST_PowerOnState_PPU_ResetFlag:
 	RTS
 	
 TEST_PowerOnState_PPU_Res_No:
-	JSR DisableRendering
-	JSR PrintTextCentered
-	.word $2252
+	JSR PrintText
+	.word $2245
 	.byte "No Reset Flag Detected!", $FF
 	JSR ResetScroll
 	RTS
@@ -16861,25 +16869,12 @@ PTskipFixRTS:
 PrintTextSpecialString:
 	; If the character we're reading is from a special list, we need to substitute it.
 	; This was a byte-saving measure so I didn't have the string "absolute" or "zeropage" in the ROM dozens of times.
-	AND #$3
-	; Multiply this number by 9.
+	AND #$7
 	TAX
-	BEQ PTSS_MultEnd
-	LDA #0
-	CLC
-PTSS_Mult:
-	ADC #9
-	DEX
-	BNE PTSS_Mult
-
-PTSS_MultEnd:
 	STY <$40
-	LDX #9
-	STX <$41 ; It's okay to use this, since it will be set to 0 by the time this routine is through.
-	TAY                    ;
-	CPY #27                ; Check if we are printing "immediate"
-	BNE PT_SpecialCharLoop ; If not, skip ahead.
-	INC <$41               ; This string has 9 characters.
+	LDY PrintTextSpecLengths, X
+	STY <$41 ; It's okay to use this, since it will be set to 0 by the time this routine is through.
+	LDY PrintTextSpecOffsets, X
 PT_SpecialCharLoop:
 	LDA PrintTextSpecialStrings, Y
 	TAX
@@ -16902,7 +16897,12 @@ PrintTextSpecialStrings:
 	.byte " zeropage"
 	.byte " absolute"
 	.byte " immediate"
+	.byte "Unofficial Instructions: "
 
+PrintTextSpecOffsets:
+	.byte 0, 9, 18, 27, 37
+PrintTextSpecLengths:
+	.byte 9, 9, 9, 10, 25
 
 PrintTextCentered:
 	; Following a JSR here should be .word $HiLo (the target PPU Address)
@@ -16926,17 +16926,24 @@ PrintTextCentered:
 	JSR AddAToByte0
 	; Get length of the string.
 PTC_dontSetPointer:
-	LDY #0
-	STY <$40
+	LDY #$FF
+	LDA #$0
+	STA <$40
 PTCGetLength:
 	INY
 	LDA [$0000],Y
 	BPL PTCGetLength
 	CMP #$FF
 	BEQ PTCGetLength_Exit
-	LDA #$9
+	STY <$42
+	AND #$7
+	TAX
+	LDY PrintTextSpecLengths, X
+	TYA
 	STA <$40
+	LDY <$42
 	JMP PTCGetLength
+	
 		
 PTCGetLength_Exit:
 	LDA <$04 ; take pointer low byte
@@ -18626,10 +18633,7 @@ TEST_MisalignedOAMDMA_Loop:
 
 ;;; SetBRKRoutineFromWord ;;;
 ; Updates the operands of the JMP instruction at address $600 to be the provided .word
-; This subroutine protects the A and Y registers.
 SetBRKRoutineFromWord:           ;
-	STA <Copy_A                  ; Make a copy of the A register.
-	STY <Copy_Y                  ; Make a copy of the Y register.
 	JSR CopyReturnAddressToByte0 ; Copy the return address into a pointer at address $0000.
 	LDY #0                       ;
 	LDA [$0000],Y                ; Read the low byte.
@@ -18641,8 +18645,6 @@ SetBRKRoutineFromWord:           ;
 	JSR FixRTS                   ; Fix the return address so we skip the .word
 	LDA #$4C                     ;
 	STA $600                     ; Put a JMP opcode at address $600.
-	LDY <Copy_Y                  ; Restore Y.
-	LDA <Copy_A                  ; Restore A.
 	RTS                          ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
