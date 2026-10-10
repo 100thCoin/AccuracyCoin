@@ -8676,9 +8676,25 @@ TEST_DMA_Plus_4016R_SkipText2:
 	;;;;;;;;;;;;;;;;;;;;;;;;;
 TEST_DMCReloadTiming:
 	;;; Test 1 [DMC Reload Timing]: Do precisely timed writes to $4010 update the reload-value of the DMC timer correctly? ;;;
-	; Basically we have a loop here that reads from open but at two precise moments.
+	; Basically we have a loop here that reads from open bus at two precise moments.
 	; - read 1 would overlap with a DMC DMA if the write to $4010 does not update the reload-value.
 	; - read 2 would overlap with a DMC DMA if the write to $4010 does update the reload-value.
+	;
+	; A refresher on the DMC timer:
+	; - Writing to $4010 determines the sample rate.
+	; - The timer is reloaded with a specific value, and counts down to zero.
+	; - When it hits zero, it is reloaded with the value again.
+	; - It does this eight times, triggering a DMC DMA when it hits zero for the eighth time.
+	;    - Whether the DMC DMA happens immediately or with a delay is currently unknown as of writing this.
+	;    - That basically means that while the timing described by my comments could be wrong... (as I assume no delay)
+	;    - ... the end result is still the same. Writing to $4010 `X` CPU cycles after the DMC DMA will result in the timer being reloaded with the value described by the test.
+	;
+	; In this loop, for every iteration, increment X.
+	; We delay by X CPU cycles relative to the moment the DMC timer reloads, but sync everything back up relative to when the DMA will occur.
+	; We write to $4010, changing the DMC sample rate. This write will occur around the moment the DMC timer needs to reload.
+	; - The question this test aims to answer is, will it reload with the old value, or the new value?
+	; We read from open bus at two precise moments in time. First, when the DMC DMA would have occurred with the fast sample rate, then the second read is with the slow sample rate.
+	; These reads get recorded in RAM, and we compare with an answer key that was determined by running this on real hardware.
 
 TEST_DMCReloadTimingLoop:            ;
 	JSR DMASync_50CyclesRemaining    ;
@@ -8688,44 +8704,57 @@ TEST_DMCReloadTimingLoop:            ;
 	STA $4010                        ; Loop + fastest rate.
 	JSR Clockslide_44                ;
 	; DMC DMA goes here.
-	JSR ClockslideFromWord           ; in 378 CPU cycles, the timer will be reset for the final time.
-	.word 320                        ; 378 - 320 = 58 cycles remaining
-	TXA                              ; -2 = 56 cycles
-	JSR Clockslide37_Plus_A          ; - (37 + A) = 19 - A cycles.
-	LDA #$40                         ; 17 - A cycles.
-	NOP                              ;
-	NOP                              ;
-	NOP                              ; 9 - A cycles.
+	JSR ClockslideFromWord           ; Timing stuff.
+	.word 326                        ; Timing stuff.
+	TXA                              ; Timing stuff.
+	JSR Clockslide37_Plus_A          ; Timing stuff.
+	LDA #$40                         ; Timing stuff.
 	                                 ;
-	STA $4010                        ; = 5 - A cycles.
-	TXA                              ;
-	TAY                              ;
-	DEY                              ;
-	.byte $30, $00                   ; 3 cycles if Y is negative, 2 if positive.
-	DEY                              ;
-	.byte $30, $00                   ; 3 cycles if Y is negative, 2 if positive.
-	DEY                              ;
-	.byte $30, $00                   ; 3 cycles if Y is negative, 2 if positive.
-	DEY                              ;
-	.byte $30, $00                   ; 3 cycles if Y is negative, 2 if positive.
-	DEY                              ;
-	.byte $30, $00                   ; 3 cycles if Y is negative, 2 if positive.
-	DEY                              ;
-	.byte $30, $00                   ; 3 cycles if Y is negative, 2 if positive.
-	                                 ; in total, 32 cycles, and we balance out the +A from earlier.
-	TXA                              ;
-	ASL A                            ;
-	TAY                              ;
-	JSR Clockslide_14                ;
-	LDA $4000                        ; DMC DMA happens during this read if early
+	                                 ; Honestly, don't worry too much about the timing stuff.
+	                                 ; The important thing is that we write to STA $4010 right before the DMC timer reloads.
+	                                 ; This happens in a loop, and the loop runs 6 times with different timing each timer. Here's how each 6 iterations of the loop work out:
+	                                 ; 0: The write to $4010 occurs 3 CPU cycles before the timer reloads. : The timer is reloaded with 428 CPU cycles.
+	                                 ; 1: The write to $4010 occurs 2 CPU cycles before the timer reloads. : The timer is reloaded with 428 CPU cycles.
+	                                 ; 2: The write to $4010 occurs 1 CPU cycle before the timer reloads.  : The timer is reloaded with 428 CPU cycles.
+	                                 ; 3: The write to $4010 occurs on the same cycle the timer reloads.   : The timer is reloaded with 428 CPU cycles.
+	                                 ; 4: The write to $4010 occurs 1 CPU cycle after the timer reloads.   : The timer is reloaded with 54 CPU cycles.
+	                                 ; 5: The write to $4010 occurs 2 CPU cycles after the timer reloads.  : The timer is reloaded with 54 CPU cycles.
+	                                 ;
+	STA $4010                        ; !!! Write to address $4010 to change the sample rate. This write will be occurring around the same time the DMC timer needs to reload.
+	                                 ; If the write to $4010 happens before the DMC timer reloads, the DMC timer will be reloaded with the slowest sample rate.
+	                                 ; If the write to $4010 happens after the DMC timer reloads... well, the timer already reloaded so it still had the fastest sample rate.
+	                                 ; Amusingly, this test also confirms that if the write to $4010 happens on the same cycle as the timer reloading, then the sample rate changes, and the DMC timer takes the new value.\
+	                                 ; Now all we need to do is confirm if the DMC timer was reloaded with the fastest sample rate or the slowest sample rate.
+	                                 ; This can be done with two precisely timed reads from open bus. One when the DMC DMA would occur with the faster rate, and one when it would occur with the slower rate.
+	                                 ; And then we can just compare with the results that were recorded on consoles.
+	TXA                              ; Timing stuff.
+	TAY                              ; Timing stuff.
+	DEY                              ; Timing stuff.
+	.byte $30, $00                   ; Timing stuff. 3 cycles if Y is negative, 2 if positive.
+	DEY                              ; Timing stuff.
+	.byte $30, $00                   ; Timing stuff. 3 cycles if Y is negative, 2 if positive.
+	DEY                              ; Timing stuff.
+	.byte $30, $00                   ; Timing stuff. 3 cycles if Y is negative, 2 if positive.
+	DEY                              ; Timing stuff.
+	.byte $30, $00                   ; Timing stuff. 3 cycles if Y is negative, 2 if positive.
+	DEY                              ; Timing stuff.
+	.byte $30, $00                   ; Timing stuff. 3 cycles if Y is negative, 2 if positive.
+	DEY                              ; Timing stuff.
+	.byte $30, $00                   ; Timing stuff. 3 cycles if Y is negative, 2 if positive.
+	                                 ; Timing stuff. in total, 32 cycles, and we balance out the +A from earlier.
+	TXA                              ; We're reading two values, so let's store them in RAM neighboring each other.
+	ASL A                            ; I'll just multiply X (what iteration of this loop are we on?) by two.
+	TAY                              ; And we'll use the Y register for the indexing when writing this stuff to RAM.
+	JSR Clockslide_14                ; Small delay to sync up with the DMA.
+	LDA $4000                        ; If the DMC timer was reloaded with the fast sample rate, the DMC DMA happens during this read
 	STA $500, Y                      ;  - In other words, you would see $00 from this read if the DMA occurred, and $40 if the DMA did not occur.
-	JSR ClockslideFromWord           ;
-	.word 365                        ;
-	LDA $4000                        ; DMC DMA happens during this read if late
+	JSR ClockslideFromWord           ; Delay for the other DMA window.
+	.word 365                        ; ^
+	LDA $4000                        ; If the DMC timer was reloaded with the slow sample rate, the  DMC DMA happens during this read
 	STA $501, Y                      ;  - In other words, you would see $00 from this read if the DMA occurred, and $40 if the DMA did not occur.
 	                                 ;
-	INX                              ;
-	CPX #6                           ;
+	INX                              ; Let's run this in a loop, delaying by 1 additional cycle each loop before to write to $4010.
+	CPX #6                           ; And we'll do this six times.
 	BNE TEST_DMCReloadTimingLoop     ;
 	                                 ;
 	LDX #0                           ;
@@ -8744,6 +8773,9 @@ TEST_DMCReloadTiming_KeyLoop:        ; I had to move the answer key somewhere el
 	
 FAIL_DMCReloadTiming:
 	JMP TEST_Fail
+	
+TEST_DMCReloadTiming_Key:
+	.byte $40, $00, $40, $00, $40, $00, $40, $00, $00, $40, $00, $40
 	
 ;;;;;;;
 	.bank 2	; If I don't do this, the ROM won't compile.
@@ -16184,9 +16216,6 @@ VerifySprOverflowFlag:
 	AND #$20 ; Bit 5 holds the sprite overflow flag
 	RTS
 ;;;;;;;
-
-TEST_DMCReloadTiming_Key:
-	.byte $40, $00, $40, $00, $40, $00, $40, $00, $00, $40, $00, $40
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                ENGINE                   ;;
