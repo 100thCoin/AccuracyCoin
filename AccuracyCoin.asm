@@ -8682,12 +8682,12 @@ TEST_DMCReloadTiming:
 	;
 	; A refresher on the DMC timer:
 	; - Writing to $4010 determines the sample rate.
-	; - The timer is reloaded with a specific value, and counts down to zero.
+	; - The timer is reloaded with a specific value, and counts down to zero. (Well- actually it's an LFSR, but it's way easier to visualize/emulate it as a counter counting down to zero.)
 	; - When it hits zero, it is reloaded with the value again.
 	; - It does this eight times, triggering a DMC DMA when it hits zero for the eighth time.
 	;    - Whether the DMC DMA happens immediately or with a delay is currently unknown as of writing this.
-	;    - That basically means that while the timing described by my comments could be wrong... (as I assume no delay)
-	;    - ... the end result is still the same. Writing to $4010 `X` CPU cycles after the DMC DMA will result in the timer being reloaded with the value described by the test.
+	;    - That basically means that while the timing described by my comments could be wrong (as I assume no delay) the end result is still the same.
+	;    - Writing to $4010 `X` CPU cycles after the DMC DMA will result in the timer being reloaded with the value described by the test.
 	;
 	; In this loop, for every iteration, increment X.
 	; We delay by X CPU cycles relative to the moment the DMC timer reloads, but sync everything back up relative to when the DMA will occur.
