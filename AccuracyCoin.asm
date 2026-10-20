@@ -319,7 +319,6 @@ result_MisalignedOAM2Addr = $495
 result_DMALandingOnWrite = $496
 result_DMCReloadTiming = $497
 
-
 result_DrawTest = $03FF	; page 3 omits the test from the all-test-result-table.
 
 ;$500 is dedicated to RAM needed for tests.
@@ -821,6 +820,7 @@ Suite_AdvancedSpriteEval:
 	table "Stale Sprite Shift Regs", $FF, result_StaleSpriteShiftRegs, TEST_StaleSpriteShiftRegs
 	table "Frozen OAM2 Increment",   $FF, result_FrozenOAM2Inc,        TEST_FrozenOAM2Inc
 	table "Misaligned OAM2 Address", $FF, result_MisalignedOAM2Addr,   TEST_MisalignedOAM2Addr
+
 	.byte $FF
 
 
@@ -2680,13 +2680,13 @@ TEST_2007StressTest_Exit:
 	;
 	;;;;;;;;;;;
 	;
-	; S┌────┐Q
+	; R┌────┐Q
 	;  │ SR │
-	; R└────┘/Q
+	; S└────┘/Q
 	;
 	; This is an SR latch.
-	; If S is ever true, then Q is set to be false.
-	; If R is ever true, then Q is set to be true.
+	; If S is ever true, then Q is set to be true.
+	; If R is ever true, then Q is set to be false.
 	; The SR latch will hold its state until either S or R are true. 
 	; This means that S could be true for a very brief amount of time, and Q will be false until R is ever true.
 	; At which point, Q will be true until S is ever true.
@@ -3323,6 +3323,16 @@ FAIL_DMALandingOnWrite:              ;
 	JMP FAIL_AndDisableAudioChannels ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+CopyOAMToPage5:
+	LDX #0
+CopyOAMToPage5Loop:
+	LDA $2004
+	STA $2004 ; increment OAM Address.
+	STA $500,X
+	INX
+	BNE CopyOAMToPage5Loop
+	RTS
+;;;;;;;
 
 	.bank 1
 	.org $A000	; This next line of code is located at address $A000 in the ROM.
@@ -8327,13 +8337,7 @@ APURegActivation_Continue:
 	
 	;;; Test 6 [APU Register Activation]: The DMA can read from the APU registers when the CPU is executing out of page $40? ;;;
 	; Step 1: copy OAM to page 2.
-	LDX #0
-TEST_APURegActivation_Test5Loop:
-	LDA $2004
-	STA $2004 ; increment OAM Address.
-	STA $500,X
-	INX
-	BNE TEST_APURegActivation_Test5Loop
+	JSR CopyOAMToPage5
 	; Instead of making a 256 byte large look up table, I'm going to check each row individually. The result should match that table printed out above in the Test 4 description.
 	; X already equals zero.
 	LDY #0
@@ -8476,12 +8480,7 @@ TEST_APURegActivation_Prep6Loop: ; And this loop makes address $280 through $2FF
 	JSR $3FFE	; Jump to $3FFE, as explained above.
 	;;;;;; A real big loop to read compare the values in OAM with the desired results.
 	LDX #0
-TEST_APURegActivation_Test6Loop:
-	LDA $2004
-	STA $2004 ; increment OAM Address.
-	STA $500,X
-	INX
-	BNE TEST_APURegActivation_Test6Loop	
+	JSR CopyOAMToPage5
 	
 	LDY #$0B	; Y loops back to $00 in $15 bytes
 TEST_APURegActivation_Eval_3:
@@ -8685,9 +8684,8 @@ TEST_DMCReloadTiming:
 	; - The timer is reloaded with a specific value, and counts down to zero. (Well- actually it's an LFSR, but it's way easier to visualize/emulate it as a counter counting down to zero.)
 	; - When it hits zero, it is reloaded with the value again.
 	; - It does this eight times, triggering a DMC DMA when it hits zero for the eighth time.
-	;    - Whether the DMC DMA happens immediately or with a delay is currently unknown as of writing this.
-	;    - That basically means that while the timing described by my comments could be wrong (as I assume no delay) the end result is still the same.
-	;    - Writing to $4010 `X` CPU cycles after the DMC DMA will result in the timer being reloaded with the value described by the test.
+	; 	- In other words, the RDY pin of the CPU is set on the cycle after this timer/LFSR is reloaded for the 8th time, indicating that all the btis of the shift register have been used.
+	;	- This timing was verified using visual 2A03, which until recently was speculated that there could be a delay between the timer expiring and the DMA occurring. But nope!
 	;
 	; In this loop, for every iteration, increment X.
 	; We delay by X CPU cycles relative to the moment the DMC timer reloads, but sync everything back up relative to when the DMA will occur.
