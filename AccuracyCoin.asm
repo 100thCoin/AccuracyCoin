@@ -1445,6 +1445,7 @@ TEST_DMA_Plus_2002R__putSync:        ; Either way, we are now synced with a put 
 	BMI FAIL_DMA_Plus_2002R ; If the VBlank flag was set, you fail the test this time for real.
 	
 	;; END OF TEST ;;
+Print_3APUCycleText:
 	JSR Test_DMA_Plus_2002_Cleanup
 	JSR WaitForVBlank
 	LDA <RunningAllTests
@@ -3201,8 +3202,7 @@ TEST_DMALandingOnWrite:
 	
 	;;; Test 6 [DMA Landing on Write]: Load DMAs can have a 4 cycle delay ;;;
 	; NOTE: Some CPU's have been seen to take an extra APU cycle for the Load DMA to occur.
-	; As of writing this test, I am entirely out of space in the ROM, so I don't have room to verify if this is running on one of those CPU's.
-	; So this test is known to fail on those consoles, and as soon as I save some more bytes, I'll try and fix this issue with this test.
+	; If you fail this error code, we'll try again with the additional APU cycle.
 	LDA #$0                          ;
 	STA $4015                        ;
 	JSR Clockslide_1000              ;
@@ -3211,7 +3211,7 @@ TEST_DMALandingOnWrite:
 	LDA #$10                         ; [put] [get]
 	STA $4015                        ; [put] [get] [put] [GET]
 	LDA $4000                        ; [put] [get] [put] [DMC DMA (get)]
-	BNE FAIL_DMALandingOnWrite1      ;
+	BNE FAIL_DMALandingOnWrite4Delay ;
 	INC <ErrorCode                   ;
 
 	;;; Test 7 [DMA Landing on Write]: Load DMAs can have a 3 cycle delay ;;;
@@ -3258,6 +3258,9 @@ TEST_DMALandingOnWrite:
 	JMP $3FFD                        ;
 	; STA ($81), Y (Write $10 to $4015)
 	; LDA <$A5 (Data bus = $E8)
+	
+FAIL_DMALandingOnWrite4Delay:        ; If you failed this specific test, then it's possible you are running this on a console revision that takes an extra APU cycle before the load DMA occurs.
+	JMP TEST_DMALandingOnWrite6Delay ; Let's run the rest of the error codes under that assumption.
 
 TEST_DMALandingOnWrite_BRK:
 
@@ -3316,12 +3319,97 @@ TEST_DMALandingOnWrite_BRK:
 	BNE FAIL_DMALandingOnWrite       ;	
 	
 	;; End Of Test ;;                ;
-	LDA #1                           ;
+	LDA #5                           ;
 	RTS                              ;	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 FAIL_DMALandingOnWrite:              ;
 	JMP FAIL_AndDisableAudioChannels ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+TEST_DMALandingOnWrite6Delay:
+	;;; Test 6 [DMA Landing on Write]: Load DMAs can have a 6 cycle delay. (alternate behavior) ;;;
+	; NOTE: Some CPU's have been seen to take an extra APU cycle for the Load DMA to occur. We're testing for one of these consoles now.
+	LDA #$0                          ;
+	STA $4015                        ;
+	JSR Clockslide_1000              ;
+	STA $4014                        ;
+	LDA <$00                         ; [get] [put] [get]
+	LDA #$10                         ; [put] [get]
+	STA $4015                        ; [put] [get] [put] [GET]
+	NOP                              ; [put] [get]
+	LDA $4000                        ; [put] [get] [put] [DMC DMA (get)]
+	BNE FAIL_DMALandingOnWrite       ; If you fail this one, then you simply fail.
+	INC <ErrorCode                   ;
+
+	JSR Print_3APUCycleText
+
+	;;; Test 7 [DMA Landing on Write]: Load DMAs can have a 5 cycle delay (alternate behavior) ;;;
+	LDA #0                           ;
+	STA $4015                        ; disable DMC
+	JSR Clockslide_1000              ;
+	
+	LDX #1
+	STA $4014                        ;
+	LDA #$10                         ; [get] [put]
+	STA $4015                        ; [get] [put] [get] [PUT]
+	LDA $3FFF,X                      ; [get] [put] [get] [put] [DMC DMA (get)]
+FAIL_DMALandingOnWrite_BNE:          ; (I make a BNE FAIL land here so I can re-use this BNE to the actual fail that was out of range from teh first BNE.)
+	BNE FAIL_DMALandingOnWrite       ; 
+	INC <ErrorCode                   ;
+	
+	;;; Test 8 [DMA Landing on Write]: Load DMAs also cannot land on write cycles ;;;
+	LDA #0                           ;
+	STA $4015                        ; disable DMC
+	JSR WaitForFrameCounterIRQFlag   ;
+	LDA #$10                         ;
+	STA $4014                        ; Trigger an OAM DMA to align with a Get cycle next.
+	LDA $00                          ; delay 3 cycles to sync with put cycle.
+	STA $4015                        ; [Opcode (put)] [Operand (get)] [Operand (put)] [Write (get)]
+	NOP                              ; [Opcode (put)] [Dummy (get)]
+	STA $4015                        ; [Opcode (put)] [Operand (get)] [Operand (put)] {Write (get)} This delays the DMA by a cycle, and does NOT read from $4015
+	LDA $4015                        ;
+	AND #$40                         ; Filter for the Frame Counter IRQ Flag
+	BEQ FAIL_DMALandingOnWrite       ;
+	INC <ErrorCode                   ;
+
+	;;; Test 9 [DMA Landing on Write]: Load DMAs that get delayed by 1 cycle take 4 cycles ;;;
+	JSR DMASync_50CyclesRemaining    ;
+	JSR Clockslide_50                ;
+	; 4 cycle DMA
+	; [Put cycle]
+	; Next DMA in 428 cycles.
+	LDA #$0                          ; +2 cycles
+	STA $4015                        ; +4 cycles
+	JSR ClockslideFromWord           ; Stall
+	.word 422
+	JSR ClockslideFromWord           ; Stall
+	.word 432
+	; A DMA does not happen here, but the timer is reset here. 432 cycles to go.
+	LDA #$4F                         ; +2 cycles
+	STA $4010                        ; +4 cycles
+	LDA #$10                         ; +2 cycles
+	STA $4015                        ; +4 cycles
+	NOP                              ; +2 cycles
+	STA $5000                        ; +4 cycles
+	                                 ; +4 cycle long DMA
+	                                 ; Next DMA in 411 cycles
+	JSR ClockslideFromWord           ; Stall for 407 cycles
+	.word 407                        ; ^
+	LDA $4000                        ; read from open bus immediately after the DMA.
+	BNE FAIL_DMALandingOnWrite_BNE   ;	
+	
+	;; End Of Test ;;                ;
+	LDA #9                           ;
+	RTS                              ;	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+
+
+
+
+
 
 CopyOAMToPage5:
 	LDX #0
@@ -8684,7 +8772,7 @@ TEST_DMCReloadTiming:
 	; - The timer is reloaded with a specific value, and counts down to zero. (Well- actually it's an LFSR, but it's way easier to visualize/emulate it as a counter counting down to zero.)
 	; - When it hits zero, it is reloaded with the value again.
 	; - It does this eight times, triggering a DMC DMA when it hits zero for the eighth time.
-	; 	- In other words, the RDY pin of the CPU is set on the cycle after this timer/LFSR is reloaded for the 8th time, indicating that all the btis of the shift register have been used.
+	; 	- In other words, the RDY pin of the CPU is set on the cycle after this timer/LFSR is reloaded for the 8th time, indicating that all the bits of the shift register have been used.
 	;	- This timing was verified using visual 2A03, which until recently was speculated that there could be a delay between the timer expiring and the DMA occurring. But nope!
 	;
 	; In this loop, for every iteration, increment X.
