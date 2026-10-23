@@ -318,6 +318,7 @@ result_MisalignedOAM2Addr = $495
 
 result_DMALandingOnWrite = $496
 result_DMCReloadTiming = $497
+result_DMCPlaybackRate = $498
 
 result_DrawTest = $03FF	; page 3 omits the test from the all-test-result-table.
 
@@ -742,6 +743,7 @@ Suite_CPUBehavior2:
 	table "Internal Data Bus",    $FF, result_InternalDataBus,   TEST_InternalDataBus
 	table "DMA Landing on Write", $FF, result_DMALandingOnWrite, TEST_DMALandingOnWrite
 	table "DMC Reload Timing",    $FF, result_DMCReloadTiming,   TEST_DMCReloadTiming
+	table "DMC Playback Rate",    $FF, result_DMCPlaybackRate,   TEST_DMCPlaybackRate
 	.byte $FF
 
 	;; Power On State ;;
@@ -3353,7 +3355,7 @@ TEST_DMALandingOnWrite6Delay:
 	LDA #$10                         ; [get] [put]
 	STA $4015                        ; [get] [put] [get] [PUT]
 	LDA $3FFF,X                      ; [get] [put] [get] [put] [DMC DMA (get)]
-FAIL_DMALandingOnWrite_BNE:          ; (I make a BNE FAIL land here so I can re-use this BNE to the actual fail that was out of range from teh first BNE.)
+FAIL_DMALandingOnWrite_BNE:          ; (I make a BNE FAIL land here so I can re-use this BNE to the actual fail that was out of range from the first BNE.)
 	BNE FAIL_DMALandingOnWrite       ; 
 	INC <ErrorCode                   ;
 	
@@ -3403,11 +3405,92 @@ FAIL_DMALandingOnWrite_BNE:          ; (I make a BNE FAIL land here so I can re-
 	RTS                              ;	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
-
-
-
-
+FAIL_DMCPlaybackRate:               ;
+	JMP TEST_Fail                   ;
+	                                ;
+TEST_DMCPlaybackRate:               ;
+	;;; Test 1 [DMC Playback Rate]: Do you pass DMA + Open Bus? ;;;
+	JSR TEST_DMA_Plus_OpenBus       ;
+	LDX #1                          ; The DMA Plus Open Bus test increments the error code, so let's fix it real quick.
+	STX <ErrorCode                  ;
+	CMP #1                          ;
+	BNE FAIL_DMCPlaybackRate        ;
+	INC <ErrorCode                  ;
+	LDX #0                          ; Reset X for the upcoming loop.
+	                                ;
+	LDA #$20                        ; This upcoming loop needs to stall for very precise amounts of CPU cycles.
+	STA <$60                        ; Unfortunately, this precise amount needs to be different in each iteration of this loop.
+	LDA #LOW(ClockslideFromWord)    ; My solution involves a `JSR ClockslideFromWord` in RAM, and I can just change the arguments in the loop.
+	STA <$61                        ;
+	LDA #HIGH(ClockslideFromWord)   ;
+	STA <$62                        ;
+	LDA #$60                        ;
+	STA <$65                        ;
+	                                ;
+	;;; Test 2 through H [DMC Playback Rate]: Does the DMC take the correct number of APU cycles between DMA's when the sample rate is set to %0000? ;;;
+	                                ;
+TEST_DMCPlaybackRate_Loop:          ;
+	LDA DMCPR_DelayLO, X            ;
+	STA <$63                        ; The low byte of the clockslide
+	LDA DMCPR_DelayHI, X            ;
+	STA <$64                        ; the high byte of the clockslide
+	                                ;
+	JSR DMASync_50CyclesRemaining   ;
+	TXA                             ;
+	ORA #$40                        ;
+	STA $4010                       ; By this point, the DMC timer/lfsr has been refreshed already, so the write to $4010 won't affect the upcoming DMA.
+	JSR Clockslide_42               ;
+	; DMA happens here.
+	JSR $0060                       ; This leads to a ClockslideFromWord, which will stall for precisely the amount determined by DMCPR_DelayHI and DMCPR_DelayLO.
+	LDA $4000                       ; The DMA should land just before the read from open bus.
+	BNE FAIL_DMCPlaybackRate        ;
+	                                ;
+	INC <ErrorCode                  ;
+	                                ;
+	INX                             ;
+	CPX #$10                        ;
+	BNE TEST_DMCPlaybackRate_Loop   ;
+	                                ;
+	LDA #1                          ;
+	RTS                             ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+DMCPR_Overhead = 19                 ;
+DMCPR_DelayHI:                      ;
+	.byte HIGH(3424-DMCPR_Overhead) ;
+	.byte HIGH(3040-DMCPR_Overhead) ;
+	.byte HIGH(2720-DMCPR_Overhead) ;
+	.byte HIGH(2560-DMCPR_Overhead) ;
+	.byte HIGH(2288-DMCPR_Overhead) ;
+	.byte HIGH(2032-DMCPR_Overhead) ;
+	.byte HIGH(1808-DMCPR_Overhead) ;
+	.byte HIGH(1712-DMCPR_Overhead) ;
+	.byte HIGH(1520-DMCPR_Overhead) ;
+	.byte HIGH(1280-DMCPR_Overhead) ;
+	.byte HIGH(1136-DMCPR_Overhead) ;
+	.byte HIGH(1024-DMCPR_Overhead) ;
+	.byte HIGH(848-DMCPR_Overhead)  ;
+	.byte HIGH(672-DMCPR_Overhead)  ;
+	.byte HIGH(576-DMCPR_Overhead)  ;
+	.byte HIGH(432-DMCPR_Overhead)  ;
+	                                ;
+DMCPR_DelayLO:                      ;
+	.byte LOW(3424-DMCPR_Overhead)  ;
+	.byte LOW(3040-DMCPR_Overhead)  ;
+	.byte LOW(2720-DMCPR_Overhead)  ;
+	.byte LOW(2560-DMCPR_Overhead)  ;
+	.byte LOW(2288-DMCPR_Overhead)  ;
+	.byte LOW(2032-DMCPR_Overhead)  ;
+	.byte LOW(1808-DMCPR_Overhead)  ;
+	.byte LOW(1712-DMCPR_Overhead)  ;
+	.byte LOW(1520-DMCPR_Overhead)  ;
+	.byte LOW(1280-DMCPR_Overhead)  ;
+	.byte LOW(1136-DMCPR_Overhead)  ;
+	.byte LOW(1024-DMCPR_Overhead)  ;
+	.byte LOW(848-DMCPR_Overhead)   ;
+	.byte LOW(672-DMCPR_Overhead)   ;
+	.byte LOW(576-DMCPR_Overhead)   ;
+	.byte LOW(432-DMCPR_Overhead)   ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 
