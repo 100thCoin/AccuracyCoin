@@ -734,6 +734,7 @@ Suite_APUTiming:
 	table "Controller Clocking",      $FF, result_ControllerClocking,     TEST_ControllerClocking
 	.byte $FF
 
+	;; CPU Behavior 2 ;;
 Suite_CPUBehavior2:
 	.byte "CPU Behavior 2", $FF
 	table "Instruction Timing",   $FF, result_InstructionTiming, TEST_InstructionTiming
@@ -3427,7 +3428,7 @@ TEST_DMCPlaybackRate:               ;
 	LDA #$60                        ;
 	STA <$65                        ;
 	                                ;
-	;;; Test 2 through H [DMC Playback Rate]: Does the DMC take the correct number of APU cycles between DMA's when the sample rate is set to %0000? ;;;
+	;;; Test 2 through H [DMC Playback Rate]: Does the DMC take the correct number of APU cycles between DMA's when the sample rate is set to the value of the X register? ;;;
 	                                ;
 TEST_DMCPlaybackRate_Loop:          ;
 	LDA DMCPR_DelayLO, X            ;
@@ -3454,7 +3455,7 @@ TEST_DMCPlaybackRate_Loop:          ;
 	LDA #1                          ;
 	RTS                             ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-DMCPR_Overhead = 19                 ;
+DMCPR_Overhead = 19                 ; How many cycles are consumed by jumping to RAM and back?
 DMCPR_DelayHI:                      ;
 	.byte HIGH(3424-DMCPR_Overhead) ;
 	.byte HIGH(3040-DMCPR_Overhead) ;
@@ -3494,16 +3495,17 @@ DMCPR_DelayLO:                      ;
 
 
 
-CopyOAMToPage5:
-	LDX #0
-CopyOAMToPage5Loop:
-	LDA $2004
-	STA $2004 ; increment OAM Address.
-	STA $500,X
-	INX
-	BNE CopyOAMToPage5Loop
-	RTS
-;;;;;;;
+CopyOAMToPage5:            ;
+	LDX #0                 ;
+CopyOAMToPage5Loop:        ;
+	LDA $2004              ; read the value from OAM
+	STA $2004              ; increment OAM Address.
+	STA $500,X             ; store the value in RAM
+	INX                    ; Increment X until it overflows
+	BNE CopyOAMToPage5Loop ;
+	RTS                    ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 	.bank 1
 	.org $A000	; This next line of code is located at address $A000 in the ROM.
@@ -19266,6 +19268,8 @@ DMASync_Loop:
 TEST_DoesTheDMAUpdateOpenBus:
 	; let's find out!
 	STA <Copy_A
+	LDA $4000
+	BEQ TEST_DoesTheDMA_Fail
 	LDA #$4F ; loop, max speed.
 	STA $4010
 	LDA #0
