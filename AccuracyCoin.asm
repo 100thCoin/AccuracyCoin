@@ -7623,6 +7623,9 @@ MisalignedOAM_Test:
 	RTS
 ;;;;;;;
 
+FAIL_MisalignedOAM_Behavior_PLA:
+	PLA
+	PLA
 FAIL_MisalignedOAM_Behavior:
 	JMP FAIL_MisalignedOAM
 	
@@ -7630,8 +7633,8 @@ TEST_MisalignedOAM_Evaluate:
 	JSR Clockslide_500			; Wait long enough for the ppu to draw every scanline in which these objects are relevant.
 	LDA $2002					; Read PPUSTATUS, putting the sprite overflow flag in bit 5.
 	AND #$20 					; mask away bit 5. The result should be A = $20, since the sprite overflow flag *should* be set.
-	BEQ FAIL_MisalignedOAM_Behavior
-	INC <ErrorCode	
+	BEQ FAIL_MisalignedOAM_Behavior_PLA
+	INC <ErrorCode
 	RTS
 ;;;;;;;
 	
