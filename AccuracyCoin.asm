@@ -7624,8 +7624,6 @@ MisalignedOAM_Test:
 ;;;;;;;
 
 FAIL_MisalignedOAM_Behavior:
-	PLA
-	PLA
 	JMP FAIL_MisalignedOAM
 	
 TEST_MisalignedOAM_Evaluate:
