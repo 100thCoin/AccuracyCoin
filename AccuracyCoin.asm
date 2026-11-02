@@ -3507,6 +3507,34 @@ CopyOAMToPage5Loop:        ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
+ClearNametable2_WithF0:
+	LDA #$F0
+	.byte $2C ; BIT Absolute. (skip the LDA #24)
+ClearNametable2_With24:
+	LDA #$24
+	.byte $2C ; BIT Absolute. (skip the LDA #0)
+ClearNametable2:
+	LDA #0
+ClearNametable2_s:
+	JSR SetPPUADDRFromWord
+	.byte $2C, $00
+	LDY #$C0
+	LDX #4
+TEST_RMW2007_ClearNametable2Loop:
+	STA $2007
+	DEY
+	BNE TEST_RMW2007_ClearNametable2Loop
+	DEX
+	BNE TEST_RMW2007_ClearNametable2Loop
+	LDA #$FF
+	LDY #$40
+	TEST_RMW2007_ClearNT2Loop2:
+	STA $2007
+	DEY
+	BNE TEST_RMW2007_ClearNT2Loop2	
+	RTS
+;;;;;;;
+
 	.bank 1
 	.org $A000	; This next line of code is located at address $A000 in the ROM.
 	
@@ -19300,34 +19328,6 @@ TEST_DoesTheDMA_Fail:
 	STA <result_DMCDMASync_PreTest
 	JMP DMASync
 ;;;;;;;;;;;;;;;	
-
-ClearNametable2_WithF0:
-	LDA #$F0
-	.byte $2C ; BIT Absolute. (skip the LDA #24)
-ClearNametable2_With24:
-	LDA #$24
-	.byte $2C ; BIT Absolute. (skip the LDA #0)
-ClearNametable2:
-	LDA #0
-ClearNametable2_s:
-	JSR SetPPUADDRFromWord
-	.byte $2C, $00
-	LDY #$C0
-	LDX #4
-TEST_RMW2007_ClearNametable2Loop:
-	STA $2007
-	DEY
-	BNE TEST_RMW2007_ClearNametable2Loop
-	DEX
-	BNE TEST_RMW2007_ClearNametable2Loop
-	LDA #$FF
-	LDY #$40
-	TEST_RMW2007_ClearNT2Loop2:
-	STA $2007
-	DEY
-	BNE TEST_RMW2007_ClearNT2Loop2	
-	RTS
-;;;;;;;
 
 	.org $FFC0
 	; 33 00s. This will be the DPCM "audio sample" played during the DMC DMA Sync loop. It should just be silence.
