@@ -238,15 +238,15 @@ For more information, I recommend reading the fully commented assembly code for 
   4: Reading from the controller port should have some bits that are open bus. These bits are different depending on the model of the console.  
 
 ### DMC DMA + OAM DMA
-  1: The DMC DMA timing in your emulator is off.  
+  1: The DMC DMA timing in your emulator is off with sample rate %1110.  
   2: The overlapping DMAs did not spend the correct number of CPU cycles.  
 
 ### Explicit DMA Abort
-  1: The DMC DMA timing in your emulator is off.  
+  1: The DMC DMA timing in your emulator is off with sample rate %1110.  
   2: The aborted DMAs did not spend the correct number of CPU cycles.  
 
 ### Implicit DMA Abort
-  1: The DMC DMA timing in your emulator is off.  
+  1: The DMC DMA timing in your emulator is off with sample rate %1110.  
   2: The aborted DMAs did not spend the correct number of CPU cycles.  
   3: The 1-cycle DMA should not get delayed by a write cycle, rather it just shouldn't occur in that case.  
   4: If the sample was set to keep looping, the DMC DMA timing in your emulator is off.  
@@ -394,7 +394,7 @@ For more information, I recommend reading the fully commented assembly code for 
 
 ### Instruction Timing
   1: The DMA should update the data bus.  
-  2: The DMA timing is not accurate enough to test this.  
+  1: The DMC DMA timing in your emulator is off with sample rate %1110.  
   3: JSR should take 6 CPU cycles.  
   4: RTS should take 6 CPU cycles.  
   5: BRK should take 7 CPU cycles.  

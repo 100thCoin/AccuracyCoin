@@ -12964,57 +12964,62 @@ PaletteRAM_PreRevG_SkipMSG:
 ;;;;;;;
 
 CalculateDMADuration:
-	; sync the DMC DMA to occur in 50 cycles.
-	LDY #0
-	JSR Clockslide_45
-CalculateDMADuration_Loop:
-	LDA $4000	;+4
-	BEQ CalculateDMADuration_End ;+2
-	; 2+4+2+3 (+4) = 15.
-	; 576 cycles between each DMA.
-	; 576 - 15 = 561
-	; if I stall for 560 cycles, I can read from open bus 1 cycle earlier in relation to the DMA each loop.
-	JSR ClockslideFromWord
-	.word 560
-	INY	; +2
+	                              ; sync the DMC DMA to occur in 50-N cycles.
+	                              ; If N = 0, then this would land directly on the read from $4000.
+	LDY #0                        ; Set Y to 0. The goal here is to calculate 'N' and store that in the Y register.
+	JSR Clockslide_45             ; Basically, we loop CalculateDMADuration_Loop until the DMC DMA lands on the $4000 read,
+CalculateDMADuration_Loop:        ; and every loop should land the DMC DMA 1 CPU cycle closer to the read from $4000.
+	LDA $4000	                  ; +4
+	BEQ CalculateDMADuration_End  ; +2
+	                              ; 2+4+2+3 (+4 from the DMA) = 15 CPU cycles from these instructions.
+	                              ; There are 576 cycles between each DMA with the chosen sample rate.
+	                              ; 576 - 15 = 561
+	                              ; if I stall for 560 cycles, I can read from open bus 1 cycle earlier in relation to the DMA each loop.
+	JSR ClockslideFromWord        ; This stalls for 560 CPU cycles.
+	.word 560                     ; Adding the +2 and +3 from the INY and JMP, we're ready for the next DMC DMA.
+	INY	                          ; +2
 	JMP CalculateDMADuration_Loop ;+3
-CalculateDMADuration_End:
-	RTS
-;;;;;;;
+CalculateDMADuration_End:         ; If branched here, Y holds the number of times we looped here, which is 'N', the number of CPU cycles we're trying to calculate.
+	RTS                           ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 CycleClockBegin:
-	JSR DMASync_50CyclesRemaining
-	; 50 cycles until the target DMA.	
-	LDA #$4E			; +2 cycles.
-	STA $4010			; +4 cycles. Make this sample loop, and use the SECOND FASTEST DMC rate.
-	JSR Clockslide_44	; [DMC DMA. + 4]
-	; 572 more cycles until the next DMA.
-	JSR Clockslide_500
-	JSR Clockslide_50
-	JSR Clockslide_16
-	RTS
-	
+	JSR DMASync_50CyclesRemaining ; Sync the CPU with a DMC DMA in 50 cycles.
+	                              ; 50 cycles until the target DMA.	
+	LDA #$4E                      ; +2 cycles.
+	STA $4010                     ; +4 cycles. Make this sample loop, and use the SECOND FASTEST DMC rate.
+	JSR Clockslide_44             ; After the RTS, [DMC DMA takes 4 cycles]
+	                              ; 572 more cycles until the next DMA.
+	JSR Clockslide_500            ; 72 more cycles
+	JSR Clockslide_50             ; 22 more cycles
+	JSR Clockslide_16             ; 6 more cycles.
+	RTS                           ; DMC DMA happens after this RTS.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 CycleClockEnd:
-	; 572-6 cycles to go until the next DMA.
-	SEI
-	JSR Clockslide_500
-	; 72-6 cycles to go. (We need to jump to CalculateDMADuration with 56 cycles remaining)
-	NOP
-	NOP
-	NOP
-	NOP
-	; 56 cycles to go:
-	JSR CalculateDMADuration
-	RTS
-;;;;;;;
+	                         ; The current goal is to jump to CalculateDMADuration such that the DMC DMA inside that subroutine occurs 'N' CPU cycles before the first read from address $4000...
+	                         ; ...where 'N' is the number of CPU cycles between returning from "CycleClockBegin" and reading the opcode of the JSR here (CycleClockEnd).
+	                         ; 566-N cycles to go until the next DMA.
+	SEI                      ; Prevent IRQ's anmd stuff. This takes 2 CPU cycles.
+	JSR ClockslideFromWord   ; We need to jump to CalculateDMADuration with 56-N cycles remaining
+	.word 508                ; Stall exactly long enough to make that happen.
+	JSR CalculateDMADuration ; After returning, the Y register will hold the value of 'N'.
+	RTS                      ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 CheckDMATiming:
-	JSR CycleClockBegin
-	NOP
-	NOP
-	JSR CycleClockEnd
-	RTS
-;;;;;;;
+	LDY #0                  ; Reset the Y register, in case we fail the timing test here.
+	JSR CycleClockBegin     ; I'm specifically using this subroutine right now, not for "stopwatch" purposes, rather I'm just setting up the DMC DMA with the correct sample rate.
+	JSR ClockslideFromWord  ; Stall until the DMC DMA would land on the read from $4000
+	.word 569               ; (Stall for 569 cycles, since the sample rate is currently set to trigger DMC DMA's 576 cycles apart)
+	LDA $4000               ; Read from open bus.
+	BNE CheckDMATiming_Fail ; If we didn't read "00", just leave.
+	JSR CycleClockBegin     ; Imagine a stopwatch starting the moment this JSR instruction returns.
+	NOP                     ; For this example, we'll make this four cycles long.
+	NOP                     ; We stall for four cycles.
+	JSR CycleClockEnd       ; Now imagine the stop watch halts the moment this JSR instruction begins. Naturally, there's not actually a "stopwatch" that can arbitrarily start and stop whenever.
+CheckDMATiming_Fail:        ; If your emulator hangs here, you might consider looking inside those subroutines.
+	RTS                     ; If this worked, the Y register holds the number of CPU cycles consumed by those two NOP instructions.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 FAIL_DMCDMAPlusOAMDMA:
 	LDA #0
