@@ -468,7 +468,7 @@ For more information, I recommend reading the fully commented assembly code for 
 
 ### JSR Edge Cases
   1: Your emulator pushed the wrong value for the return address.  
-  2: JSR should push the return address to the stack between reading the first and second operand.
+  2: JSR should push the return address to the stack between reading the first and second operand.  
   3: Your emulator has incorrect open bus emulation.  
   4: JSR should leave the value of the second operand on the data bus.  
 
