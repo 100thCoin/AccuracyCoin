@@ -263,6 +263,9 @@ For more information, I recommend reading the fully commented assembly code for 
   7: The length counter shouldn't be set when the channel is disabled.  
   8: If the channel is set to play infinitely, it shouldn't clock the length counter.  
   9: If the channel is set to play infinitely, the length counter should be left unchanged.  
+  A: The pulse 2 length counter failed the load/status/halt/disable checks.  
+  B: The triangle length counter failed the load/status/halt/disable checks.  
+  C: The noise length counter failed the load/status/halt/disable checks.  
 
 ### APU Length Table
   1: Your emulator did not pass APU Length Counter.  
@@ -468,7 +471,7 @@ For more information, I recommend reading the fully commented assembly code for 
 
 ### JSR Edge Cases
   1: Your emulator pushed the wrong value for the return address.  
-  2: JSR should push the return address to the stack between reading the first and second operand.
+  2: JSR should push the return address to the stack between reading the first and second operand.  
   3: Your emulator has incorrect open bus emulation.  
   4: JSR should leave the value of the second operand on the data bus.  
 
@@ -511,6 +514,8 @@ For more information, I recommend reading the fully commented assembly code for 
   H: Sample rate %1111 should take 432 CPU cycles before the DMC DMA occurs.  
 
 ## Page 16: Power On State
+
+> **Soft reset limitation:** AccuracyCoin expects a power cycle for valid results. Pressing reset does not reset the PPU, APU, or OAM address; the ROM intentionally skips the power-on tests on a warm boot, and some timing/APU/sprite tests can report different results after reset. The reset path performs best-effort NMI and APU/DMC cleanup, but it does not recreate the power-on state.
 
 ### DRAW PPU Reset Flag
   This test attempts to write to the ppu registers before the end of the first VBlank.  
@@ -594,6 +599,7 @@ or
 
 ### PPU Register Mirroring
   1: PPU registers should be mirrored through $3FFF.  
+  2: Nametable mirroring is wrong: with horizontal mirroring, $2000/$2400 and $2800/$2C00 should alias, and the two pairs should be independent.  
 
 ### PPU Register Open Bus
   1: Reading from a write-only register PPU should return the most recently written value to the PPU IO bus.  
@@ -658,6 +664,11 @@ or
   2: The Sprite Overflow Flag should not be the same thing as the CPU's Overflow flag.  
   3: Evaluating only 8 sprites in a single scanline should not set the Sprite Overflow Flag.  
   4: Sprite evaluation should occur even if only the background is being rendered. This should also set the Sprite Overflow Flag.  
+  5: With eight sprites in range, a ninth sprite's Y out of range should leave the flag clear when the rest of the buggy overflow search reads out-of-range values.  
+  6: The buggy overflow search should read the tile byte of the next OAM entry as a Y coordinate; an in-range value there should set the flag.  
+  7: The buggy overflow search should read an attribute byte two OAM entries later as a Y coordinate; an in-range value there should set the flag.  
+  8: The buggy overflow search should read an X byte three OAM entries later as a Y coordinate; an in-range value there should set the flag.  
+  9: The overflow search should not read the X byte of the ninth sprite; an in-range value there should leave the flag clear.  
 
 ### Sprite 0 Hit Behavior
   1: A Sprite zero hit did not occur.  
@@ -674,6 +685,8 @@ or
   C: Sprite zero hits should not be able to happen at Y>=239  
   D: Your sprites are being rendered one scanline higher than they should be, or your sprite zero hit detection isn't actually checking for "solid pixels" overlapping.  
   E: The sprite zero hit flag was set too early.  
+  F: Sprite zero hits should respect horizontal flipping.  
+  10: An 8x16 sprite with an odd tile index should select the pattern table from tile bit 0; a solid 8x16 sprite should still hit the background. This code is displayed as `G` in the on-screen result table.  
 
 ### $2002 Flag Timing
   1: The flags were not cleared on the correct ppu cycle.  

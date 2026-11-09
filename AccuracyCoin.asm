@@ -362,6 +362,8 @@ RESET_SkipPowerOnTests:
 	TXS		 ; This prevents some tests where the resulting stack pointer is 00 from pushing data, and overwriting the bottom of the stack.
 	LDA #$40
 	STA $4017; Disable the APU Frame Counter IRQ.
+	STA $2000 ; A = $40 here: clear NMI-enable for a warm reset. A stale test NMI routine may still be at $700.
+	STA $4015 ; A = $40 here: disable all APU channels and stop a DMC left running by the previous test.
 TEST_PPUResetFlag:
 	; All throughout this ROM, you will see me label the various tests like so:
 	; 3 semicolons, the error code that will appear if the test fails here, the name of the test in square brackets, then a description of what is being tested.
@@ -3535,6 +3537,223 @@ TEST_RMW2007_ClearNametable2Loop:
 	RTS
 ;;;;;;;
 
+	.org $9E61
+	; Tests 5 through 9 for [Sprite Overflow Behavior].
+	; Once 8 sprites are in range, the PPU keeps walking OAM looking for a 9th. After
+	; the first check it increments both the sprite index and the byte index, so it
+	; reads OAM addresses 32, 37, 42, 47, 48, ... and can mistake tile, attribute, and
+	; X bytes for Y values. (NESdev: PPU sprite evaluation, "Sprite overflow bug".)
+	; Each table row is five bytes copied to $50-$54, then the expected $2002 bit 5:
+	;   $50 OAM[9][1] (tile), $51 OAM[10][2] (attribute), $52 OAM[11][3] (X),
+	;   $53 OAM[9][0] (Y), $54 OAM[8][3] (X, which the walk skips).
+	TEST_SprOverflow_BugCases:
+		LDA #0
+		STA <$57 ; case index
+	sprOverflow_BugCaseLoop:
+		LDA <$57
+		ASL A
+		STA <$55
+		ASL A
+		CLC
+		ADC <$55 ; A = case index * 6
+		TAY
+		LDX #0
+	sprOverflow_BugCaseLoad:
+		LDA TEST_SprOverflow_BugCases_Table,Y
+		STA <$50,X
+		INY
+		INX
+		CPX #5
+		BNE sprOverflow_BugCaseLoad
+		LDA TEST_SprOverflow_BugCases_Table,Y
+		STA <$56 ; expected bit 5 value
+		JSR sprOverflow_BugCaseSetup
+		JSR EnableRendering
+		JSR Clockslide_3000
+		LDA $2002
+		AND #$20
+		CMP <$56
+		BNE sprOverflow_BugCaseFail
+		INC <ErrorCode
+		INC <$57
+		LDA <$57
+		CMP #5
+		BNE sprOverflow_BugCaseLoop
+		RTS
+	sprOverflow_BugCaseFail:
+		PLA ; Remove the return address of this subroutine.
+		PLA
+		JMP FAIL_SprOverflow
+	
+	TEST_SprOverflow_BugCases_Table:
+		; Case 5: every byte the walk checks is out of range. Flag clear.
+		.byte $F0, $F0, $F0, $F0, $F0, $00
+		; Case 6: OAM[9][1] (tile) reads in range. Flag set.
+		.byte $00, $F0, $F0, $F0, $F0, $20
+		; Case 7: OAM[10][2] (attribute) reads in range. Flag set.
+		.byte $F0, $00, $F0, $F0, $F0, $20
+		; Case 8: OAM[11][3] (X) reads in range. Flag set.
+		.byte $F0, $F0, $00, $F0, $F0, $20
+		; Case 9: OAM[8][3] (X, three bytes after the 9th sprite's Y) is skipped. Flag clear.
+		.byte $F0, $F0, $F0, $F0, $00, $00
+	
+	sprOverflow_BugCaseSetup:
+		JSR ClearPage2WithF0
+		LDX #0
+		LDY #0
+	sprOverflow_BugCaseSprites:
+		LDA SpriteOverflowLUT,Y
+		STA $200,X
+		INX
+		INY
+		CPY #4
+		BNE sprOverflow_BugCaseSprites1
+		LDY #0
+	sprOverflow_BugCaseSprites1:
+		CPX #4*8
+		BNE sprOverflow_BugCaseSprites
+		LDA <$53
+		STA $224 ; OAM[9][0]
+		LDA <$50
+		STA $225 ; OAM[9][1]
+		LDA <$51
+		STA $22A ; OAM[10][2]
+		LDA <$52
+		STA $22F ; OAM[11][3]
+		LDA <$54
+		STA $223 ; OAM[8][3]
+		JSR WaitForVBlank
+		JSR OAMDMAWithPage2
+		RTS
+	
+	ClearPage2WithF0:
+		LDX #0
+		LDA #$F0
+	ClearPage2WithF0Loop:
+		STA $200,X
+		INX
+		BNE ClearPage2WithF0Loop
+		RTS
+
+	; The APU length-counter test only exercises pulse 1 inline. This covers the
+	; other three channels without spending the few bytes left in bank 1.
+	.org $9F05
+	TEST_APU_OtherChannels:
+		LDA #$40		; 4-step, IRQ inhibited; reset the frame-counter phase.
+		STA $4017
+		LDY #0
+	TEST_APU_OtherChannels_Loop:
+		LDA #0
+		STA $4015
+		LDA TEST_APU_OtherChannels_Bits,Y
+		STA $4015
+		LDX TEST_APU_OtherChannels_Offsets,Y
+		LDA #0		; clear halt (and the triangle linear counter) first.
+		STA $4004,X
+		LDA #$18
+		STA $4007,X
+		LDA $4015
+		AND TEST_APU_OtherChannels_Bits,Y
+		BEQ TEST_APU_OtherChannels_Fail
+		LDA #$80
+		STA $4017
+		STA $4017
+		LDA $4015
+		AND TEST_APU_OtherChannels_Bits,Y
+		BNE TEST_APU_OtherChannels_Fail
+		JMP TEST_APU_OtherChannels_AfterFail
+	TEST_APU_OtherChannels_Fail:
+		LDA #0
+		STA $4015
+		LDA #0
+		RTS
+	TEST_APU_OtherChannels_AfterFail:
+		LDA #$18
+		STA $4007,X
+		LDA TEST_APU_OtherChannels_Halt,Y
+		STA $4004,X
+		LDA #$80
+		STA $4017
+		STA $4017
+		LDA $4015
+		AND TEST_APU_OtherChannels_Bits,Y
+		BEQ TEST_APU_OtherChannels_Fail
+		LDA #0
+		STA $4004,X
+		LDA #$80
+		STA $4017
+		STA $4017
+		LDA $4015
+		AND TEST_APU_OtherChannels_Bits,Y
+		BNE TEST_APU_OtherChannels_Fail
+		LDA #$18
+		STA $4007,X
+		LDA #0
+		STA $4015
+		LDA TEST_APU_OtherChannels_Bits,Y
+		STA $4015
+		LDA $4015
+		AND TEST_APU_OtherChannels_Bits,Y
+		BNE TEST_APU_OtherChannels_Fail
+		INC <ErrorCode
+		INY
+		CPY #3
+		BEQ TEST_APU_OtherChannels_Done
+		JMP TEST_APU_OtherChannels_Loop
+	TEST_APU_OtherChannels_Done:
+		LDA #$80		; leave 5-step so the next run's $40 write is a mode change.
+		STA $4017
+		LDA #1		; pulse 1 stays enabled with length 0; Length Table loads its first value without enabling it.
+		STA $4015
+		RTS
+	TEST_APU_OtherChannels_Bits:
+		.byte $02, $04, $08
+	TEST_APU_OtherChannels_Halt:
+		.byte $20, $80, $20
+	TEST_APU_OtherChannels_Offsets:
+		.byte 0, 4, 8
+
+	TEST_Sprite0Hit_Flip:
+		;;; Test F [Sprite Zero Hit Behavior]: Horizontal flipping should move the sprite zero hit pixel. ;;;
+		JSR WaitForVBlank
+		JSR PrintCHR
+		.word $2001
+		.byte $24, $C0, $FF
+		JSR ResetScroll
+		LDA #0
+		STA $2000
+		JSR InitializeSpriteZero
+		;    YPos, CHR, Att, XPos
+		.byte $00, $C0, $40, $09
+		JSR EnableRendering
+		JSR WaitForVBlank
+		JSR OAMDMAWithPage2
+		JSR Clockslide_3000
+		LDA $2002
+		AND #$40
+		BEQ TEST_Sprite0Hit_Flip_Fail
+		INC <ErrorCode
+		;;; Test 10 [Sprite Zero Hit Behavior]: An 8x16 sprite with an odd tile index should select the pattern table from bit 0, not the 8x8 sprite table select. ;;;
+	;;; Tile $C1 is solid in sprite table 1 and a one-pixel dot in table 0.  The
+	;;; background dot at $2002 is under the sprite's right edge, so a table-0
+	;;; selection misses it while the correct table-1 selection hits.
+	TEST_Sprite0Hit_8x16_Odd:
+		LDA #$20
+		STA $2000
+		JSR InitializeSpriteZero
+		;    YPos, CHR, Att, XPos
+		.byte $00, $C1, $00, $09
+		JSR WaitForVBlank
+		JSR OAMDMAWithPage2
+		JSR Clockslide_3000
+		BIT $2002
+		BVC TEST_Sprite0Hit_Flip_Fail
+		INC <ErrorCode
+		RTS
+	TEST_Sprite0Hit_Flip_Fail:
+		JMP FAIL_Sprite0Hit_Behavior2
+
+	; (OAM DMA conflict result path moved to $DFF8 in bank 2.)
 	.bank 1
 	.org $A000	; This next line of code is located at address $A000 in the ROM.
 	
@@ -3898,6 +4117,10 @@ TEST_PPURegMirroring:
 	PLA          ; Pull the results off the stack
 	CMP #$01
 	BNE TEST_Fail2
+	INC <ErrorCode
+	JSR TEST_NametableMirroring
+	CMP #1
+	BNE TEST_Fail2
 	;; END OF TEST ;;
 	RTS
 ;;;;;;;;;;;;;;;;;;
@@ -3945,7 +4168,9 @@ TEST_DummyReads_BPLFail: ; I ran out of bytes so the branches here are a bit cur
 	LDA $3FF0, X ; Dummy read $3F52 (A mirror of $2002), then read $4052 (Open bus emulation is NOT needed to pass this test!)
 	LDA $2002	 ; If bit 7 of A gets set, then the dummy read was from the wrong address (bit 7 of $2002 was not cleared by the dummy read).
 TEST_DummyReads_BMIFail: ; I ran out of bytes so the branches here are a bit cursed.
-	BMI TEST_Fail2
+	BPL TEST_DummyReads_BMIFail_OK
+	JMP TEST_Fail2
+TEST_DummyReads_BMIFail_OK:
 	INC <ErrorCode 	
 	
 	;;; Test 4 [Dummy Read Cycles]: STA $2002, X (where X=0) reads $2002 once. ;;;
@@ -3953,7 +4178,9 @@ TEST_DummyReads_BMIFail: ; I ran out of bytes so the branches here are a bit cur
 	JSR Clockslide_29780 ; Wait a frame so the VBlank flag gets set
 	STA $2002, X ; The dummy read cycle will read from $2002.
 	LDA $2002	 ; If bit 7 of A gets set, then $2002 was not read during the STA
-	BMI TEST_Fail2
+	BPL TEST_DummyReads_Test4OK
+	JMP TEST_Fail2
+TEST_DummyReads_Test4OK:
 	INC <ErrorCode 	
 	
 	;;; Test 5 [Dummy Read Cycles]: STA dummy read is on the correct address ;;;
@@ -7357,6 +7584,8 @@ TEST_Sprite0Hit_Behavior_Continued:
 	LDA $2002	; This should read 2 CPU cycles *AFTER* the sprite zero hit flag is set.
 	AND #$40
 	BEQ FAIL_Sprite0Hit_Behavior2	
+	INC <ErrorCode
+	JSR TEST_Sprite0Hit_Flip
 	;; END OF TEST ;;
 	JSR ClearOverscanNametable
 	LDA #1
@@ -7581,6 +7810,9 @@ TEST_SprOverflow_Behavior:
 	LDA $2002
 	AND #$20 ; Bit 5 holds the sprite overflow flag
 	BEQ FAIL_SprOverflow
+	INC <ErrorCode
+	; Tests 5 through 9 are out of line in the free space at the end of bank 0.
+	JSR TEST_SprOverflow_BugCases
 	
 	;; END OF TEST ;;
 	JSR ClearOverscanNametable
@@ -10403,6 +10635,10 @@ TEST_APULengthCounter_DelayQuarterSecondLoop:	; Let's wait for 15 frames. About 
 	STA $4017 ; It actually will work this time.
 	LDA $4015
 	BNE FAIL_APULengthCounter1 ; The pulse 1 channel should no longer be playing.
+	INC <ErrorCode
+	JSR TEST_APU_OtherChannels
+	CMP #1
+	BNE FAIL_APULengthCounter1
 
 	;; END OF TEST ;;
 	LDA #1
@@ -14212,7 +14448,7 @@ TEST_APURegActivation_Finale:
 	LDA $4016
 	LDA $4016	; it is assumed the B button is not pressed during the test.
 	LSR A
-	BCS TEST_APURegActivation_ConflictClocked	
+	BCS APURegActConflictJmp
 	; And the controller ports were NOT clocked here!
 	LDA <RunningAllTests
 	BNE TEST_APURegActivation_Res1
@@ -14223,36 +14459,59 @@ TEST_APURegActivation_Finale:
 TEST_APURegActivation_Res1:
 	LDA #5 ; Success Code 1
 	RTS
+
+APURegActConflictJmp:
+	JMP TEST_APURegActivation_ConflictClocked
 	
+	; (OAM DMA conflict result path moved to bank 2 at $DFF8.)
+	; PressStartToContinue lives in bank 3 at $FFA0. It used to sit here in
+	; bank 2, but the nametable mirroring test below grows past $DFCE and was
+	; overwriting the results screen's Start handler.
+	; Horizontal mirroring aliases $2000/$2400 and $2800/$2C00, while the two
+	; pairs stay independent. This is the NROM board wiring, not a CPU mirror.
+	.org $DFA6
+	TEST_NametableMirroring:
+		JSR DisableRendering
+		JSR SetPPUADDRFromWord
+		.byte $20, $00
+		LDA #$5A
+		STA $2007
+		JSR SetPPUADDRFromWord
+		.byte $28, $00
+		LDA #$A5
+		STA $2007
+		JSR SetPPUADDRFromWord
+		.byte $24, $00
+		LDA $2007
+		LDA $2007
+		CMP #$5A
+		BNE TEST_NametableMirroring_Fail
+		JSR SetPPUADDRFromWord
+		.byte $2C, $00
+		LDA $2007
+		LDA $2007
+		CMP #$A5
+		BNE TEST_NametableMirroring_Fail
+		JSR SetPPUADDRFromWord
+		.byte $20, $00
+		LDA #$24
+		STA $2007
+		JSR SetPPUADDRFromWord
+		.byte $28, $00
+		LDA #$24
+		STA $2007
+		JSR ResetScroll
+		LDA #1
+		RTS
+	TEST_NametableMirroring_Fail:
+		LDA #0
+		JMP ResetScroll
+
+	.org $DFF8
 TEST_APURegActivation_ConflictClocked:
-	; Bingo! Look at that. The controller ports *were* clocked, but did not appear in OAM!
-	LDA <RunningAllTests
-	BNE TEST_APURegActivation_Res2
-	JSR PrintTextCentered
-	.word $2350
-	.byte "OAM DMA Bus Conflict Clocks", $FF
-	JSR ResetScroll
-TEST_APURegActivation_Res2:
 	LDA #9 ; Success Code 2
 	RTS
-;;;;;;;
-	
-PressStartToContinue:
-	JSR ReadController1
-	LDA <controller_New
-	AND #$10
-	BEQ PressStartToContinue_End
-	JSR SetUpDefaultPalette
-	JSR DisableNMI
-	JSR DisableRendering
-	JSR ClearNametable
-	LDX #$EF ; Due to some tests modifying the stack pointer, it's convenient to put it at EF instead of FF.
-	TXS		 ; This prevents some tests where the resulting stack pointer is 00 from pushing data, and overwriting the bottom of the stack.
-	JMP ReloadMainMenu
-PressStartToContinue_End:
-	RTI
-;;;;;;;
-	
+
 	.bank 3
 	.org $E000
 
@@ -19335,6 +19594,23 @@ TEST_DoesTheDMA_Fail:
 	JMP DMASync
 ;;;;;;;;;;;;;;;	
 
+	.org $FFA0
+PressStartToContinue:
+	JSR ReadController1
+	LDA <controller_New
+	AND #$10
+	BEQ PressStartToContinue_End
+	JSR SetUpDefaultPalette
+	JSR DisableNMI
+	JSR DisableRendering
+	JSR ClearNametable
+	LDX #$EF ; Due to some tests modifying the stack pointer, it's convenient to put it at EF instead of FF.
+	TXS		 ; This prevents some tests where the resulting stack pointer is 00 from pushing data, and overwriting the bottom of the stack.
+	JMP ReloadMainMenu
+PressStartToContinue_End:
+	RTI
+;;;;;;;
+	
 	.org $FFC0
 	; 33 00s. This will be the DPCM "audio sample" played during the DMC DMA Sync loop. It should just be silence.
 	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
