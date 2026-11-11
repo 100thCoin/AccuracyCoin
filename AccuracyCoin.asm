@@ -1214,6 +1214,12 @@ AXYFS_IgnoreStackPointer:
 AXYFS_IgnoreStackPointer_Done:
 	RTS
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                 TESTS                   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; I initially started writing tests at address $A000, but as I filled up more and more of the ROM, I needed to start using this space for tests too.
+; This is a fairly odd test to appear earliest in the ROM. It's a specific possible path that can be taken during the "SHS" opcode test.
+
 TEST_SHS_Behavior4_9B:
 	LDA #$9B
 	PHA	
@@ -3428,8 +3434,8 @@ TEST_DMCPlaybackRate:               ;
 	LDA #$60                        ;
 	STA <$65                        ;
 	                                ;
-	;;; Test 2 through H [DMC Playback Rate]: Does the DMC take the correct number of APU cycles between DMA's when the sample rate is set to the value of the X register? ;;;
-	                                ;
+	;;; Test 2 through H [DMC Playback Rate]: Does the DMC take the correct number of APU cycles between DMA's with every sample rate? ;;;
+	                                ; We're just going to store (the X register | $40) to $4010, so we start with sample rate $00 and work up to rate $0F.
 TEST_DMCPlaybackRate_Loop:          ;
 	LDA DMCPR_DelayLO, X            ;
 	STA <$63                        ; The low byte of the clockslide
@@ -3537,10 +3543,6 @@ TEST_RMW2007_ClearNametable2Loop:
 
 	.bank 1
 	.org $A000	; This next line of code is located at address $A000 in the ROM.
-	
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;                 TESTS                   ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	
 DebugTest:  ; This test is no longer in use. It was a placeholder back when I had a list of tests I wanted to add, but had yet to write code for them.
 	LDA #02 ; FAIL! (Error code 0 will let me know the test isn't implemented yet, hence it ran DebugTest.)
@@ -5701,10 +5703,10 @@ TEST_SHA_Behavior1:
 	.byte $0D
 	.byte $0D, $FF, $80, (flag_i | flag_c | flag_z | flag_v)
 	; Hi = ($1E+1) & A & X;
-	; 	 = $05
+	; 	 = $0D (A mirror of $05xx)
 	; $510 = A & X & H
-	;	   = $0D & $15 & $1F
-	;	   = 5
+	;	   = $0D & $FF & $1F
+	;	   = 0D
 	INC <$55 ; make this non-zero for the test.	
 	JSR TEST_RunTest_AddrInitAXYF
 	.word $0555 ; $0402 will be the operand.
@@ -5716,8 +5718,8 @@ TEST_SHA_Behavior1:
 	; Hi = ($1E+1) & A & X;
 	; 	 = $00
 	; $510 = A & X & H
-	;	   = $0D & $15 & $1F
-	;	   = 5
+	;	   = $F0 & $FF & $05
+	;	   = 00
 	
 	; And now to test if the value written is still ANDed with H if the cycle before the write had a DMA.
 	PHA
