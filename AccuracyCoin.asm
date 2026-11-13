@@ -3169,6 +3169,7 @@ TEST_DMALandingOnWrite:
                                      ; Don't bother updating the error code, since I need to use an STX to fix it after this anyway.
 	
 	;;; Test 3 [DMA Landing on Write]: The PPU memory-mapped IO registers have working mirrors ;;;
+	JSR WaitForVBlank
 	JSR TEST_PPURegMirroring         ;
 	LDX #3                           ; The DMA Plus Open Bus test increments the error code, so let's fix it real quick.
 	STX <ErrorCode                   ;
