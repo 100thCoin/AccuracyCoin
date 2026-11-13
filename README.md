@@ -480,13 +480,14 @@ For more information, I recommend reading the fully commented assembly code for 
 ### DMA Landing on Write
   1: Open bus should not always read 00.  
   2: The DMC DMA should update the data bus, or your DMC DMA timing is incorrect.  
-  3: The DMC DMA cannot occur on a CPU Write cycle, and should instead be delayed until the next CPU Read cycle.  
-  4: If the DMC DMA begins on an APU Get cycle, the DMC DMA is 1 cycle shorter than usual.  
-  5: If the DMC DMA would land on two consecutive write cycles, it gets delayed by 2 cycles and then lasts the usual 4 CPU cycles.  
-  6: If the write to $4015 occurs on an APU Get cycle, the Load DMA should occur after 4 CPU cycles.  
-  7: If the write to $4015 occurs on an APU Put cycle, the Load DMA should occur after 3 CPU cycles.  
-  8: Load DMAs also should not be able to halt the CPU on write cycles.  
-  9: Load DMAs that get delayed by 1 cycle should halt the CPU for 4 cycles.  
+  3: PPU IO Registers should have mirrors from $2008 through $3FFF.  
+  4: The DMC DMA cannot occur on a CPU Write cycle, and should instead be delayed until the next CPU Read cycle.  
+  5: If the DMC DMA begins on an APU Get cycle, the DMC DMA is 1 cycle shorter than usual.  
+  6: If the DMC DMA would land on two consecutive write cycles, it gets delayed by 2 cycles and then lasts the usual 4 CPU cycles.  
+  7: If the write to $4015 occurs on an APU Get cycle, the Load DMA should occur after 4 CPU cycles.  
+  8: If the write to $4015 occurs on an APU Put cycle, the Load DMA should occur after 3 CPU cycles.  
+  9: Load DMAs also should not be able to halt the CPU on write cycles.  
+  A: Load DMAs that get delayed by 1 cycle should halt the CPU for 4 cycles.  
 
 ### DMC Reload Timing
   1: Writing to $4010 as the DMC timer resets should cause the timer to reload using the new value.  

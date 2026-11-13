@@ -3158,7 +3158,7 @@ TEST_DMALandingOnWrite:
 	;;; Test 1 [DMA Landing on Write]: Open bus should not always read 00 ;;;
 	LDA $4000                        ;
 	BEQ FAIL_DMALandingOnWrite1      ;
-	INC <ErrorCode                   ;
+                                     ; Don't bother updating the error code, since I need to use an STX to fix it after this anyway.
 
 	;;; Test 2 [DMA Landing on Write]: The DMC DMA can update the data bus when reading from open bus ;;;
 	JSR TEST_DMA_Plus_OpenBus        ;
@@ -3166,9 +3166,17 @@ TEST_DMALandingOnWrite:
 	STX <ErrorCode                   ;
 	CMP #1                           ;
 	BNE FAIL_DMALandingOnWrite1      ;
+                                     ; Don't bother updating the error code, since I need to use an STX to fix it after this anyway.
+	
+	;;; Test 3 [DMA Landing on Write]: The PPU memory-mapped IO registers have working mirrors ;;;
+	JSR TEST_PPURegMirroring         ;
+	LDX #3                           ; The DMA Plus Open Bus test increments the error code, so let's fix it real quick.
+	STX <ErrorCode                   ;
+	CMP #1                           ;
+	BNE FAIL_DMALandingOnWrite1      ;
 	INC <ErrorCode                   ;
 
-	;;; Test 3 [DMA Landing on Write]: The DMC DMA cannot happen on a write cycle ;;;
+	;;; Test 4 [DMA Landing on Write]: The DMC DMA cannot happen on a write cycle ;;;
 	; This test will verify two things:
 	; 1. The DMC DMA cannot occur on a write cycle.
 	; 2. If the DMC DMA is delayed due to a write cycle, then the get/put alignment is different, skipping a cycle of the DMA.
@@ -3189,14 +3197,14 @@ TEST_DMALandingOnWrite:
 	BEQ FAIL_DMALandingOnWrite1      ; Fail the test if the flag is cleared
 	INC <ErrorCode                   ;
 	
-	;;; Test 4 [DMA Landing on Write]: The DMC DMA is shorter if starting on a Get cycle ;;;
+	;;; Test 5 [DMA Landing on Write]: The DMC DMA is shorter if starting on a Get cycle ;;;
 	JSR ClockslideFromWord           ;
 	.word 412                        ;
 	LDA $4000                        ;
 	BNE FAIL_DMALandingOnWrite1      ;
 	INC <ErrorCode                   ;
 	
-	;;; Test 5 [DMA Landing on Write]: If the DMC DMA would land on two consecutive write cycles, it gets delayed by 2 cycles and then takes 4 whole cycles ;;;
+	;;; Test 6 [DMA Landing on Write]: If the DMC DMA would land on two consecutive write cycles, it gets delayed by 2 cycles and then takes 4 whole cycles ;;;
 	JSR DMASync_50CyclesRemaining    ;
 	LDA #$4F                         ; Loop this sample
 	STA $4010                        ;
@@ -3209,7 +3217,7 @@ TEST_DMALandingOnWrite:
 	BNE FAIL_DMALandingOnWrite1      ;
 	INC <ErrorCode                   ;
 	
-	;;; Test 6 [DMA Landing on Write]: Load DMAs can have a 4 cycle delay ;;;
+	;;; Test 7 [DMA Landing on Write]: Load DMAs can have a 4 cycle delay ;;;
 	; NOTE: Some CPU's have been seen to take an extra APU cycle for the Load DMA to occur.
 	; If you fail this error code, we'll try again with the additional APU cycle.
 	LDA #$0                          ;
@@ -3223,7 +3231,7 @@ TEST_DMALandingOnWrite:
 	BNE FAIL_DMALandingOnWrite4Delay ;
 	INC <ErrorCode                   ;
 
-	;;; Test 7 [DMA Landing on Write]: Load DMAs can have a 3 cycle delay ;;;
+	;;; Test 8 [DMA Landing on Write]: Load DMAs can have a 3 cycle delay ;;;
 	LDA #0                           ;
 	STA $4015                        ; disable DMC
 	; The idea:
@@ -3288,7 +3296,7 @@ TEST_DMALandingOnWrite_BRK:
 	BNE FAIL_DMALandingOnWrite       ;
 	INC <ErrorCode                   ;
 	
-	;;; Test 8 [DMA Landing on Write]: Load DMAs also cannot land on write cycles ;;;
+	;;; Test 9 [DMA Landing on Write]: Load DMAs also cannot land on write cycles ;;;
 	LDA #0                           ;
 	STA $4015                        ; disable DMC
 	JSR WaitForFrameCounterIRQFlag   ;
@@ -3302,7 +3310,7 @@ TEST_DMALandingOnWrite_BRK:
 	BEQ FAIL_DMALandingOnWrite       ;
 	INC <ErrorCode                   ;
 
-	;;; Test 9 [DMA Landing on Write]: Load DMAs that get delayed by 1 cycle take 4 cycles ;;;
+	;;; Test A [DMA Landing on Write]: Load DMAs that get delayed by 1 cycle take 4 cycles ;;;
 	JSR DMASync_50CyclesRemaining    ;
 	JSR Clockslide_50                ;
 	; 4 cycle DMA
@@ -3336,7 +3344,7 @@ FAIL_DMALandingOnWrite:              ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 TEST_DMALandingOnWrite6Delay:
-	;;; Test 6 [DMA Landing on Write]: Load DMAs can have a 6 cycle delay. (alternate behavior) ;;;
+	;;; Test 7 [DMA Landing on Write]: Load DMAs can have a 6 cycle delay. (alternate behavior) ;;;
 	; NOTE: Some CPU's have been seen to take an extra APU cycle for the Load DMA to occur. We're testing for one of these consoles now.
 	LDA #$0                          ;
 	STA $4015                        ;
@@ -3352,7 +3360,7 @@ TEST_DMALandingOnWrite6Delay:
 
 	JSR Print_3APUCycleText
 
-	;;; Test 7 [DMA Landing on Write]: Load DMAs can have a 5 cycle delay (alternate behavior) ;;;
+	;;; Test 8 [DMA Landing on Write]: Load DMAs can have a 5 cycle delay (alternate behavior) ;;;
 	LDA #0                           ;
 	STA $4015                        ; disable DMC
 	JSR Clockslide_1000              ;
@@ -3366,7 +3374,7 @@ FAIL_DMALandingOnWrite_BNE:          ; (I make a BNE FAIL land here so I can re-
 	BNE FAIL_DMALandingOnWrite       ; 
 	INC <ErrorCode                   ;
 	
-	;;; Test 8 [DMA Landing on Write]: Load DMAs also cannot land on write cycles ;;;
+	;;; Test 9 [DMA Landing on Write]: Load DMAs also cannot land on write cycles ;;;
 	LDA #0                           ;
 	STA $4015                        ; disable DMC
 	JSR WaitForFrameCounterIRQFlag   ;
@@ -3381,7 +3389,7 @@ FAIL_DMALandingOnWrite_BNE:          ; (I make a BNE FAIL land here so I can re-
 	BEQ FAIL_DMALandingOnWrite       ;
 	INC <ErrorCode                   ;
 
-	;;; Test 9 [DMA Landing on Write]: Load DMAs that get delayed by 1 cycle take 4 cycles ;;;
+	;;; Test A [DMA Landing on Write]: Load DMAs that get delayed by 1 cycle take 4 cycles ;;;
 	JSR DMASync_50CyclesRemaining    ;
 	JSR Clockslide_50                ;
 	; 4 cycle DMA
