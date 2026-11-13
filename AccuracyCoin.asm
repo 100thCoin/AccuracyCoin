@@ -418,7 +418,7 @@ PostResetFlagTest:
 	JSR VerifyJSRBehavior
 	JSR ClearNametable
 	LDA #$5A
-	STA PowerOn_MagicNumber ; At this point, let's write out magic number to RAM, indicating that any reset after this point is a warm boot.
+	STA PowerOn_MagicNumber ; At this point, let's write our magic number to RAM, indicating that any reset after this point is a warm boot.
 							; So now if the reset button is pressed, we skip writing to the results of TEST_PowerOnState_CPU_Registers, and skip running the PPU reset flag test.
 							; I guess that means you could hit the reset button at any point before this to ruin the results of those tests.
 							; I'm not sure why you would do that though...

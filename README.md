@@ -394,7 +394,7 @@ For more information, I recommend reading the fully commented assembly code for 
 
 ### Instruction Timing
   1: The DMA should update the data bus.  
-  1: The DMC DMA timing in your emulator is off with sample rate %1110.  
+  2: The DMC DMA timing in your emulator is off with sample rate %1110.  
   3: JSR should take 6 CPU cycles.  
   4: RTS should take 6 CPU cycles.  
   5: BRK should take 7 CPU cycles.  
@@ -475,7 +475,7 @@ For more information, I recommend reading the fully commented assembly code for 
 ### Internal Data Bus
   1: Reading from open bus should work correctly when crossing a page boundary. DMC DMA Timing should be correct.  
   2: The DMC DMA Bus Conflict with $4015 cannot affect the internal data bus.  
-  2: Reads from $4015 only update the internal data bus and cannot affect the external data bus.  
+  3: Reads from $4015 only update the internal data bus and cannot affect the external data bus.  
 
 ### DMA Landing on Write
   1: Open bus should not always read 00.  
